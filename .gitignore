@@ -218,3 +218,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local uv caches (keep uv.lock and .python-version in version control)
+.uv-cache/
+.uv/
+
+# IDE settings
+.idea/
+.vscode/
+*.code-workspace
+
+# Local environment files (allow a future secrets-free example)
+.env.*
+!.env.example
