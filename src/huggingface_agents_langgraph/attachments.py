@@ -2,10 +2,13 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import TypedDict
 
 from datasets import load_dataset
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError
+
+from huggingface_agents_langgraph.state import AgentState
 
 DATASET_REPO_ID = "gaia-benchmark/GAIA"
 DATASET_CONFIG = "2023_level1"
@@ -18,6 +21,12 @@ class TaskNotFoundError(LookupError):
 
 class AttachmentNotFoundError(FileNotFoundError):
     """Raised when GAIA metadata references an unavailable attachment."""
+
+
+class AttachmentResolverUpdate(TypedDict):
+    """State fields produced by the attachment resolver node."""
+
+    file_path: Path | None
 
 
 @lru_cache(maxsize=1)
@@ -58,3 +67,16 @@ def get_attachment_path(task_id: str) -> Path | None:
         ) from error
 
     return Path(local_path)
+
+
+def attachment_resolver(state: AgentState) -> AttachmentResolverUpdate:
+    """Resolve the local attachment path for a task, when one is expected."""
+    if not state["file_name"].strip():
+        return {"file_path": None}
+
+    try:
+        file_path = get_attachment_path(state["task_id"])
+    except AttachmentNotFoundError:
+        file_path = None
+
+    return {"file_path": file_path}

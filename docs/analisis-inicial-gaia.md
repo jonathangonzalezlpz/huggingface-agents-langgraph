@@ -347,3 +347,99 @@ route router
 evidence evidence_acquisition-->reasoning
 answer_candidate reasoning --> answer_production
 submitted_answer answer_production-->POST
+
+# Arquitectura ejecutable mínima
+
+Decidir de lo que tenemos hasta ahora que se traduce en un nodo real del grafo y que se traslada a una simple función previa.
+
+Hasta ahora el flujo ya apunta a algo así:
+```
+START
+  ↓
+preprocessing
+  ↓
+¿hay fichero?
+  ├── sí → attachment_resolver
+  └── no
+          ↓
+        router
+          ↓
+   conditional edges
+    ├── code
+    ├── spreadsheet
+    ├── document
+    ├── web
+    └── direct
+          ↓
+    evidence_acquisition
+          ↓
+       reasoning
+          ↓
+    answer_production
+          ↓
+         END
+```
+
+pero por ejemplo preprocessing se encargará de funciones simples, existe porque es una etapa habitual en el tratamiento de datos entrada, en este caso la mantendremos pero puede que no fuese del todo necesaria. Esta etapa trabajará únicamente con task_id, question y file_name; datos que ya vienen de una base de datos tratada, por lo que preprocessing podría no ser necesario, aún así podemos vincularlo a tareas tipo: limpieza espacios en question, normalizar file_name, derivar la extensión, detectar si hay el adjunto esperado, validar que esos campos mínimos existan. Hacer por ejemplo lo de derivar la extensión implica añadir ese campo derivable al State por lo que hay que tener cuidado, ya que por definición campos facilmente derivables no deberían formar parte del estado.
+
+Por otro lado, el check de fichero puede ser parte del propio router, no creo que tenga suficiente caracter para ser un nodo ya que tan solo comprobará si existe el campo filename. Puede justificarse cierto calado únicamente debido al acceso al recurso para obtener el file_path a través del conector custom debido al error 404 del método GET.
+
+evidence_acquisition no es necesario reflejarlo directamente, la evidencia es la salida de cada rama empleada en el condicional previo.
+
+```
+START
+  ↓
+preprocessing (función simple, comprueba campos mínimos task_id y question y limpia espacios de question)
+  ↓
+¿file_name != ""?--¿hay fichero?
+  ├── sí → attachment_resolver (attachment_resolver es quién se encarga de obtener el file_path)
+  └── no
+          ↓
+        router
+          ↓
+   conditional edges
+    ├── code
+    ├── spreadsheet
+    ├── document
+    ├── web
+    └── direct
+          ↓
+       evidence
+          ↓
+       reasoning
+          ↓
+    answer_production
+          ↓
+    submitted_answer
+          ↓
+         END
+```
+
+
+| Nodo | Lee | Escribe | Determinista / LLM | Tool externa |
+|---|---|---|---|---|
+| preprocessing | `task_id`, `question`, `file_name` | `question`, `file_name` | Determinista | No. Código Python para validación, normalización y limpieza |
+| attachment_resolver | `task_id`, `file_name` | `file_path` | Determinista | Sí/No según implementación. Acceso al endpoint oficial o al dataset GAIA |
+| router | `question`, `file_name`, `file_path` | `route` | Híbrido: determinista para señales claras; LLM para decisiones semánticas | No necesariamente |
+| code_processing | `question`, `file_path` | `evidence` | Híbrido | Lectura/análisis/ejecución controlada de código |
+| spreadsheet_processing | `question`, `file_path` | `evidence` | Híbrido | Lector y procesamiento tabular |
+| document_processing | `question`, `file_path` | `evidence` | Híbrido | Extractor de texto/documentos; OCR como fallback si fuese necesario |
+| web_research | `question` | `evidence` | LLM / agentic | Web search + lectura de páginas; Wikipedia cuando corresponda |
+| direct | `question` | `evidence` | LLM / determinista según tarea | Opcional: calculadora o ejecución de Python para cálculos |
+| reasoning | `question`, `evidence` | `answer_candidate` | LLM | Normalmente no |
+| answer_production | `question`, `answer_candidate` | `submitted_answer` | Híbrido: LLM para interpretar restricciones + normalización determinista cuando sea posible | Normalmente no |
+
+Recordemos que evidence será una lista de objetos:
+
+```
+evidence = [
+  {
+    content: ...,
+    source_type: ...,
+    source: ...
+  },
+  ...
+]
+```
+
+Creo que de momento con esos 3 subcampos es suficiente para generar un sistema robusto a las preguntas analizadas. Además ha de ser una lista porque una pregunta creo que puede llegar a requerir evidencias multifuente.
