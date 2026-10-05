@@ -1,5 +1,6 @@
 """Deterministic routing based on task attachment extensions."""
 
+import re
 from pathlib import Path
 from typing import TypedDict
 
@@ -10,7 +11,27 @@ EXTENSION_ROUTES: dict[str, Route] = {
     ".py": "code",
     ".xlsx": "spreadsheet",
     ".pdf": "document",
+    ".mp3": "multimedia",
+    ".wav": "multimedia",
+    ".m4a": "multimedia",
+    ".flac": "multimedia",
+    ".ogg": "multimedia",
+    ".aac": "multimedia",
+    ".mp4": "multimedia",
+    ".mov": "multimedia",
+    ".mkv": "multimedia",
+    ".webm": "multimedia",
+    ".avi": "multimedia",
+    ".png": "multimedia",
+    ".jpg": "multimedia",
+    ".jpeg": "multimedia",
+    ".webp": "multimedia",
+    ".bmp": "multimedia",
 }
+VIDEO_URL_PATTERN = re.compile(
+    r"https?://(?:www\.)?(?:youtube\.com/watch\?v=[\w-]+|youtu\.be/[\w-]+)",
+    re.IGNORECASE,
+)
 
 
 class RouterUpdate(TypedDict):
@@ -25,6 +46,9 @@ def router(state: AgentState) -> RouterUpdate:
     if file_name:
         extension = Path(file_name).suffix.lower()
         return {"route": EXTENSION_ROUTES.get(extension, "unimplemented")}
+
+    if VIDEO_URL_PATTERN.search(state["question"]):
+        return {"route": "multimedia"}
 
     return {"route": _classify_question(state["question"])}
 

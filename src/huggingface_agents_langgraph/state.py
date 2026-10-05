@@ -7,6 +7,7 @@ Route = Literal[
     "code",
     "spreadsheet",
     "document",
+    "multimedia",
     "web",
     "wikipedia",
     "direct",

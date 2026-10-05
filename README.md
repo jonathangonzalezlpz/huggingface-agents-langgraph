@@ -134,3 +134,11 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
+
+### Rama multimedia
+
+La rama `multimedia_processing` reconoce adjuntos de audio, imagen y video, y enlaces directos de YouTube. Instala sus dependencias opcionales con `uv sync --extra multimedia`. La primera ejecucion descarga los modelos locales: Whisper `small` para transcripcion, AST AudioSet para etiquetas acusticas y SmolVLM `256M` para imagenes. La inferencia usa CPU e int8 para Whisper; las imagenes de video se muestrean a intervalos de al menos cinco segundos con un maximo de ocho frames. El reconocimiento acustico se ejecuta solo si la pregunta menciona sonidos, musica u otros eventos.
+
+Se pueden cambiar `MEDIA_ASR_MODEL`, `MEDIA_AUDIO_CLASSIFIER_MODEL` y `MEDIA_VLM_MODEL` en `.env`. Descargar videos de YouTube requiere acceso de red y puede depender de la disponibilidad del sitio y del contenido. El muestreo limitado puede no capturar eventos visuales breves.
+
+`MEDIA_MODELS_IDLE_SECONDS` controla cuanto tiempo permanecen cargados Whisper, AST y el VLM despues de terminar su uso; por defecto son cinco minutos. Al vencer el periodo se liberan de memoria y se vuelven a cargar cuando se necesitan otra vez.

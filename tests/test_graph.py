@@ -10,6 +10,7 @@ from huggingface_agents_langgraph.graph import _route_after_router, build_state_
         ("direct", "direct"),
         ("web", "web"),
         ("wikipedia", "web"),
+        ("multimedia", "multimedia"),
         ("unimplemented", "finish"),
     ],
 )

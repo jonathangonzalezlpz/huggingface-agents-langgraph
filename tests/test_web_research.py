@@ -29,7 +29,7 @@ def test_web_research_searches_extracts_and_selects_page_text(
     monkeypatch.setattr(web_research, "DDGS", FakeDDGS)
     state = {
         "task_id": "task-1",
-        "question": "What city does the article mention?",
+        "question": "What city does this web page mention?",
         "file_name": "",
         "route": "web",
     }

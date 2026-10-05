@@ -514,3 +514,34 @@ Conector de videos de youtube? Existe algo similar o es el propio el llm el que 
 Una imagen como fuente de entrada, necesitamos un componente que permita analizar imágenes, un VLM?
 
 Y creo que con esto el abanico quedaría bastante completo, y siempre hay la opción de que ante algo desconocido el razonador sea quien decida (el beneficio de contar siempre con cierta libertad) Capacidades extra que ya apreciamos en las preguntas: podría ser el tema del ajedrez, no dejarlo al llm y acotar un poco el campo, el llm me da posiciones el motor (mucho más certero o centrado en tarea) me da la respuesta/jugada.
+
+## Rama de procesamiento multimedia
+
+Para las preguntas cuyo material de entrada sea audio, imagen o vídeo, se añadirá una rama multimedia única al router y un nodo de entrada común, `multimedia_processing`. El nodo actuará como punto de coordinación y entregará evidencias al flujo compartido de razonamiento. El procesamiento concreto se mantendrá modular por modalidad, porque cada tipo de recurso necesita operaciones, modelos y límites diferentes; no se concentrará toda la lógica en una función monolítica.
+
+```text
+router (modalidad detectada por el adjunto)
+  └── multimedia
+        └── multimedia_processing
+              ├── audio: transcripción y análisis acústico bajo demanda
+              ├── imagen: análisis visual mediante VLM
+              └── vídeo: transcripción y muestreo limitado de fotogramas
+                    ↓
+              selección común de evidencias
+                    ↓
+                 reasoning
+```
+
+La extensión del adjunto permite reconocer la modalidad, pero la pregunta debe guiar qué análisis se necesita. En audio se transcribirá el habla cuando la respuesta dependa de lo dicho; el reconocimiento de sonidos, música u otros eventos se activará cuando la pregunta requiera información acústica que la transcripción no conserva. Así, una voz memo con una receta puede resolverse a partir de su transcripción, mientras que una pregunta sobre una canción o un sonido requiere análisis de audio.
+
+Para imágenes se contempla un VLM local de tamaño moderado, suficiente como punto de partida para describir la imagen y extraer la información visual que pida la pregunta. No se presupone que un VLM resuelva por sí solo tareas especializadas: por ejemplo, una posición de ajedrez podría requerir convertir la imagen a una representación de tablero y consultar un motor de ajedrez si las preguntas evaluadas justifican esa capacidad.
+
+En vídeo se priorizará la transcripción del audio y una selección pequeña de fotogramas distribuidos en el tiempo, en lugar de analizar cada frame. Si la pregunta depende de un evento visual breve o de contar elementos simultáneos, se podrá ampliar el muestreo en los intervalos pertinentes. La estrategia debe aportar señales visuales útiles manteniendo acotados el cómputo y los recursos de inferencia.
+
+La separación propuesta es, por tanto, una sola rama y un nodo de entrada en el grafo, con procesadores internos específicos para audio, imagen y vídeo, además de una salida común de evidencias con procedencia. Solo será necesario convertir los procesadores en nodos LangGraph independientes si aparecen requisitos concretos de reintentos, límites de recursos, ejecución condicional o evaluación aislada por modalidad.
+
+### Implementacion inicial
+
+La rama `multimedia_processing` ya esta conectada al grafo. Utiliza Whisper `small` para transcripcion, AST AudioSet para reconocer eventos acusticos cuando la pregunta lo necesita y SmolVLM `256M` para examinar imagenes y fotogramas. Instala sus dependencias con `uv sync --extra multimedia`. `MEDIA_VLM_IDLE_SECONDS` determina cuanto tiempo queda cargado el modelo visual tras su ultima inferencia (300 segundos por defecto); despues se libera de memoria y se vuelve a cargar al procesar otra imagen o video que requiera analisis visual.
+
+La misma politica de inactividad se aplica a Whisper y AST: cada modelo se carga solo al requerir transcripcion o clasificacion, y se libera tras el periodo configurado sin uso.

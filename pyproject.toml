@@ -17,6 +17,25 @@ dependencies = [
     "pypdf>=5,<7",
 ]
 
+[project.optional-dependencies]
+multimedia = [
+    "av>=14,<16",
+    "faster-whisper>=1.1,<2",
+    "librosa>=0.10,<1",
+    "pillow>=11,<13",
+    "torch>=2.6,<3",
+    "transformers>=4.51,<5",
+    "yt-dlp>=2025.3.31",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [dependency-groups]
 dev = [
     "pytest>=8.3,<10",
