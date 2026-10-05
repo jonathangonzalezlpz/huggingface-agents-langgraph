@@ -5,11 +5,15 @@ import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from urllib.request import urlopen
 
 from huggingface_agents_langgraph.attachments import get_attachment_path
+from huggingface_agents_langgraph.config import LLM_BASE_URL
 from huggingface_agents_langgraph.graph import build_state_graph
+from huggingface_agents_langgraph.multimedia_processing import (
+    get_multimedia_model_status,
+)
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
 FRONTEND_DIRECTORY = Path(__file__).parent / "frontend"
@@ -30,6 +34,14 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self._serve_asset("styles.css")
         elif request_path in {"/api/questions", "/api/random-question"}:
             self._get_questions(request_path)
+        elif request_path == "/api/status":
+            self._send_json(
+                200,
+                {
+                    "llm": _get_llm_status(),
+                    "multimedia_models": get_multimedia_model_status(),
+                },
+            )
         elif request_path.startswith("/api/files/"):
             self._get_attachment(unquote(request_path.removeprefix("/api/files/")))
         else:
@@ -162,6 +174,36 @@ def main() -> None:
         pass
     finally:
         server.server_close()
+
+
+def _get_llm_status() -> dict[str, str]:
+    """Probe llama.cpp without sending a request that could wake the model."""
+    parsed_url = urlsplit(LLM_BASE_URL)
+    api_path = parsed_url.path.rstrip("/")
+    root_path = api_path.removesuffix("/v1")
+    server_url = urlunsplit(
+        (parsed_url.scheme, parsed_url.netloc, root_path, "", "")
+    ).rstrip("/")
+
+    try:
+        with urlopen(f"{server_url}/health", timeout=2) as response:
+            health_status = response.status
+    except HTTPError as error:
+        if error.code == 503:
+            return {"state": "loading", "name": "LLM razonador"}
+        return {"state": "unavailable", "name": "LLM razonador"}
+    except (URLError, TimeoutError, OSError):
+        return {"state": "unavailable", "name": "LLM razonador"}
+
+    try:
+        with urlopen(f"{server_url}/props", timeout=2) as response:
+            properties = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, OSError, json.JSONDecodeError):
+        state = "ready" if health_status == 200 else "loading"
+        return {"state": state, "name": "LLM razonador"}
+
+    state = "sleeping" if properties.get("is_sleeping") else "ready"
+    return {"state": state, "name": "LLM razonador"}
 
 
 if __name__ == "__main__":

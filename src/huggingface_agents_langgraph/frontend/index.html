@@ -29,6 +29,22 @@
         </p>
       </section>
 
+      <section class="model-panel" aria-labelledby="model-panel-title">
+        <div class="model-panel-heading">
+          <div>
+            <div class="control-label">SISTEMA LOCAL</div>
+            <h2 id="model-panel-title">Estado de modelos</h2>
+            <p>Estado de carga y memoria, actualizado automáticamente.</p>
+          </div>
+          <button id="refresh-models-button" class="button button-secondary" type="button">
+            Actualizar
+          </button>
+        </div>
+        <div id="model-status-list" class="model-status-list" aria-live="polite">
+          <div class="model-status-loading">Consultando modelos locales…</div>
+        </div>
+      </section>
+
       <section class="control-panel" aria-label="Controles de preguntas">
         <div class="control-copy">
           <div class="control-label">ELIGE UNA SESIÓN</div>

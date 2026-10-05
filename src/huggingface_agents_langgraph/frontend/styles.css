@@ -112,6 +112,29 @@ h1 span {
 
 .hero-copy { max-width: 610px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.8; }
 
+.model-panel {
+  margin-bottom: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(21, 33, 52, 0.62);
+}
+
+.model-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.model-panel-heading h2 { margin: 7px 0 4px; font-size: 17px; }
+.model-panel-heading p, .model-status-loading { margin: 0; color: var(--quiet); font-size: 11px; }
+.model-status-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 17px; }
+.model-status-card { min-width: 0; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: rgba(4, 11, 20, .28); }
+.model-status-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.model-status-name { overflow: hidden; color: #dce5f4; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.model-status-badge { flex: 0 0 auto; padding: 4px 7px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); font-size: 9px; }
+.model-status-badge.ready, .model-status-badge.loaded, .model-status-badge.in_use { color: var(--green); border-color: rgba(141, 232, 187, .23); background: rgba(141, 232, 187, .06); }
+.model-status-badge.sleeping, .model-status-badge.unloaded { color: #cfc8ff; border-color: rgba(169, 154, 255, .23); background: rgba(169, 154, 255, .06); }
+.model-status-badge.loading { color: #ffd08a; border-color: rgba(255, 208, 138, .23); }
+.model-status-badge.unavailable, .model-status-badge.error { color: #ffadad; border-color: rgba(255, 173, 173, .23); }
+.model-status-model, .model-status-detail { display: block; overflow: hidden; margin-top: 8px; color: var(--quiet); font-family: "DM Mono", Consolas, monospace; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.model-status-detail { margin-top: 5px; font-family: inherit; }
+
 .control-panel, .session-bar, .question-card {
   border: 1px solid var(--line);
   background: var(--panel);
@@ -209,6 +232,8 @@ h1 span {
   .hero { padding: 52px 0 34px; }
   .hero-copy { font-size: 13px; }
   .control-panel { align-items: flex-start; flex-direction: column; padding: 18px; }
+  .model-panel { padding: 16px; }
+  .model-status-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .control-actions { width: 100%; }
   .control-actions .button { flex: 1; padding: 0 9px; font-size: 11px; }
   .session-bar { align-items: stretch; flex-wrap: wrap; gap: 13px; }

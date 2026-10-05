@@ -7,6 +7,19 @@ const sessionTitle = document.querySelector("#session-title");
 const progressLabel = document.querySelector("#progress-label");
 const progressFill = document.querySelector("#progress-fill");
 const notice = document.querySelector("#notice");
+const modelStatusList = document.querySelector("#model-status-list");
+const refreshModelsButton = document.querySelector("#refresh-models-button");
+const MODEL_STATE_LABELS = {
+  ready: "En memoria",
+  loaded: "En memoria",
+  in_use: "En uso",
+  loading: "Cargando",
+  sleeping: "Dormido",
+  unloaded: "Descargado",
+  not_loaded: "Bajo demanda",
+  unavailable: "Sin conexión",
+  error: "Error",
+};
 
 function showNotice(message) {
   notice.textContent = message;
@@ -36,6 +49,60 @@ function setBusy(busy) {
 function setProgress(processed, total) {
   progressLabel.textContent = `${processed} / ${total} procesadas`;
   progressFill.style.width = total ? `${(processed / total) * 100}%` : "0%";
+}
+
+function renderModelStatus(model) {
+  const card = document.createElement("article");
+  card.className = "model-status-card";
+  const top = document.createElement("div");
+  top.className = "model-status-top";
+  const name = document.createElement("span");
+  name.className = "model-status-name";
+  name.textContent = model.name;
+  const badge = document.createElement("span");
+  badge.className = `model-status-badge ${model.state}`;
+  badge.textContent = MODEL_STATE_LABELS[model.state] || model.state;
+  top.append(name, badge);
+  card.append(top);
+
+  if (model.model) {
+    const modelName = document.createElement("span");
+    modelName.className = "model-status-model";
+    modelName.textContent = model.model;
+    modelName.title = model.model;
+    card.append(modelName);
+  }
+
+  const detail = document.createElement("span");
+  detail.className = "model-status-detail";
+  if (model.state === "unloaded") {
+    detail.textContent = `Inactivo ${model.idle_for_seconds}s · descarga tras ${model.idle_timeout_seconds}s`;
+  } else if (model.state === "not_loaded") {
+    detail.textContent = "Se carga al necesitarlo";
+  } else if (model.idle_timeout_seconds) {
+    detail.textContent = `Descarga tras ${model.idle_timeout_seconds}s sin uso`;
+  } else {
+    detail.textContent = model.state === "sleeping" ? "Descargado por inactividad" : "";
+  }
+  card.append(detail);
+  return card;
+}
+
+async function refreshModelStatus() {
+  try {
+    const status = await requestJson("/api/status", { cache: "no-store" });
+    modelStatusList.replaceChildren(
+      renderModelStatus(status.llm),
+      ...status.multimedia_models.map(renderModelStatus),
+    );
+  } catch {
+    modelStatusList.replaceChildren(
+      renderModelStatus({ name: "LLM razonador", state: "unavailable" }),
+      renderModelStatus({ name: "VLM", state: "error" }),
+      renderModelStatus({ name: "Whisper", state: "error" }),
+      renderModelStatus({ name: "AST audio", state: "error" }),
+    );
+  }
 }
 
 function renderQuestion(question, index, total) {
@@ -180,6 +247,7 @@ async function processQuestion(card) {
   } finally {
     card._runButton.disabled = false;
     updateBatchProgress();
+    void refreshModelStatus();
   }
 }
 
@@ -205,3 +273,6 @@ async function processAllQuestions() {
 randomButton.addEventListener("click", loadRandomQuestion);
 batchButton.addEventListener("click", loadQuestionBatch);
 runAllButton.addEventListener("click", processAllQuestions);
+refreshModelsButton.addEventListener("click", refreshModelStatus);
+void refreshModelStatus();
+window.setInterval(refreshModelStatus, 5000);

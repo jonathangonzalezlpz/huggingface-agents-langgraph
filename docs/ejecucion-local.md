@@ -60,3 +60,7 @@ El proyecto usa los endpoints documentados en el [Hands-On de Unit 4](https://hu
 - `GET /questions`: la batería de preguntas.
 
 Los adjuntos se obtienen del repositorio GAIA a través de `huggingface_hub`; no se incluyen en el repositorio del proyecto. Las búsquedas generales usan [DDGS](https://github.com/deedy5/ddgs); las preguntas que mencionan publicaciones también consultan [Europe PMC](https://europepmc.org/RestfulWebService), que puede devolver texto completo de artículos disponibles en acceso abierto. Wikipedia usa la [API de MediaWiki](https://www.mediawiki.org/wiki/API:Search). Estas fuentes requieren conexión a Internet. Europe PMC está especializado en ciencias de la vida y no cubre todos los papers; Wikipedia consulta el contenido actual y no recupera una revisión histórica concreta.
+
+## Estado de los modelos en el frontal
+
+El frontal consulta periodicamente `/api/status` y muestra el estado del LLM razonador y de los tres modelos multimedia: VLM, Whisper y AST. El sondeo usa los endpoints de solo lectura `/health` y `/props` de llama.cpp para distinguir el modelo listo del modelo dormido sin despertarlo. Para cada modelo multimedia se muestra si aun no se ha cargado, esta cargando, en uso, residente en memoria o descargado tras inactividad.
