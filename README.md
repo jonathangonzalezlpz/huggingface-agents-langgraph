@@ -10,9 +10,9 @@ El diseño contempla rutas especializadas para código, hojas de cálculo, docum
 
 ## Estado actual
 
-Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y un router determinista para `.py`, `.xlsx` y `.pdf`. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo, obtiene evidencia, razona sobre ella y produce `submitted_answer`.
+Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx` y `.pdf`. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; la rama `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; la rama `.pdf` extrae texto con número de página y usa el selector común de evidencias. Las evidencias pasan a razonamiento y producción de `submitted_answer`.
 
-Las demás ramas todavía terminan después del router. Tampoco hay un ejecutor que procese las 20 preguntas ni envío de respuestas al benchmark.
+El selector común divide y prioriza evidencias de cualquier fuente textual, manteniendo referencias a páginas o URLs, y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La rama PDF ya lo utiliza; las futuras ramas web y Wikipedia podrán reutilizarlo. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La extracción requiere una capa de texto; los PDF escaneados todavía necesitan OCR. Las ramas de investigación web y preguntas directas todavía terminan después del router. Tampoco hay un ejecutor que procese las 20 preguntas ni envío de respuestas al benchmark.
 
 ## Estructura
 
@@ -21,6 +21,7 @@ src/huggingface_agents_langgraph/
 ├── answer_production.py # Formato de la respuesta final
 ├── attachments.py       # Índice GAIA y descarga local de adjuntos
 ├── code_processing.py   # Decisión entre inspeccionar y ejecutar adjuntos Python
+├── document_processing.py # Extracción de texto de adjuntos PDF
 ├── config.py            # URL y tiempos límite del LLM y de ejecución
 ├── graph.py             # Construcción y compilación del StateGraph actual
 ├── llm.py               # Cliente del endpoint local de chat completions

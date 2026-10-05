@@ -197,6 +197,29 @@ Creo que son los pilares del sistema. Routing en cuanto el camino a seguir, alca
 
 En este caso en el que las respuesta ha de contener unicamente la "respuesta" añadiría una última pata de producción/redacción de la misma. Un LLM seguramente dará una respuesta formulada y en este caso hay que devolver lo justo.
 
+## Selección de evidencias y presupuesto de contexto
+
+No conviene entregar al razonador todo el contenido de un PDF, una página web o un artículo de Wikipedia. Los lectores de cada fuente deberían extraer texto y conservar su procedencia (por ejemplo, número de página o URL); después, una capacidad común puede dividir ese texto en fragmentos y seleccionar los que mejor responden a la pregunta. Así, la obtención del texto depende del formato, mientras que la selección de información útil se reutiliza entre fuentes.
+
+El razonador recibe esos fragmentos como evidencias con su referencia, en lugar de un volcado completo del documento. Se mantiene un presupuesto máximo de contexto para reducir tokens de entrada y tiempo de inferencia, y se conserva el contexto cercano mediante fragmentos con solapamiento. Si la fuente es pequeña, se puede entregar completa. La selección léxica es eficiente, pero puede pasar por alto información expresada con sinónimos; por ello, se debe preservar la posibilidad de mejorar el ranking con una etapa semántica cuando las pruebas indiquen que hace falta, sin volver a enviar siempre el texto entero.
+
+La selección no debería convertirse en un resumen que reemplace o mezcle los datos originales. Para estas preguntas interesa conservar el fragmento textual concreto y su fuente, ya que el razonador necesita suficiente contexto para interpretar la evidencia y producir una respuesta verificable. El límite de contexto debe reducir información irrelevante, no borrar matices necesarios para contestar.
+
+### Ajuste al benchmark GAIA
+
+En este proyecto, las preguntas son acotadas y normalmente buscan un dato concreto en una fuente identificable. Por eso tiene sentido empezar con una estrategia sencilla y trazable: conservar la página o URL, dividir el texto con algo de solapamiento, recuperar por coincidencia léxica y enviar al razonador un conjunto limitado de fragmentos originales. Así evitamos un volcado completo sin añadir llamadas extra al LLM. La recuperación léxica puede perder información expresada con vocabulario distinto; habrá que medir ese fallo antes de aumentar la complejidad.
+
+### Estrategias para sistemas con corpus o preguntas más complejos
+
+Si las preguntas requieren relacionar muchas fuentes, seguir cadenas de evidencia o responder consultas variadas sobre documentos extensos, hay estrategias más potentes que se pueden combinar:
+
+- **Recuperación híbrida y reranking:** combinar búsqueda léxica (por ejemplo, BM25) con embeddings para encontrar coincidencias semánticas; después, un reranker vuelve a ordenar los candidatos según la pregunta. El modelo grande recibe los fragmentos originales mejor clasificados, con sus fuentes.
+- **Recuperación jerárquica:** crear resúmenes organizados por secciones o grupos de documentos para localizar primero el área pertinente y luego recuperar pasajes originales de esa sección. RAPTOR describe una estructura recursiva de resúmenes para recuperar información a distintos niveles de abstracción ([paper](https://proceedings.iclr.cc/paper_files/paper/2024/file/8a2acd174940dbca361a6398a4f9df91-Paper-Conference.pdf)). Los resúmenes sirven para navegar el corpus; la respuesta final debería poder volver a las fuentes originales.
+- **Cascada de modelos:** un modelo pequeño puede clasificar la pregunta, seleccionar o puntuar fragmentos y resolver tareas sencillas; se escala al modelo grande cuando la confianza es baja o la evidencia requiere más razonamiento. FrugalGPT estudia cascadas que eligen entre modelos para reducir coste manteniendo la calidad ([paper](https://arxiv.org/abs/2305.05176)). El modelo pequeño puede añadir latencia si se ejecuta siempre, así que conviene medirlo con la batería real.
+- **Recuperación iterativa con verificación:** el razonador identifica qué evidencia falta, hace otra búsqueda y comprueba si los pasajes recuperados sostienen la respuesta. Self-RAG estudia la recuperación adaptativa y la reflexión sobre la relevancia y el apoyo de las fuentes ([paper](https://arxiv.org/abs/2310.11511)).
+
+Estas estrategias cuestan más en implementación, almacenamiento, llamadas o latencia. En GAIA empezaría por evaluar la recuperación léxica contra las preguntas reales y conservaría los fragmentos originales; embeddings, reranking, modelos pequeños o recuperación iterativa se añadirían cuando los errores observados muestren que el selector actual no encuentra evidencia suficiente.
+
 
 # Profundizando en recorrido Pregunta concreta
 
@@ -427,8 +450,8 @@ preprocessing (función simple, comprueba campos mínimos task_id y question y l
 | router | `question`, `file_name`, `file_path` | `route` | Híbrido: determinista para señales claras; LLM para decisiones semánticas | No necesariamente |
 | code_processing | `question`, `file_path` | `evidence` | Híbrido | Lectura/análisis/ejecución controlada de código |
 | spreadsheet_processing | `question`, `file_path` | `evidence` | Híbrido: el LLM interpreta la pregunta y propone un plan; Python ejecuta las operaciones soportadas; si el plan no basta, se usa análisis general del LLM | Lector y procesamiento tabular |
-| document_processing | `question`, `file_path` | `evidence` | Híbrido | Extractor de texto/documentos; OCR como fallback si fuese necesario |
-| web_research | `question` | `evidence` | LLM / agentic | Web search + lectura de páginas; Wikipedia cuando corresponda |
+| document_processing | `question`, `file_path` | `evidence` | Determinista | Extrae texto PDF con referencia de página y delega el troceado y selección al selector común; OCR queda como mejora futura para documentos escaneados |
+| web_research | `question` | `evidence` | LLM / agentic | Web search + lector de páginas, que entrega texto con URL al selector común; Wikipedia cuando corresponda |
 | direct | `question` | `evidence` | LLM / determinista según tarea | Opcional: calculadora o ejecución de Python para cálculos |
 | reasoning | `question`, `evidence` | `answer_candidate` | LLM | Normalmente no |
 | answer_production | `question`, `answer_candidate` | `submitted_answer` | Híbrido: LLM para interpretar restricciones + normalización determinista cuando sea posible | Normalmente no |

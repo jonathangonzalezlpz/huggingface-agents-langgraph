@@ -8,6 +8,7 @@ from langgraph.graph.state import CompiledStateGraph
 from huggingface_agents_langgraph.answer_production import answer_production
 from huggingface_agents_langgraph.attachments import attachment_resolver
 from huggingface_agents_langgraph.code_processing import code_processing
+from huggingface_agents_langgraph.document_processing import document_processing
 from huggingface_agents_langgraph.preprocessing import preprocessing
 from huggingface_agents_langgraph.reasoning import reasoning
 from huggingface_agents_langgraph.routing import router
@@ -26,12 +27,14 @@ def _route_after_preprocessing(
 
 def _route_after_router(
     state: AgentState,
-) -> Literal["code", "spreadsheet", "finish"]:
+) -> Literal["code", "spreadsheet", "document", "finish"]:
     """Send supported file tasks to their processing nodes."""
     if state.get("route") == "code":
         return "code"
     if state.get("route") == "spreadsheet":
         return "spreadsheet"
+    if state.get("route") == "document":
+        return "document"
     return "finish"
 
 
@@ -44,6 +47,7 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
     graph.add_node("router", router)
     graph.add_node("code_processing", code_processing)
     graph.add_node("spreadsheet_processing", spreadsheet_processing)
+    graph.add_node("document_processing", document_processing)
     graph.add_node("reasoning", reasoning)
     graph.add_node("answer_production", answer_production)
 
@@ -63,11 +67,13 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
         {
             "code": "code_processing",
             "spreadsheet": "spreadsheet_processing",
+            "document": "document_processing",
             "finish": END,
         },
     )
     graph.add_edge("code_processing", "reasoning")
     graph.add_edge("spreadsheet_processing", "reasoning")
+    graph.add_edge("document_processing", "reasoning")
     graph.add_edge("reasoning", "answer_production")
     graph.add_edge("answer_production", END)
 
