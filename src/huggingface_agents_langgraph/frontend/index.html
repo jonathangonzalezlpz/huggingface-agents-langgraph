@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101827" />
+    <title>GAIA Workbench</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <main class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="GAIA Workbench inicio">
+          <span class="brand-mark">G</span>
+          <span>GAIA <span class="brand-light">WORKBENCH</span></span>
+        </a>
+        <span class="local-indicator"><span></span> AGENTE LOCAL</span>
+      </header>
+
+      <section class="hero">
+        <div class="eyebrow"><span class="eyebrow-line"></span> UNIT 4 · EVALUATION LAB</div>
+        <h1>Pregunta.<br /><span>Investiga. Responde.</span></h1>
+        <p class="hero-copy">
+          Ejecuta una pregunta aleatoria o recorre la batería GAIA de 20 tareas.
+          Cada respuesta aparece junto a su pregunta y sus recursos.
+        </p>
+      </section>
+
+      <section class="control-panel" aria-label="Controles de preguntas">
+        <div class="control-copy">
+          <div class="control-label">ELIGE UNA SESIÓN</div>
+          <div class="control-hint">Las preguntas llegan desde la API oficial del curso.</div>
+        </div>
+        <div class="control-actions">
+          <button id="random-button" class="button button-secondary" type="button">
+            <span class="button-icon">↻</span> Pregunta aleatoria
+          </button>
+          <button id="batch-button" class="button button-primary" type="button">
+            <span class="button-icon">▦</span> Cargar batería de 20
+          </button>
+        </div>
+      </section>
+
+      <section id="session-bar" class="session-bar" hidden>
+        <div>
+          <span class="control-label">SESIÓN</span>
+          <strong id="session-title"></strong>
+        </div>
+        <div class="session-progress">
+          <span id="progress-label">0 / 0 procesadas</span>
+          <div class="progress-track"><span id="progress-fill"></span></div>
+        </div>
+        <button id="run-all-button" class="button button-run-all" type="button" hidden>
+          ▶ Procesar todas
+        </button>
+      </section>
+
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section id="question-list" class="question-list" aria-live="polite">
+        <div class="empty-state">
+          <div class="empty-icon">✳</div>
+          <h2>Tu próxima tarea empieza aquí</h2>
+          <p>Carga una pregunta aleatoria o la batería completa para empezar.</p>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>HUGGING FACE AGENTS COURSE</span>
+        <span>RESPUESTAS GENERADAS LOCALMENTE</span>
+      </footer>
+    </main>
+  </body>
+</html>

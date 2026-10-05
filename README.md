@@ -10,18 +10,22 @@ El diseño contempla rutas especializadas para código, hojas de cálculo, docum
 
 ## Estado actual
 
-Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento que valida `task_id` y `question` y recorta espacios de la pregunta, la resolución local de adjuntos y un router determinista para `.py`, `.xlsx` y `.pdf`. Las rutas desconocidas reciben `unimplemented`.
+Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y un router determinista para `.py`, `.xlsx` y `.pdf`. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo, obtiene evidencia, razona sobre ella y produce `submitted_answer`.
 
-El grafo actual ejecuta `preprocessing`, resuelve el adjunto si `file_name` está presente y pasa el estado al router. Después termina. `code_processing.py` contiene solo la firma del nodo y lanza `NotImplementedError`. Todavía no hay procesamiento de ramas, integración de un LLM en el grafo, razonamiento, producción de respuesta, ni un ejecutor que procese las 20 preguntas. El envío de respuestas al benchmark tampoco está implementado.
+Las demás ramas todavía terminan después del router. Tampoco hay un ejecutor que procese las 20 preguntas ni envío de respuestas al benchmark.
 
 ## Estructura
 
 ```text
 src/huggingface_agents_langgraph/
+├── answer_production.py # Formato de la respuesta final
 ├── attachments.py       # Índice GAIA y descarga local de adjuntos
-├── code_processing.py   # Firma inicial del nodo para adjuntos Python
+├── code_processing.py   # Decisión entre inspeccionar y ejecutar adjuntos Python
+├── config.py            # URL y tiempos límite del LLM y de ejecución
 ├── graph.py             # Construcción y compilación del StateGraph actual
+├── llm.py               # Cliente del endpoint local de chat completions
 ├── preprocessing.py     # Validación y normalización de la entrada
+├── reasoning.py         # Respuesta candidata basada en la evidencia
 ├── routing.py           # Clasificación por extensión
 └── state.py             # Evidence, AgentState y Route
 tests/
@@ -43,7 +47,7 @@ uv sync
 
 ## Configuración
 
-No hay variables de entorno ni credenciales de modelo configuradas por el proyecto. `attachments.py` consulta el dataset público `gaia-benchmark/GAIA` (configuración `2023_level1`, partición `validation`) mediante `datasets` y `huggingface_hub`; la biblioteca utiliza su caché y configuración local habituales.
+`LLM_BASE_URL` permite configurar el endpoint OpenAI-compatible del modelo y, por defecto, apunta a `http://127.0.0.1:8080/v1`. El dataset GAIA requiere acceso autorizado en Hugging Face; configura un token de lectura en `HF_TOKEN`. Copia `.env.example` como `.env` y añade el token. `.env` está excluido de Git. `attachments.py` consulta `gaia-benchmark/GAIA` (configuración `2023_level1`, partición `validation`) mediante `datasets` y `huggingface_hub`.
 
 El lanzador del modelo acepta estos parámetros:
 
@@ -58,13 +62,13 @@ El script no selecciona explícitamente backend GPU ni capas para offload; el us
 
 ## Ejecución actual
 
-No existe todavía un punto de entrada que ejecute el agente sobre las preguntas del curso. Para observar el grafo parcial con una entrada sin adjunto:
+No existe todavía un punto de entrada que recorra el benchmark completo. Para ejecutar la pregunta de ejemplo con un adjunto Python, inicia primero el servidor local de Qwen y ejecuta:
 
 ```powershell
-uv run python -c "from huggingface_agents_langgraph.graph import build_state_graph; graph = build_state_graph(); print(graph.invoke({'task_id': 'local-example', 'question': '  What is 2 + 2?  ', 'file_name': ''}))"
+uv run --env-file .env python -c "from huggingface_agents_langgraph.graph import build_state_graph; graph = build_state_graph(); print(graph.invoke({'task_id': 'f918266a-b3e0-4914-865d-4faa564f1aef', 'question': 'What is the final numeric output from the attached Python code?', 'file_name': 'f918266a-b3e0-4914-865d-4faa564f1aef.py'}))"
 ```
 
-El resultado contiene el estado normalizado y `route: "unimplemented"`; el grafo aún no genera una respuesta.
+El resultado incluye `evidence`, `answer_candidate` y `submitted_answer`. La ejecución del adjunto tiene un límite de sesenta segundos.
 
 ### Servidor local de Qwen
 
@@ -86,11 +90,31 @@ De forma predeterminada sirve `Qwen3-8B-GGUF` con cuantización `Q5_K_M` en `127
 .\scripts\start_local_llm.ps1 -SleepIdleSeconds 600
 ```
 
-También se pueden pasar `-Model`, `-HostAddress` y `-Port`. El script configura `llama.cpp` con `--sleep-idle-seconds`: al vencer el periodo sin peticiones, el servidor libera de memoria el modelo y la caché de contexto; una petición posterior los vuelve a cargar. El proceso del servidor permanece activo. Este servidor aún no está conectado al grafo ni a un cliente LLM del proyecto. Consulta la [documentación de opciones del servidor llama.cpp](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
+También se pueden pasar `-Model`, `-HostAddress` y `-Port`. El script configura `llama.cpp` con `--sleep-idle-seconds`: al vencer el periodo sin peticiones, el servidor libera de memoria el modelo y la caché de contexto; una petición posterior los vuelve a cargar. El proceso del servidor permanece activo. El grafo usa el servidor llama.cpp mediante su API compatible con OpenAI. Consulta la [documentación de opciones del servidor llama.cpp](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 
 ### Adjuntos GAIA
 
 El análisis del proyecto documenta errores 404 del endpoint oficial de Unit 4 `/files/{task_id}` para algunas tareas con adjuntos. Para el desarrollo local, `attachments.py` obtiene los metadatos desde `gaia-benchmark/GAIA` y descarga el archivo con `hf_hub_download`. El índice de tareas se mantiene en caché durante la ejecución del proceso. El repositorio no incluye archivos del benchmark.
+
+### Arrancar el sistema
+
+El lanzador inicia Qwen si aún no está activo, espera a que su API responda y permite elegir el modo:
+
+```powershell
+.\scripts\start_agent.ps1
+```
+
+También se puede indicar directamente `-Mode frontend` o `-Mode terminal`. El modo terminal permite escoger una pregunta aleatoria o procesar la batería completa. Consulta [docs/ejecucion-local.md](docs/ejecucion-local.md) para preparación, opciones del lanzador y funcionamiento de ambos modos.
+
+### Frontal GAIA
+
+Con el servidor de Qwen iniciado y `.env` configurado, arranca el frontal local:
+
+```powershell
+uv run --env-file .env python -m huggingface_agents_langgraph.web_app
+```
+
+Abre `http://127.0.0.1:7860`. Permite cargar una pregunta aleatoria o la batería que devuelve `GET /questions`, descargar el adjunto y ejecutar una o todas las preguntas. La batería se procesa en orden y muestra la respuesta por pregunta. Las rutas que aún no están implementadas se indican en la tarjeta sin respuesta.
 
 ## Desarrollo
 
