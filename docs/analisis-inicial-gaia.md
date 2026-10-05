@@ -68,6 +68,10 @@ Inteprete de documentos excel, tendrá que entenderlo, sumar y excluir filas del
 Resumen: lector excel (estructura tabla) + filtro filas (entender texto filas para poder filtrar drinks) + módulo math + dar formato
 Evidencias de entrada: file_name .xlsx
 
+En este caso parece que hay partes que se pueden resolver de forma determinista. El LLM puede interpretar qué significa "food" en las filas y traducir la pregunta a una operación estructurada (por ejemplo, sumar la columna de ventas filtrando la categoría comida). Una vez definida esa operación, Python debería aplicar el filtro y hacer la suma, evitando delegar aritmética al LLM.
+
+No todas las preguntas sobre Excel se podrán expresar como una operación sencilla. Si la pregunta requiere comparar tablas, encontrar relaciones, ordenar resultados o realizar varios pasos que no quepan en ese plan, no conviene forzarla ni simplificarla: se pasa el libro al análisis general del LLM. Así se aprovecha el cálculo determinista cuando encaja y se conserva una vía flexible para las preguntas más abiertas.
+
 5.
 
 ```
@@ -422,7 +426,7 @@ preprocessing (función simple, comprueba campos mínimos task_id y question y l
 | attachment_resolver | `task_id`, `file_name` | `file_path` | Determinista | Sí/No según implementación. Acceso al endpoint oficial o al dataset GAIA |
 | router | `question`, `file_name`, `file_path` | `route` | Híbrido: determinista para señales claras; LLM para decisiones semánticas | No necesariamente |
 | code_processing | `question`, `file_path` | `evidence` | Híbrido | Lectura/análisis/ejecución controlada de código |
-| spreadsheet_processing | `question`, `file_path` | `evidence` | Híbrido | Lector y procesamiento tabular |
+| spreadsheet_processing | `question`, `file_path` | `evidence` | Híbrido: el LLM interpreta la pregunta y propone un plan; Python ejecuta las operaciones soportadas; si el plan no basta, se usa análisis general del LLM | Lector y procesamiento tabular |
 | document_processing | `question`, `file_path` | `evidence` | Híbrido | Extractor de texto/documentos; OCR como fallback si fuese necesario |
 | web_research | `question` | `evidence` | LLM / agentic | Web search + lectura de páginas; Wikipedia cuando corresponda |
 | direct | `question` | `evidence` | LLM / determinista según tarea | Opcional: calculadora o ejecución de Python para cálculos |

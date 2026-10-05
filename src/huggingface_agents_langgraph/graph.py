@@ -11,6 +11,7 @@ from huggingface_agents_langgraph.code_processing import code_processing
 from huggingface_agents_langgraph.preprocessing import preprocessing
 from huggingface_agents_langgraph.reasoning import reasoning
 from huggingface_agents_langgraph.routing import router
+from huggingface_agents_langgraph.spreadsheet_processing import spreadsheet_processing
 from huggingface_agents_langgraph.state import AgentState
 
 
@@ -23,10 +24,14 @@ def _route_after_preprocessing(
     return "skip_attachment"
 
 
-def _route_after_router(state: AgentState) -> Literal["code", "finish"]:
-    """Send supported Python tasks to code processing."""
+def _route_after_router(
+    state: AgentState,
+) -> Literal["code", "spreadsheet", "finish"]:
+    """Send supported file tasks to their processing nodes."""
     if state.get("route") == "code":
         return "code"
+    if state.get("route") == "spreadsheet":
+        return "spreadsheet"
     return "finish"
 
 
@@ -38,6 +43,7 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
     graph.add_node("attachment_resolver", attachment_resolver)
     graph.add_node("router", router)
     graph.add_node("code_processing", code_processing)
+    graph.add_node("spreadsheet_processing", spreadsheet_processing)
     graph.add_node("reasoning", reasoning)
     graph.add_node("answer_production", answer_production)
 
@@ -54,9 +60,14 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
     graph.add_conditional_edges(
         "router",
         _route_after_router,
-        {"code": "code_processing", "finish": END},
+        {
+            "code": "code_processing",
+            "spreadsheet": "spreadsheet_processing",
+            "finish": END,
+        },
     )
     graph.add_edge("code_processing", "reasoning")
+    graph.add_edge("spreadsheet_processing", "reasoning")
     graph.add_edge("reasoning", "answer_production")
     graph.add_edge("answer_production", END)
 
