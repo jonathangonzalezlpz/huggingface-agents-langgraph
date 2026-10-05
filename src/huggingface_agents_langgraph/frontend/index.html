@@ -60,6 +60,54 @@
         </div>
       </section>
 
+      <section class="experiment-panel" aria-labelledby="experiment-title">
+        <div>
+          <div class="control-label">CONFIGURACIÓN DEL EXPERIMENTO</div>
+          <h2 id="experiment-title">Capacidades disponibles</h2>
+          <p>Elige un perfil para saber qué aporta cada rama del agente.</p>
+        </div>
+        <label class="experiment-name-label">Nombre del experimento
+          <input id="experiment-name" value="Completo" maxlength="80" />
+        </label>
+        <div class="experiment-presets">
+          <button class="button button-secondary preset-button" data-profile="full" type="button">Completo</button>
+          <button class="button button-secondary preset-button" data-profile="direct" type="button">Solo directo</button>
+          <button class="button button-secondary preset-button" data-profile="no-web" type="button">Sin web</button>
+          <button class="button button-secondary preset-button" data-profile="no-files" type="button">Sin adjuntos</button>
+        </div>
+        <div class="capability-list">
+          <label><input type="checkbox" data-capability="web" checked /> Web y Wikipedia</label>
+          <label><input type="checkbox" data-capability="code" checked /> Código</label>
+          <label><input type="checkbox" data-capability="spreadsheet" checked /> Excel</label>
+          <label><input type="checkbox" data-capability="document" checked /> PDF y documentos</label>
+          <label><input type="checkbox" data-capability="multimedia" checked /> Imagen, audio y vídeo</label>
+        </div>
+        <p id="experiment-mode" class="experiment-mode">El router decide qué rama usar.</p>
+      </section>
+
+      <section id="score-panel" class="score-panel" hidden>
+        <div>
+          <div class="control-label">PUNTUACIÓN OFICIAL</div>
+          <h2>Calcular aciertos</h2>
+          <p>Envía las 20 respuestas al evaluador del curso. El envío actualiza la clasificación pública.</p>
+        </div>
+        <label>Usuario de Hugging Face<input id="hf-username" autocomplete="username" /></label>
+        <label>Código del agente<input id="agent-code" autocomplete="off" /></label>
+        <label>Experimento a puntuar<select id="score-experiment"></select></label>
+        <button id="score-button" class="button button-primary" type="button">Enviar y calcular score oficial</button>
+        <p id="score-result" class="score-result" aria-live="polite"></p>
+      </section>
+
+      <section id="experiment-history" class="experiment-history" hidden>
+        <div class="control-label">EJECUCIONES LOCALES</div>
+        <h2>Comparar experimentos</h2>
+        <div id="experiment-history-list" class="experiment-history-list"></div>
+        <div id="comparison-panel" class="comparison-panel" hidden>
+          <h3>Respuestas por pregunta</h3>
+          <div id="comparison-content"></div>
+        </div>
+      </section>
+
       <section id="session-bar" class="session-bar" hidden>
         <div>
           <span class="control-label">SESIÓN</span>
@@ -70,7 +118,7 @@
           <div class="progress-track"><span id="progress-fill"></span></div>
         </div>
         <button id="run-all-button" class="button button-run-all" type="button" hidden>
-          ▶ Procesar todas
+          ▶ Lanzar experimento
         </button>
       </section>
 

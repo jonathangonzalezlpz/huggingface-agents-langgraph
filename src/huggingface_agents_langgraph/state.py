@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
+from huggingface_agents_langgraph.experiments import ExperimentConfig
+
 Route = Literal[
     "code",
     "spreadsheet",
@@ -34,3 +36,4 @@ class AgentState(TypedDict):
     evidence: NotRequired[list[Evidence]]
     answer_candidate: NotRequired[str]
     submitted_answer: NotRequired[str]
+    experiment: NotRequired[ExperimentConfig]

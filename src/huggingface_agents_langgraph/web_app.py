@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from huggingface_agents_langgraph.attachments import get_attachment_path
 from huggingface_agents_langgraph.config import LLM_BASE_URL
@@ -50,6 +50,9 @@ class WebAppHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         """Run a GAIA task through the local LangGraph workflow."""
         if urlsplit(self.path).path != "/api/run":
+            if urlsplit(self.path).path == "/api/score":
+                self._submit_score()
+                return
             self._send_json(404, {"error": "Not found"})
             return
 
@@ -109,8 +112,55 @@ class WebAppHandler(BaseHTTPRequestHandler):
             },
         )
 
+    def _submit_score(self) -> None:
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > MAX_REQUEST_BYTES:
+                raise ValueError("Request body is empty or too large")
+            payload = json.loads(self.rfile.read(content_length))
+            if not isinstance(payload, dict):
+                raise ValueError("Score request must be a JSON object")
+            username = payload.get("username")
+            agent_code = payload.get("agent_code")
+            answers = payload.get("answers")
+            if not isinstance(username, str) or not username.strip():
+                raise ValueError("username is required")
+            if not isinstance(agent_code, str) or not agent_code.strip():
+                raise ValueError("agent_code is required")
+            if not isinstance(answers, list) or len(answers) != 20:
+                raise ValueError("Exactly 20 answers are required")
+            for answer in answers:
+                if (
+                    not isinstance(answer, dict)
+                    or not isinstance(answer.get("task_id"), str)
+                    or not isinstance(answer.get("submitted_answer"), str)
+                ):
+                    raise ValueError("Each answer needs task_id and submitted_answer")
+            body = json.dumps(
+                {
+                    "username": username.strip(),
+                    "agent_code": agent_code.strip(),
+                    "answers": answers,
+                }
+            ).encode("utf-8")
+            request = Request(
+                f"{SCORING_API_URL}/submit",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urlopen(request, timeout=60) as response:
+                result = json.loads(response.read().decode("utf-8"))
+        except (ValueError, TypeError, json.JSONDecodeError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        except (HTTPError, URLError, TimeoutError, OSError) as error:
+            self._send_json(502, {"error": f"Official scoring failed: {error}"})
+            return
+        self._send_json(200, result)
+
     @staticmethod
-    def _validate_task(payload: object) -> dict[str, str]:
+    def _validate_task(payload: object) -> dict:
         if not isinstance(payload, dict):
             raise ValueError("Task must be a JSON object")
 
@@ -124,10 +174,13 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if not isinstance(file_name, str):
             raise ValueError("file_name must be a string")
 
+        from huggingface_agents_langgraph.experiments import normalize_experiment
+
         return {
             "task_id": task_id,
             "question": question,
             "file_name": file_name,
+            "experiment": normalize_experiment(payload.get("experiment")),
         }
 
     def _serve_asset(self, file_name: str) -> None:

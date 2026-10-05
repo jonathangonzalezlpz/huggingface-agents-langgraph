@@ -142,6 +142,56 @@ h1 span {
   backdrop-filter: blur(18px);
 }
 
+.experiment-panel, .score-panel, .experiment-history {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(21, 33, 52, 0.62);
+}
+.experiment-panel h2, .score-panel h2, .experiment-history h2 { margin: 6px 0 0; font-size: 16px; }
+.experiment-panel p, .score-panel p { margin: 4px 0 0; color: var(--quiet); font-size: 11px; line-height: 1.6; }
+.experiment-name-label, .score-panel label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
+.experiment-name-label input, .score-panel input, .score-panel select {
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #101827;
+  font: inherit;
+}
+.experiment-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.capability-list { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.capability-list label { display: flex; align-items: center; gap: 7px; color: #d4deed; font-size: 11px; }
+.capability-list input { accent-color: var(--cyan); }
+.experiment-mode, .score-result { color: var(--cyan) !important; }
+.experiment-history-list { display: grid; gap: 8px; }
+.experiment-history-row { display: grid; grid-template-columns: auto 150px 1fr auto; align-items: center; gap: 12px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; }
+.experiment-select-label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+.experiment-select-label input { accent-color: var(--cyan); }
+.comparison-panel { min-width: 0; margin-top: 12px; }
+.comparison-panel[hidden] { display: none; }
+.comparison-panel h3 { margin: 10px 0; color: #dce5f4; font-size: 13px; }
+.comparison-panel > div { overflow-x: auto; }
+.comparison-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.comparison-table th, .comparison-table td { min-width: 210px; padding: 11px; border: 1px solid var(--line); vertical-align: top; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comparison-table th { color: var(--cyan); background: rgba(0,0,0,.16); }
+.comparison-table th:first-child, .comparison-table td:first-child { min-width: 280px; }
+.comparison-table td { color: #d5e1f3; line-height: 1.6; }
+.comparison-table small { color: var(--quiet); font-size: 9px; }
+.comparison-question strong, .question-variation { display: block; }
+.question-variation { margin-top: 5px; font-size: 9px; }
+.question-variation.same { color: var(--green); }
+.question-variation.changed { color: #ffd08a; }
+.comparison-question p { margin: 7px 0 0; color: var(--muted); }
+.experiment-history-row strong { color: #dce5f4; font-size: 11px; }
+.experiment-history-row span { color: var(--quiet); font-size: 10px; }
+.experiment-history-row .experiment-score { color: var(--cyan); }
+.score-panel[hidden], .experiment-history[hidden] { display: none; }
+
 .control-panel {
   display: flex;
   align-items: center;
@@ -232,6 +282,8 @@ h1 span {
   .hero { padding: 52px 0 34px; }
   .hero-copy { font-size: 13px; }
   .control-panel { align-items: flex-start; flex-direction: column; padding: 18px; }
+  .experiment-panel, .score-panel, .experiment-history { padding: 16px; }
+  .experiment-history-row { grid-template-columns: 1fr; gap: 7px; }
   .model-panel { padding: 16px; }
   .model-status-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .control-actions { width: 100%; }

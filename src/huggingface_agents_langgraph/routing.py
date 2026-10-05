@@ -4,6 +4,10 @@ import re
 from pathlib import Path
 from typing import TypedDict
 
+from huggingface_agents_langgraph.experiments import (
+    DEFAULT_EXPERIMENT,
+    is_capability_enabled,
+)
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
 from huggingface_agents_langgraph.state import AgentState, Route
 
@@ -32,6 +36,18 @@ VIDEO_URL_PATTERN = re.compile(
     r"https?://(?:www\.)?(?:youtube\.com/watch\?v=[\w-]+|youtu\.be/[\w-]+)",
     re.IGNORECASE,
 )
+ROUTE_CAPABILITIES = {
+    "code": "code",
+    "spreadsheet": "spreadsheet",
+    "document": "document",
+    "multimedia": "multimedia",
+}
+
+
+def capability_for_attachment(file_name: str) -> str | None:
+    """Return the graph capability associated with an attachment filename."""
+    route = EXTENSION_ROUTES.get(Path(file_name).suffix.lower())
+    return ROUTE_CAPABILITIES.get(route or "")
 
 
 class RouterUpdate(TypedDict):
@@ -42,15 +58,26 @@ class RouterUpdate(TypedDict):
 
 def router(state: AgentState) -> RouterUpdate:
     """Route known attachments by type and classify questions without files."""
+    experiment = state.get("experiment", DEFAULT_EXPERIMENT)
+    if experiment["force_direct"]:
+        return {"route": "direct"}
+
     file_name = state["file_name"].strip()
     if file_name:
         extension = Path(file_name).suffix.lower()
-        return {"route": EXTENSION_ROUTES.get(extension, "unimplemented")}
+        route = EXTENSION_ROUTES.get(extension, "unimplemented")
+        capability = ROUTE_CAPABILITIES.get(route)
+        if capability and not is_capability_enabled(experiment, capability):
+            return {"route": "direct"}
+        return {"route": route}
 
     if VIDEO_URL_PATTERN.search(state["question"]):
         return {"route": "multimedia"}
 
-    return {"route": _classify_question(state["question"])}
+    route = _classify_question(state["question"])
+    if route in {"web", "wikipedia"} and not is_capability_enabled(experiment, "web"):
+        return {"route": "direct"}
+    return {"route": route}
 
 
 def _classify_question(question: str) -> Route:

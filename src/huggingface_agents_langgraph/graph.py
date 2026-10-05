@@ -9,10 +9,14 @@ from huggingface_agents_langgraph.answer_production import answer_production
 from huggingface_agents_langgraph.attachments import attachment_resolver
 from huggingface_agents_langgraph.code_processing import code_processing
 from huggingface_agents_langgraph.document_processing import document_processing
+from huggingface_agents_langgraph.experiments import (
+    DEFAULT_EXPERIMENT,
+    is_capability_enabled,
+)
 from huggingface_agents_langgraph.multimedia_processing import multimedia_processing
 from huggingface_agents_langgraph.preprocessing import preprocessing
 from huggingface_agents_langgraph.reasoning import reasoning
-from huggingface_agents_langgraph.routing import router
+from huggingface_agents_langgraph.routing import capability_for_attachment, router
 from huggingface_agents_langgraph.spreadsheet_processing import spreadsheet_processing
 from huggingface_agents_langgraph.state import AgentState
 from huggingface_agents_langgraph.web_research import web_research
@@ -22,7 +26,14 @@ def _route_after_preprocessing(
     state: AgentState,
 ) -> Literal["resolve_attachment", "skip_attachment"]:
     """Choose whether the workflow needs to resolve an attachment."""
-    if state["file_name"].strip():
+    experiment = state.get("experiment", DEFAULT_EXPERIMENT)
+    if experiment["force_direct"]:
+        return "skip_attachment"
+    file_name = state["file_name"].strip()
+    if file_name:
+        capability = capability_for_attachment(file_name)
+        if capability and not is_capability_enabled(experiment, capability):
+            return "skip_attachment"
         return "resolve_attachment"
     return "skip_attachment"
 
@@ -33,6 +44,19 @@ def _route_after_router(
     "code", "spreadsheet", "document", "multimedia", "web", "direct", "finish"
 ]:
     """Send tasks to a source-specific node or directly to reasoning."""
+    experiment = state.get("experiment", DEFAULT_EXPERIMENT)
+    if experiment["force_direct"]:
+        return "direct"
+    capability = {
+        "code": "code",
+        "spreadsheet": "spreadsheet",
+        "document": "document",
+        "multimedia": "multimedia",
+        "web": "web",
+        "wikipedia": "web",
+    }.get(state.get("route", ""))
+    if capability and not is_capability_enabled(experiment, capability):
+        return "direct"
     if state.get("route") == "code":
         return "code"
     if state.get("route") == "spreadsheet":

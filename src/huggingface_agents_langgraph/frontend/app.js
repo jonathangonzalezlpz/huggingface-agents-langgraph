@@ -9,6 +9,18 @@ const progressFill = document.querySelector("#progress-fill");
 const notice = document.querySelector("#notice");
 const modelStatusList = document.querySelector("#model-status-list");
 const refreshModelsButton = document.querySelector("#refresh-models-button");
+const experimentName = document.querySelector("#experiment-name");
+const capabilityInputs = [...document.querySelectorAll("[data-capability]")];
+const experimentMode = document.querySelector("#experiment-mode");
+const scorePanel = document.querySelector("#score-panel");
+const scoreButton = document.querySelector("#score-button");
+const scoreResult = document.querySelector("#score-result");
+const scoreExperimentSelect = document.querySelector("#score-experiment");
+const experimentHistory = document.querySelector("#experiment-history");
+const experimentHistoryList = document.querySelector("#experiment-history-list");
+const comparisonPanel = document.querySelector("#comparison-panel");
+const comparisonContent = document.querySelector("#comparison-content");
+let activeExperimentSnapshot = null;
 const MODEL_STATE_LABELS = {
   ready: "En memoria",
   loaded: "En memoria",
@@ -44,6 +56,167 @@ function setBusy(busy) {
   randomButton.disabled = busy;
   batchButton.disabled = busy;
   runAllButton.disabled = busy;
+}
+
+function getExperiment() {
+  if (activeExperimentSnapshot) return activeExperimentSnapshot;
+  return {
+    name: experimentName.value.trim() || "Personalizado",
+    force_direct: experimentName.dataset.forceDirect === "true",
+    enabled_capabilities: capabilityInputs
+      .filter((input) => input.checked)
+      .map((input) => input.dataset.capability),
+  };
+}
+
+function applyProfile(profile) {
+  const allEnabled = profile === "full" || profile === "direct";
+  experimentName.dataset.forceDirect = profile === "direct" ? "true" : "false";
+  capabilityInputs.forEach((input) => {
+    input.checked = allEnabled || (profile === "no-web" && input.dataset.capability !== "web") ||
+      (profile === "no-files" && input.dataset.capability === "web");
+  });
+  experimentName.value = {
+    full: "Completo", direct: "Solo directo", "no-web": "Sin web", "no-files": "Sin adjuntos",
+  }[profile];
+  experimentMode.textContent = profile === "direct"
+    ? "Todas las preguntas irán directamente al razonador."
+    : "El router decide entre las capacidades habilitadas.";
+}
+
+function saveExperimentRecord() {
+  const cards = [...questionList.querySelectorAll(".question-card")];
+  if (cards.length !== 20 || cards.some((card) => !card._result)) return;
+  const configs = cards.map((card) => card._experimentUsed);
+  const sameConfig = configs.every(
+    (config) => JSON.stringify(config) === JSON.stringify(configs[0]),
+  );
+  const record = {
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString(),
+    config: sameConfig
+      ? configs[0]
+      : { name: "Configuración mixta", force_direct: false, enabled_capabilities: [] },
+    answers: cards.map((card) => ({
+      task_id: card._question.task_id,
+      question: card._question.question,
+      submitted_answer: card._result.submitted_answer || "",
+      route: card._result.route || "error",
+      experiment: card._experimentUsed,
+    })),
+  };
+  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+  history.unshift(record);
+  localStorage.setItem("gaia-experiments", JSON.stringify(history.slice(0, 20)));
+  scorePanel.hidden = false;
+  scoreResult.textContent = "Experimento guardado en este navegador; puedes calcular la puntuación oficial cuando quieras.";
+  renderExperimentHistory();
+}
+
+function renderExperimentHistory() {
+  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+  experimentHistory.hidden = history.length === 0;
+  scoreExperimentSelect.replaceChildren();
+  experimentHistoryList.replaceChildren();
+  history.forEach((record) => {
+    const option = document.createElement("option");
+    option.value = record.id;
+    option.textContent = `${record.config.name} · ${new Date(record.created_at).toLocaleString()}`;
+    scoreExperimentSelect.append(option);
+
+    const row = document.createElement("article");
+    row.className = "experiment-history-row";
+    const selectLabel = document.createElement("label");
+    selectLabel.className = "experiment-select-label";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.experimentId = record.id;
+    checkbox.addEventListener("change", renderExperimentComparison);
+    selectLabel.append(checkbox, document.createTextNode("Comparar"));
+    const title = document.createElement("strong");
+    title.textContent = record.config.name;
+    const details = document.createElement("span");
+    const routes = record.answers.reduce((counts, answer) => {
+      counts[answer.route] = (counts[answer.route] || 0) + 1;
+      return counts;
+    }, {});
+    details.textContent = `${new Date(record.created_at).toLocaleString()} · ${record.answers.length}/20 respuestas · ${Object.entries(routes).map(([route, count]) => `${route}: ${count}`).join(" · ")}`;
+    const score = document.createElement("span");
+    score.className = "experiment-score";
+    score.textContent = record.score
+      ? `${record.score.score}% · ${record.score.correct_count}/${record.score.total_attempted}`
+      : "Sin puntuación oficial";
+    row.append(selectLabel, title, details, score);
+    experimentHistoryList.append(row);
+  });
+  renderExperimentComparison();
+}
+
+function renderExperimentComparison() {
+  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+  const selectedIds = new Set(
+    [...experimentHistoryList.querySelectorAll("input:checked")].map(
+      (input) => input.dataset.experimentId,
+    ),
+  );
+  const selected = history.filter((record) => selectedIds.has(record.id));
+  comparisonPanel.hidden = selected.length < 2;
+  comparisonContent.replaceChildren();
+  if (selected.length < 2) return;
+
+  const table = document.createElement("table");
+  table.className = "comparison-table";
+  const header = document.createElement("tr");
+  ["Pregunta", ...selected.map((record) => record.config.name)].forEach((label) => {
+    const cell = document.createElement("th");
+    cell.textContent = label;
+    header.append(cell);
+  });
+  const head = document.createElement("thead");
+  head.append(header);
+  table.append(head);
+
+  const taskIds = [...new Set(selected.flatMap((record) => record.answers.map((answer) => answer.task_id)))];
+  const body = document.createElement("tbody");
+  taskIds.forEach((taskId) => {
+    const answers = selected.map((record) => record.answers.find((answer) => answer.task_id === taskId));
+    const prompts = answers.map((answer) => answer?.question || "");
+    const nonemptyPrompts = [...new Set(prompts.filter(Boolean))];
+    const row = document.createElement("tr");
+    const questionCell = document.createElement("td");
+    questionCell.className = "comparison-question";
+    const taskLabel = document.createElement("strong");
+    taskLabel.textContent = taskId;
+    const variation = document.createElement("span");
+    variation.className = `question-variation ${nonemptyPrompts.length === 1 && prompts.every(Boolean) ? "same" : "changed"}`;
+    variation.textContent = nonemptyPrompts.length === 1 && prompts.every(Boolean)
+      ? "Pregunta idéntica"
+      : "Pregunta distinta o ausente";
+    questionCell.append(taskLabel, variation);
+    if (nonemptyPrompts.length === 1) {
+      const prompt = document.createElement("p");
+      prompt.textContent = nonemptyPrompts[0];
+      questionCell.append(prompt);
+    } else {
+      prompts.forEach((promptText, index) => {
+        const prompt = document.createElement("p");
+        prompt.textContent = `${selected[index].config.name}: ${promptText || "No disponible"}`;
+        questionCell.append(prompt);
+      });
+    }
+    row.append(questionCell);
+    answers.forEach((answer) => {
+      const cell = document.createElement("td");
+      cell.textContent = answer?.submitted_answer || "Sin respuesta";
+      const route = document.createElement("small");
+      route.textContent = `Ruta: ${answer?.route || "sin dato"}`;
+      cell.append(document.createElement("br"), route);
+      row.append(cell);
+    });
+    body.append(row);
+  });
+  table.append(body);
+  comparisonContent.append(table);
 }
 
 function setProgress(processed, total) {
@@ -172,6 +345,7 @@ function renderQuestion(question, index, total) {
   card._status = status;
   card._answer = answerValue;
   card._runButton = runButton;
+  card._result = null;
   return card;
 }
 
@@ -191,6 +365,7 @@ function displayQuestions(questions, title) {
 async function loadRandomQuestion() {
   clearNotice();
   setBusy(true);
+  scorePanel.hidden = true;
   try {
     const question = await requestJson("/api/random-question");
     displayQuestions([question], "Pregunta aleatoria");
@@ -204,6 +379,7 @@ async function loadRandomQuestion() {
 async function loadQuestionBatch() {
   clearNotice();
   setBusy(true);
+  scorePanel.hidden = true;
   try {
     const questions = await requestJson("/api/questions");
     if (!Array.isArray(questions)) {
@@ -224,12 +400,15 @@ async function processQuestion(card) {
   card._answer.className = "answer-value pending";
   card._answer.textContent = "El agente está trabajando…";
   card._runButton.disabled = true;
+  const experiment = structuredClone(getExperiment());
+  card._experimentUsed = experiment;
   try {
     const result = await requestJson("/api/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(card._question),
+      body: JSON.stringify({ ...card._question, experiment }),
     });
+    card._result = result;
     card._status.className = "card-status done";
     card._status.textContent = result.submitted_answer ? "Respondida" : "Sin respuesta";
     if (result.submitted_answer) {
@@ -242,12 +421,47 @@ async function processQuestion(card) {
   } catch (error) {
     card._status.className = "card-status";
     card._status.textContent = "Error";
+    card._result = { error: error.message, submitted_answer: "", route: "error" };
     card._answer.className = "answer-value error";
     card._answer.textContent = error.message;
   } finally {
     card._runButton.disabled = false;
     updateBatchProgress();
+    saveExperimentRecord();
     void refreshModelStatus();
+  }
+}
+
+async function calculateOfficialScore() {
+  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+  const record = history.find((item) => item.id === scoreExperimentSelect.value);
+  if (!record || record.answers.length !== 20) {
+    showNotice("Primero ejecuta las 20 preguntas de la batería.");
+    return;
+  }
+  scoreButton.disabled = true;
+  scoreResult.textContent = "Enviando las respuestas al evaluador oficial…";
+  try {
+    const result = await requestJson("/api/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: document.querySelector("#hf-username").value,
+        agent_code: document.querySelector("#agent-code").value,
+        answers: record.answers.map(({ task_id, submitted_answer }) => ({ task_id, submitted_answer })),
+      }),
+    });
+    const correct = result.correct_count;
+    const total = result.total_attempted || 20;
+    const percentage = result.score;
+    scoreResult.textContent = `${percentage}% · ${correct}/${total} aciertos · ${result.message || "Puntuación recibida"}`;
+    record.score = { score: percentage, correct_count: correct, total_attempted: total };
+    localStorage.setItem("gaia-experiments", JSON.stringify(history));
+    renderExperimentHistory();
+  } catch (error) {
+    scoreResult.textContent = error.message;
+  } finally {
+    scoreButton.disabled = false;
   }
 }
 
@@ -260,12 +474,18 @@ function updateBatchProgress() {
 async function processAllQuestions() {
   clearNotice();
   setBusy(true);
+  activeExperimentSnapshot = structuredClone(getExperiment());
+  capabilityInputs.forEach((input) => { input.disabled = true; });
+  document.querySelectorAll(".preset-button").forEach((button) => { button.disabled = true; });
   try {
     const cards = [...questionList.querySelectorAll(".question-card")];
     for (const card of cards) {
       await processQuestion(card);
     }
   } finally {
+    activeExperimentSnapshot = null;
+    capabilityInputs.forEach((input) => { input.disabled = false; });
+    document.querySelectorAll(".preset-button").forEach((button) => { button.disabled = false; });
     setBusy(false);
   }
 }
@@ -274,5 +494,16 @@ randomButton.addEventListener("click", loadRandomQuestion);
 batchButton.addEventListener("click", loadQuestionBatch);
 runAllButton.addEventListener("click", processAllQuestions);
 refreshModelsButton.addEventListener("click", refreshModelStatus);
+document.querySelectorAll(".preset-button").forEach((button) => {
+  button.addEventListener("click", () => applyProfile(button.dataset.profile));
+});
+capabilityInputs.forEach((input) => input.addEventListener("change", () => {
+  experimentName.dataset.forceDirect = "false";
+  experimentName.value = "Personalizado";
+  experimentMode.textContent = "El router decide entre las capacidades habilitadas.";
+}));
+scoreButton.addEventListener("click", calculateOfficialScore);
+applyProfile("full");
+renderExperimentHistory();
 void refreshModelStatus();
 window.setInterval(refreshModelStatus, 5000);

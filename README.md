@@ -125,7 +125,7 @@ Con el servidor de Qwen iniciado y `.env` configurado, arranca el frontal local:
 uv run --env-file .env python -m huggingface_agents_langgraph.web_app
 ```
 
-Abre `http://127.0.0.1:7860`. Permite cargar una pregunta aleatoria o la batería que devuelve `GET /questions`, descargar el adjunto y ejecutar una o todas las preguntas. La batería se procesa en orden y muestra la respuesta por pregunta. Las rutas que aún no están implementadas se indican en la tarjeta sin respuesta.
+Abre `http://127.0.0.1:7860`. Permite cargar una pregunta aleatoria o la batería que devuelve `GET /questions`, descargar el adjunto y ejecutar preguntas con perfiles de capacidades configurables. La batería se procesa en orden y muestra la respuesta y la ruta por pregunta. El historial local permite comparar experimentos alineados por `task_id`; solicitar el score oficial envía explícitamente las respuestas al evaluador del curso y actualiza su clasificación. Consulta [docs/ejecucion-local.md](docs/ejecucion-local.md) para los detalles.
 
 ## Desarrollo
 

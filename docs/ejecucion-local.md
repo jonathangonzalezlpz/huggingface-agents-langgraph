@@ -44,9 +44,15 @@ Los parámetros disponibles son `Model`, `HostAddress`, `Port`, `SleepIdleSecond
 
 El modo `frontend` sirve la interfaz solo en el equipo local, en [http://127.0.0.1:7860](http://127.0.0.1:7860). Usa la API del curso para cargar una pregunta aleatoria con `GET /random-question` o la batería con `GET /questions`.
 
-Cada pregunta aparece en una tarjeta con su `task_id`, el texto y si incluye un adjunto. Si lo tiene, el botón de descarga obtiene el archivo desde el dataset GAIA usando `task_id`. La tarjeta muestra el estado del procesamiento y `submitted_answer` al terminar. En la batería, el botón de procesamiento recorre las preguntas secuencialmente y actualiza el progreso.
+Cada pregunta aparece en una tarjeta con su `task_id`, el texto y si incluye un adjunto. Si lo tiene, el botón de descarga obtiene el archivo desde el dataset GAIA usando `task_id`. La tarjeta muestra el estado del procesamiento y `submitted_answer` al terminar. En la batería, “Lanzar experimento” recorre las preguntas secuencialmente y actualiza el progreso.
 
-El frontal no envía respuestas a `POST /submit`. El grafo produce respuestas para tareas `.py`, `.xlsx` y `.pdf`, para preguntas que requieren búsqueda web o Wikipedia, y para preguntas directas que pueden resolverse usando solo el enunciado. Las búsquedas web necesitan acceso a Internet; no requieren una clave adicional.
+### Experimentos y evaluación
+
+Antes de ejecutar la batería se puede nombrar un experimento, aplicar perfiles rápidos o configurar cada capacidad por separado: código, Excel, documentos/PDF, multimedia y web/Wikipedia. “Solo directo” fuerza las veinte tareas a pasar del enunciado al razonador. Si se deshabilita la capacidad asociada a un adjunto, el sistema omite su descarga y procesamiento y entrega la pregunta al razonador sin esa evidencia. Cada lanzamiento captura la configuración para que no cambie durante la batería.
+
+Las ejecuciones completas se guardan en el almacenamiento local del navegador con las respuestas y las rutas utilizadas. El historial permite seleccionar dos o más experimentos y compararlos por `task_id`; también marca si el texto de la pregunta es idéntico, distinto o falta en alguna ejecución. Este historial permanece en el navegador y no se sube al repositorio.
+
+La API `GET /questions` no proporciona las respuestas correctas, así que el frontal no puede calcular el porcentaje de acierto comparando localmente. En el panel de puntuación se puede elegir una ejecución y solicitar el score oficial. Solo al pulsar “Enviar y calcular score oficial” se envían usuario, código del agente y las veinte respuestas a `POST /submit`; el servicio devuelve el porcentaje y los aciertos sobre el total y actualiza la clasificación pública del curso. Ejecutar o comparar experimentos no hace ese envío. Las búsquedas web necesitan acceso a Internet; no requieren una clave adicional.
 
 ## Modo terminal
 
