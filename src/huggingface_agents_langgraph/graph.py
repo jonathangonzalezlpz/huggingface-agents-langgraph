@@ -14,6 +14,7 @@ from huggingface_agents_langgraph.reasoning import reasoning
 from huggingface_agents_langgraph.routing import router
 from huggingface_agents_langgraph.spreadsheet_processing import spreadsheet_processing
 from huggingface_agents_langgraph.state import AgentState
+from huggingface_agents_langgraph.web_research import web_research
 
 
 def _route_after_preprocessing(
@@ -27,14 +28,18 @@ def _route_after_preprocessing(
 
 def _route_after_router(
     state: AgentState,
-) -> Literal["code", "spreadsheet", "document", "finish"]:
-    """Send supported file tasks to their processing nodes."""
+) -> Literal["code", "spreadsheet", "document", "web", "direct", "finish"]:
+    """Send tasks to a source-specific node or directly to reasoning."""
     if state.get("route") == "code":
         return "code"
     if state.get("route") == "spreadsheet":
         return "spreadsheet"
     if state.get("route") == "document":
         return "document"
+    if state.get("route") in {"web", "wikipedia"}:
+        return "web"
+    if state.get("route") == "direct":
+        return "direct"
     return "finish"
 
 
@@ -48,6 +53,7 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
     graph.add_node("code_processing", code_processing)
     graph.add_node("spreadsheet_processing", spreadsheet_processing)
     graph.add_node("document_processing", document_processing)
+    graph.add_node("web_research", web_research)
     graph.add_node("reasoning", reasoning)
     graph.add_node("answer_production", answer_production)
 
@@ -68,12 +74,15 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
             "code": "code_processing",
             "spreadsheet": "spreadsheet_processing",
             "document": "document_processing",
+            "web": "web_research",
+            "direct": "reasoning",
             "finish": END,
         },
     )
     graph.add_edge("code_processing", "reasoning")
     graph.add_edge("spreadsheet_processing", "reasoning")
     graph.add_edge("document_processing", "reasoning")
+    graph.add_edge("web_research", "reasoning")
     graph.add_edge("reasoning", "answer_production")
     graph.add_edge("answer_production", END)
 

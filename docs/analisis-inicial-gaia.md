@@ -392,15 +392,12 @@ preprocessing
         router
           ↓
    conditional edges
-    ├── code
-    ├── spreadsheet
-    ├── document
-    ├── web
-    └── direct
-          ↓
-    evidence_acquisition
-          ↓
-       reasoning
+    ├── code ──────────┐
+    ├── spreadsheet ───┤
+    ├── document ──────┤→ evidence → reasoning
+    ├── web ───────────┤
+    ├── wikipedia ─────┘
+    └── direct ────────────→ reasoning (question only)
           ↓
     answer_production
           ↓
@@ -425,15 +422,12 @@ preprocessing (función simple, comprueba campos mínimos task_id y question y l
         router
           ↓
    conditional edges
-    ├── code
-    ├── spreadsheet
-    ├── document
-    ├── web
-    └── direct
-          ↓
-       evidence
-          ↓
-       reasoning
+    ├── code ──────────┐
+    ├── spreadsheet ───┤
+    ├── document ──────┤→ evidence → reasoning
+    ├── web ───────────┤
+    ├── wikipedia ─────┘
+    └── direct ────────────→ reasoning (question only)
           ↓
     answer_production
           ↓
@@ -447,13 +441,13 @@ preprocessing (función simple, comprueba campos mínimos task_id y question y l
 |---|---|---|---|---|
 | preprocessing | `task_id`, `question`, `file_name` | `question`, `file_name` | Determinista | No. Código Python para validación, normalización y limpieza |
 | attachment_resolver | `task_id`, `file_name` | `file_path` | Determinista | Sí/No según implementación. Acceso al endpoint oficial o al dataset GAIA |
-| router | `question`, `file_name`, `file_path` | `route` | Híbrido: determinista para señales claras; LLM para decisiones semánticas | No necesariamente |
+| router | `question`, `file_name`, `file_path` | `route` | Determinista por extensión si hay adjunto; sin adjunto usa el LLM para elegir `direct`, `web` o `wikipedia` | No necesariamente |
 | code_processing | `question`, `file_path` | `evidence` | Híbrido | Lectura/análisis/ejecución controlada de código |
 | spreadsheet_processing | `question`, `file_path` | `evidence` | Híbrido: el LLM interpreta la pregunta y propone un plan; Python ejecuta las operaciones soportadas; si el plan no basta, se usa análisis general del LLM | Lector y procesamiento tabular |
 | document_processing | `question`, `file_path` | `evidence` | Determinista | Extrae texto PDF con referencia de página y delega el troceado y selección al selector común; OCR queda como mejora futura para documentos escaneados |
-| web_research | `question` | `evidence` | LLM / agentic | Web search + lector de páginas, que entrega texto con URL al selector común; Wikipedia cuando corresponda |
-| direct | `question` | `evidence` | LLM / determinista según tarea | Opcional: calculadora o ejecución de Python para cálculos |
-| reasoning | `question`, `evidence` | `answer_candidate` | LLM | Normalmente no |
+| web_research | `question`, `route` | `evidence` | Búsqueda y extracción deterministas; razonamiento posterior con LLM | DDGS para web general; Europe PMC para publicaciones de ciencias de la vida; API MediaWiki para Wikipedia; selector común conserva URL |
+| direct (ruta, no nodo) | `question` | — | El router la selecciona semánticamente; pasa directamente a reasoning sin evidencia externa | No |
+| reasoning | `question`, `evidence` (opcional en ruta directa) | `answer_candidate` | LLM | Normalmente no |
 | answer_production | `question`, `answer_candidate` | `submitted_answer` | Híbrido: LLM para interpretar restricciones + normalización determinista cuando sea posible | Normalmente no |
 
 Recordemos que evidence será una lista de objetos:
@@ -470,3 +464,53 @@ evidence = [
 ```
 
 Creo que de momento con esos 3 subcampos es suficiente para generar un sistema robusto a las preguntas analizadas. Además ha de ser una lista porque una pregunta creo que puede llegar a requerir evidencias multifuente.
+
+# Un vistazo más a las preguntas
+
+Dimos un repaso más a las posibles preguntas mediante el método GET /random-question y descubrimos un abanico más amplio de fuentes/tipos de pregunta:
+
+```
+{
+  "task_id": "99c9cc74-fdc8-46c6-8f8d-3ce2d3bfeea3",
+  "question": "Hi, I'm making a pie but I could use some help with my shopping list. I have everything I need for the crust, but I'm not sure about the filling. I got the recipe from my friend Aditi, but she left it as a voice memo and the speaker on my phone is buzzing so I can't quite make out what she's saying. Could you please listen to the recipe and list all of the ingredients that my friend described? I only want the ingredients for the filling, as I have everything I need to make my favorite pie crust. I've attached the recipe as Strawberry pie.mp3.\n\nIn your response, please only list the ingredients, not any measurements. So if the recipe calls for \"a pinch of salt\" or \"two cups of ripe strawberries\" the ingredients on the list would be \"salt\" and \"ripe strawberries\".\n\nPlease format your response as a comma separated list of ingredients. Also, please alphabetize the ingredients.",
+  "Level": "1",
+  "file_name": "99c9cc74-fdc8-46c6-8f8d-3ce2d3bfeea3.mp3"
+}
+```
+
+Lo importante, capacidad de procesar audio. Como mínimo capacidad de transcribir para que el LLM pueda procesarlo, pero iría un paso más allá y contemplaría reconocer sonidos o música, no solo trasncribir.
+
+```
+{
+  "task_id": "2d83110e-a098-4ebb-9987-066c06fa42d0",
+  "question": ".rewsna eht sa \"tfel\" drow eht fo etisoppo eht etirw ,ecnetnes siht dnatsrednu uoy fI",
+  "Level": "1",
+  "file_name": ""
+}
+```
+
+Una pregunta mal escrita? No la acabo de ver. Habrá que ver que dice el razonador, pero sin duda entraría por esa rama directa del router, veremos si es capaz de dar una respuesta válida.
+
+```
+{
+  "task_id": "a1e91b78-d3d8-4675-bb8d-62741b4b68a6",
+  "question": "In the video https://www.youtube.com/watch?v=L1vXCYZAYYM, what is the highest number of bird species to be on camera simultaneously?",
+  "Level": "1",
+  "file_name": ""
+}
+```
+
+Conector de videos de youtube? Existe algo similar o es el propio el llm el que se encarga. Creo que existirá algo que permita explotar mejor la info de esta fuente. Será algo similar a audio, transcripción seguro, pero al ser un video puede tener más complejidad si requiere algo de entendimiento visual (reconocimiento de frames, VLM) Ir con cuidado sin pasarse ya que con análisis de video puede ser sencillo ir a máximos y estar desaprovechando recursos, por ejemplo, análisis visual exaustivo (consumo de tokens disparado) y las preguntas no lo requieren (puede estar injustifidicado o solo justificarse en algunas preguntas)
+
+```
+{
+  "task_id": "cca530fc-4052-43b2-b130-b30968d8aa44",
+  "question": "Review the chess position provided in the image. It is black's turn. Provide the correct next move for black which guarantees a win. Please provide your response in algebraic notation.",
+  "Level": "1",
+  "file_name": "cca530fc-4052-43b2-b130-b30968d8aa44.png"
+}
+```
+
+Una imagen como fuente de entrada, necesitamos un componente que permita analizar imágenes, un VLM?
+
+Y creo que con esto el abanico quedaría bastante completo, y siempre hay la opción de que ante algo desconocido el razonador sea quien decida (el beneficio de contar siempre con cierta libertad) Capacidades extra que ya apreciamos en las preguntas: podría ser el tema del ajedrez, no dejarlo al llm y acotar un poco el campo, el llm me da posiciones el motor (mucho más certero o centrado en tarea) me da la respuesta/jugada.

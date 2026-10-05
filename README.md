@@ -10,9 +10,9 @@ El diseño contempla rutas especializadas para código, hojas de cálculo, docum
 
 ## Estado actual
 
-Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx` y `.pdf`. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; la rama `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; la rama `.pdf` extrae texto con número de página y usa el selector común de evidencias. Las evidencias pasan a razonamiento y producción de `submitted_answer`.
+Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM: la ruta web busca y lee páginas, Wikipedia usa su API y la ruta directa llega al razonador solo con la pregunta. Las evidencias recuperadas pasan al razonamiento y a la producción de `submitted_answer`.
 
-El selector común divide y prioriza evidencias de cualquier fuente textual, manteniendo referencias a páginas o URLs, y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La rama PDF ya lo utiliza; las futuras ramas web y Wikipedia podrán reutilizarlo. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La extracción requiere una capa de texto; los PDF escaneados todavía necesitan OCR. Las ramas de investigación web y preguntas directas todavía terminan después del router. Tampoco hay un ejecutor que procese las 20 preguntas ni envío de respuestas al benchmark.
+El selector común divide y prioriza evidencias de cualquier fuente textual, mantiene referencias a páginas o URLs y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La ruta web usa DDGS y, cuando la pregunta menciona papers o artículos, añade Europe PMC para buscar publicaciones biomédicas y recuperar texto completo cuando está disponible en acceso abierto. No todos los artículos ni disciplinas están cubiertos por Europe PMC; DDGS sigue como búsqueda general. La ruta Wikipedia consulta la Wikipedia inglesa actual, no una revisión histórica concreta. La extracción PDF requiere una capa de texto; los PDF escaneados todavía necesitan OCR. Tampoco hay un ejecutor que procese las 20 preguntas ni envío de respuestas al benchmark.
 
 ## Estructura
 
@@ -21,17 +21,27 @@ src/huggingface_agents_langgraph/
 ├── answer_production.py # Formato de la respuesta final
 ├── attachments.py       # Índice GAIA y descarga local de adjuntos
 ├── code_processing.py   # Decisión entre inspeccionar y ejecutar adjuntos Python
+├── config.py            # URL y límites de ejecución
 ├── document_processing.py # Extracción de texto de adjuntos PDF
-├── config.py            # URL y tiempos límite del LLM y de ejecución
+├── evidence_selection.py # Selección compartida de evidencias relevantes
 ├── graph.py             # Construcción y compilación del StateGraph actual
 ├── llm.py               # Cliente del endpoint local de chat completions
 ├── preprocessing.py     # Validación y normalización de la entrada
-├── reasoning.py         # Respuesta candidata basada en la evidencia
-├── routing.py           # Clasificación por extensión
+├── reasoning.py         # Respuesta candidata desde evidencias o pregunta directa
+├── routing.py           # Clasificación por extensión o intención semántica
+├── spreadsheet_processing.py # Análisis híbrido de libros Excel
+├── web_research.py      # Búsqueda web, académica y Wikipedia
 └── state.py             # Evidence, AgentState y Route
 tests/
 ├── test_attachments.py
-└── test_preprocessing.py
+├── test_document_processing.py
+├── test_evidence_selection.py
+├── test_graph.py
+├── test_preprocessing.py
+├── test_reasoning.py
+├── test_routing.py
+├── test_spreadsheet_processing.py
+└── test_web_research.py
 scripts/
 └── start_local_llm.ps1  # Lanzador local de llama.cpp y Qwen
 docs/
