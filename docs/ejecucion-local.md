@@ -7,7 +7,7 @@ El lanzador reúne el servidor local de Qwen y las dos formas de usar el agente:
 Instala las dependencias del proyecto y configura el acceso al dataset GAIA:
 
 ```powershell
-uv sync
+uv sync --extra multimedia
 Copy-Item .env.example .env
 ```
 
@@ -42,7 +42,7 @@ Los parámetros disponibles son `Model`, `HostAddress`, `Port`, `SleepIdleSecond
 
 ## Frontal web
 
-El modo `frontend` sirve la interfaz solo en el equipo local, en [http://127.0.0.1:7860](http://127.0.0.1:7860). Usa la API del curso para cargar una pregunta aleatoria con `GET /random-question` o la batería con `GET /questions`.
+El modo `frontend` sirve la interfaz solo en el equipo local, en [http://127.0.0.1:7860](http://127.0.0.1:7860). El lanzador activa el extra `multimedia` en `uv run`, para que sus dependencias sigan disponibles aunque uv sincronice el entorno al arrancar. La primera sincronización puede descargar varias dependencias grandes. Usa la API del curso para cargar una pregunta aleatoria con `GET /random-question` o la batería con `GET /questions`.
 
 Cada pregunta aparece en una tarjeta con su `task_id`, el texto y si incluye un adjunto. Si lo tiene, el botón de descarga obtiene el archivo desde el dataset GAIA usando `task_id`. La tarjeta muestra el estado del procesamiento y `submitted_answer` al terminar. En la batería, “Lanzar experimento” recorre las preguntas secuencialmente y actualiza el progreso.
 
@@ -50,9 +50,13 @@ Cada pregunta aparece en una tarjeta con su `task_id`, el texto y si incluye un 
 
 Antes de ejecutar la batería se puede nombrar un experimento, aplicar perfiles rápidos o configurar cada capacidad por separado: código, Excel, documentos/PDF, multimedia y web/Wikipedia. “Solo directo” fuerza las veinte tareas a pasar del enunciado al razonador. Si se deshabilita la capacidad asociada a un adjunto, el sistema omite su descarga y procesamiento y entrega la pregunta al razonador sin esa evidencia. Cada lanzamiento captura la configuración para que no cambie durante la batería.
 
+Durante la ejecución se puede detener la batería. El agente termina la pregunta que ya está procesando y se para antes de iniciar la siguiente; al reanudar continúa con las preguntas pendientes y conserva el perfil elegido.
+
 Las ejecuciones completas se guardan en el almacenamiento local del navegador con las respuestas y las rutas utilizadas. El historial permite seleccionar dos o más experimentos y compararlos por `task_id`; también marca si el texto de la pregunta es idéntico, distinto o falta en alguna ejecución. Este historial permanece en el navegador y no se sube al repositorio.
 
 La API `GET /questions` no proporciona las respuestas correctas, así que el frontal no puede calcular el porcentaje de acierto comparando localmente. En el panel de puntuación se puede elegir una ejecución y solicitar el score oficial. Solo al pulsar “Enviar y calcular score oficial” se envían usuario, código del agente y las veinte respuestas a `POST /submit`; el servicio devuelve el porcentaje y los aciertos sobre el total y actualiza la clasificación pública del curso. Ejecutar o comparar experimentos no hace ese envío. Las búsquedas web necesitan acceso a Internet; no requieren una clave adicional.
+
+Para reducir la latencia, el razonador genera directamente la respuesta final en una llamada, en vez de razonar y hacer después una segunda llamada de reformateo. Las clasificaciones breves del router, código y plan Excel limitan su salida y desactivan el modo de pensamiento extendido de Qwen 3. La extracción de hasta tres páginas web se ejecuta en paralelo. En vídeo, los fotogramas se buscan mediante saltos temporales y solo se activa Whisper/AST si la pregunta pide información de audio; las preguntas visuales no transcriben sonido de fondo.
 
 ## Modo terminal
 

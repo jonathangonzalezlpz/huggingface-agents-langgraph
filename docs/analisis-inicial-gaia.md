@@ -545,3 +545,46 @@ La separación propuesta es, por tanto, una sola rama y un nodo de entrada en el
 La rama `multimedia_processing` ya esta conectada al grafo. Utiliza Whisper `small` para transcripcion, AST AudioSet para reconocer eventos acusticos cuando la pregunta lo necesita y SmolVLM `256M` para examinar imagenes y fotogramas. Instala sus dependencias con `uv sync --extra multimedia`. `MEDIA_VLM_IDLE_SECONDS` determina cuanto tiempo queda cargado el modelo visual tras su ultima inferencia (300 segundos por defecto); despues se libera de memoria y se vuelve a cargar al procesar otra imagen o video que requiera analisis visual.
 
 La misma politica de inactividad se aplica a Whisper y AST: cada modelo se carga solo al requerir transcripcion o clasificacion, y se libera tras el periodo configurado sin uso.
+
+## Grafo resultante antes de los cambios para reducir latencia
+
+Este es el grafo implementado antes de probar los cambios descritos en el apartado siguiente. El preprocesamiento resolvía los adjuntos habilitados y el router elegía una rama según la pregunta y las capacidades del experimento. Cada rama especializada generaba evidencias para el razonador; la ruta directa omitía esa investigación. La producción de la respuesta final era un nodo independiente.
+
+```mermaid
+flowchart TD
+    S([Inicio]) --> P[preprocessing]
+    P -->|adjunto y capacidad habilitada| AR[attachment_resolver]
+    P -->|sin adjunto o capacidad deshabilitada| R[router]
+    AR --> R
+    R -->|code| C[code_processing]
+    R -->|spreadsheet| SP[spreadsheet_processing]
+    R -->|document| D[document_processing]
+    R -->|multimedia| M[multimedia_processing]
+    R -->|web o Wikipedia| W[web_research]
+    R -->|direct| RE[reasoning]
+    C --> RE
+    SP --> RE
+    D --> RE
+    M --> RE
+    W --> RE
+    RE --> AP[answer_production]
+    AP --> E([Fin])
+    R -->|ruta no implementada| E
+```
+
+La configuración del experimento podía deshabilitar capacidades y hacer que el flujo usara la ruta directa. En ambos casos, el razonador recibía la pregunta y, cuando la rama seleccionada había encontrado material útil, las evidencias asociadas.
+
+## Latencia observada y cambios intentados para mejorar la fluidez
+
+Al ejecutar la batería observamos que el sistema respondía, pero algunas preguntas tardaban en completarse. La demora se notaba especialmente cuando se encadenaban llamadas al LLM o se necesitaba procesar contenido multimedia, como audio o vídeo. También aparecieron errores al faltar dependencias opcionales para descargar y analizar vídeo.
+
+Para reducir trabajo innecesario y hacer el flujo más ágil, se probaron estos cambios:
+
+- Integrar la producción y normalización de la respuesta final en la llamada de razonamiento, eliminando una llamada adicional al LLM y el nodo `answer_production`.
+- Acotar la generación en las decisiones breves del router y en los planes de código y cálculo, sin recortar del mismo modo la respuesta razonada.
+- Ejecutar en paralelo la extracción de resultados web independientes.
+- Evitar transcribir audio cuando la pregunta sobre el vídeo solo necesita analizar lo visual y evitar cargar modelos de audio para preguntas que no dependen del sonido.
+- Muestrear un conjunto limitado de fotogramas del vídeo, en vez de decodificarlo entero, y limitar la longitud de la descripción visual.
+- Hacer que el script de arranque instale también el grupo opcional de dependencias multimedia para que las preguntas de vídeo dispongan de sus dependencias.
+
+Estos cambios buscan reducir llamadas, cómputo y esperas evitables. Aún no se ha realizado una comparación controlada de tiempos antes y después; por tanto, no se atribuye una mejora cuantificada. El procesamiento local de modelos y la descarga o lectura de recursos externos todavía pueden añadir latencia, y conviene medir la batería completa con configuraciones comparables para identificar qué ramas concentran la demora.

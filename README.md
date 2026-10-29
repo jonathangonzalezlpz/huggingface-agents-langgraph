@@ -4,30 +4,31 @@ Implementación en desarrollo de la asignación final de la Unidad 4 del [Huggin
 
 ## Diseño
 
-La arquitectura propuesta es un workflow controlado e híbrido. Usa señales deterministas, como la extensión del adjunto, para seleccionar una capacidad; deja al LLM las decisiones que requieren interpretar la pregunta. El flujo previsto resuelve adjuntos, obtiene evidencias, razona sobre ellas y produce una respuesta final.
+La arquitectura es un workflow controlado e híbrido. Usa señales deterministas, como la extensión del adjunto, para seleccionar capacidades conocidas; deja al LLM las decisiones que requieren interpretar la pregunta. El flujo resuelve adjuntos, obtiene evidencias, razona sobre ellas y genera la respuesta final en una sola llamada de razonamiento.
 
 El diseño contempla rutas especializadas para código, hojas de cálculo, documentos, investigación web y preguntas resolubles directamente. `Evidence` ya está definido con `content`, `source_type` y `source`, para asociar la información obtenida con su procedencia. La arquitectura y las decisiones están desarrolladas en [docs/analisis-inicial-gaia.md](docs/analisis-inicial-gaia.md); este README resume el estado actual.
 
 ## Estado actual
 
-Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM: la ruta web busca y lee páginas, Wikipedia usa su API y la ruta directa llega al razonador solo con la pregunta. Las evidencias recuperadas pasan al razonamiento y a la producción de `submitted_answer`.
+Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia, multimedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM: la ruta web busca y lee páginas, Wikipedia usa su API y la ruta directa llega al razonador solo con la pregunta. El razonador produce directamente `submitted_answer` para evitar una segunda llamada de formato.
 
-El selector común divide y prioriza evidencias de cualquier fuente textual, mantiene referencias a páginas o URLs y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La ruta web usa DDGS y, cuando la pregunta menciona papers o artículos, añade Europe PMC para buscar publicaciones biomédicas y recuperar texto completo cuando está disponible en acceso abierto. No todos los artículos ni disciplinas están cubiertos por Europe PMC; DDGS sigue como búsqueda general. La ruta Wikipedia consulta la Wikipedia inglesa actual, no una revisión histórica concreta. La extracción PDF requiere una capa de texto; los PDF escaneados todavía necesitan OCR. Tampoco hay un ejecutor que procese las 20 preguntas ni envío de respuestas al benchmark.
+El selector común divide y prioriza evidencias de cualquier fuente textual, mantiene referencias a páginas o URLs y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La ruta web usa DDGS y, cuando la pregunta menciona papers o artículos, añade Europe PMC para buscar publicaciones biomédicas y recuperar texto completo cuando está disponible en acceso abierto. No todos los artículos ni disciplinas están cubiertos por Europe PMC; DDGS sigue como búsqueda general. La ruta Wikipedia consulta la Wikipedia inglesa actual, no una revisión histórica concreta. La extracción PDF requiere una capa de texto; los PDF escaneados todavía necesitan OCR. El frontal permite lanzar experimentos sobre la batería de 20 preguntas y comparar sus resultados.
 
 ## Estructura
 
 ```text
 src/huggingface_agents_langgraph/
-├── answer_production.py # Formato de la respuesta final
 ├── attachments.py       # Índice GAIA y descarga local de adjuntos
 ├── code_processing.py   # Decisión entre inspeccionar y ejecutar adjuntos Python
 ├── config.py            # URL y límites de ejecución
 ├── document_processing.py # Extracción de texto de adjuntos PDF
+├── experiments.py       # Configuración de capacidades por experimento
 ├── evidence_selection.py # Selección compartida de evidencias relevantes
 ├── graph.py             # Construcción y compilación del StateGraph actual
 ├── llm.py               # Cliente del endpoint local de chat completions
+├── multimedia_processing.py # Audio, imágenes y vídeo
 ├── preprocessing.py     # Validación y normalización de la entrada
-├── reasoning.py         # Respuesta candidata desde evidencias o pregunta directa
+├── reasoning.py         # Respuesta final desde evidencias o pregunta directa
 ├── routing.py           # Clasificación por extensión o intención semántica
 ├── spreadsheet_processing.py # Análisis híbrido de libros Excel
 ├── web_research.py      # Búsqueda web, académica y Wikipedia
@@ -53,7 +54,7 @@ docs/
 El proyecto requiere Python 3.12 y usa `uv` junto con `uv.lock` para gestionar las dependencias:
 
 ```powershell
-uv sync
+uv sync --extra multimedia
 ```
 
 ## Configuración
@@ -71,15 +72,15 @@ El lanzador del modelo acepta estos parámetros:
 
 El script no selecciona explícitamente backend GPU ni capas para offload; el uso de GPU depende de la instalación de `llama.cpp` disponible en el sistema.
 
-## Ejecución actual
+## Ejecución del grafo
 
-No existe todavía un punto de entrada que recorra el benchmark completo. Para ejecutar la pregunta de ejemplo con un adjunto Python, inicia primero el servidor local de Qwen y ejecuta:
+El lanzador ofrece modo terminal y frontal web; el frontal permite ejecutar la batería de 20 tareas bajo perfiles de capacidades. Para invocar directamente el grafo con una pregunta de ejemplo y un adjunto Python, inicia primero el servidor local de Qwen y ejecuta:
 
 ```powershell
-uv run --env-file .env python -c "from huggingface_agents_langgraph.graph import build_state_graph; graph = build_state_graph(); print(graph.invoke({'task_id': 'f918266a-b3e0-4914-865d-4faa564f1aef', 'question': 'What is the final numeric output from the attached Python code?', 'file_name': 'f918266a-b3e0-4914-865d-4faa564f1aef.py'}))"
+uv run --extra multimedia --env-file .env python -c "from huggingface_agents_langgraph.graph import build_state_graph; graph = build_state_graph(); print(graph.invoke({'task_id': 'f918266a-b3e0-4914-865d-4faa564f1aef', 'question': 'What is the final numeric output from the attached Python code?', 'file_name': 'f918266a-b3e0-4914-865d-4faa564f1aef.py'}))"
 ```
 
-El resultado incluye `evidence`, `answer_candidate` y `submitted_answer`. La ejecución del adjunto tiene un límite de sesenta segundos.
+El resultado incluye `evidence` y `submitted_answer`. La ejecución del adjunto tiene un límite de sesenta segundos.
 
 ### Servidor local de Qwen
 
@@ -122,7 +123,7 @@ También se puede indicar directamente `-Mode frontend` o `-Mode terminal`. El m
 Con el servidor de Qwen iniciado y `.env` configurado, arranca el frontal local:
 
 ```powershell
-uv run --env-file .env python -m huggingface_agents_langgraph.web_app
+uv run --extra multimedia --env-file .env python -m huggingface_agents_langgraph.web_app
 ```
 
 Abre `http://127.0.0.1:7860`. Permite cargar una pregunta aleatoria o la batería que devuelve `GET /questions`, descargar el adjunto y ejecutar preguntas con perfiles de capacidades configurables. La batería se procesa en orden y muestra la respuesta y la ruta por pregunta. El historial local permite comparar experimentos alineados por `task_id`; solicitar el score oficial envía explícitamente las respuestas al evaluador del curso y actualiza su clasificación. Consulta [docs/ejecucion-local.md](docs/ejecucion-local.md) para los detalles.
