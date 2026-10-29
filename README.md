@@ -59,7 +59,7 @@ uv sync --extra multimedia
 
 ## Configuración
 
-`LLM_BASE_URL` permite configurar el endpoint OpenAI-compatible del modelo y, por defecto, apunta a `http://127.0.0.1:8080/v1`. El dataset GAIA requiere acceso autorizado en Hugging Face; configura un token de lectura en `HF_TOKEN`. Copia `.env.example` como `.env` y añade el token. `.env` está excluido de Git. `attachments.py` consulta `gaia-benchmark/GAIA` (configuración `2023_level1`, partición `validation`) mediante `datasets` y `huggingface_hub`.
+`LLM_BASE_URL` configura el endpoint OpenAI-compatible principal y, por defecto, apunta a `http://127.0.0.1:8080/v1`. `OLLAMA_BASE_URL` permite descubrir y usar modelos locales de Ollama desde el selector de experimentos; su valor predeterminado es `http://127.0.0.1:11434/v1`. Ollama debe estar ejecutándose para que sus modelos aparezcan. El dataset GAIA requiere acceso autorizado en Hugging Face; configura un token de lectura en `HF_TOKEN`. Copia `.env.example` como `.env` y añade el token. `.env` está excluido de Git. `attachments.py` consulta `gaia-benchmark/GAIA` (configuración `2023_level1`, partición `validation`) mediante `datasets` y `huggingface_hub`.
 
 El lanzador del modelo acepta estos parámetros:
 
@@ -74,7 +74,7 @@ El script no selecciona explícitamente backend GPU ni capas para offload; el us
 
 ## Ejecución del grafo
 
-El lanzador ofrece modo terminal y frontal web; el frontal permite ejecutar la batería de 20 tareas bajo perfiles de capacidades. Para invocar directamente el grafo con una pregunta de ejemplo y un adjunto Python, inicia primero el servidor local de Qwen y ejecuta:
+El lanzador ofrece modo terminal y frontal web; el frontal permite ejecutar la batería de 20 tareas bajo perfiles de capacidades y seleccionar, por experimento, un modelo del endpoint principal o de Ollama. Para invocar directamente el grafo con una pregunta de ejemplo y un adjunto Python, inicia primero el servidor local de Qwen y ejecuta:
 
 ```powershell
 uv run --extra multimedia --env-file .env python -c "from huggingface_agents_langgraph.graph import build_state_graph; graph = build_state_graph(); print(graph.invoke({'task_id': 'f918266a-b3e0-4914-865d-4faa564f1aef', 'question': 'What is the final numeric output from the attached Python code?', 'file_name': 'f918266a-b3e0-4914-865d-4faa564f1aef.py'}))"
@@ -126,7 +126,7 @@ Con el servidor de Qwen iniciado y `.env` configurado, arranca el frontal local:
 uv run --extra multimedia --env-file .env python -m huggingface_agents_langgraph.web_app
 ```
 
-Abre `http://127.0.0.1:7860`. Permite cargar una pregunta aleatoria o la batería que devuelve `GET /questions`, descargar el adjunto y ejecutar preguntas con perfiles de capacidades configurables. La batería se procesa en orden y muestra la respuesta y la ruta por pregunta. El historial local permite comparar experimentos alineados por `task_id`; solicitar el score oficial envía explícitamente las respuestas al evaluador del curso y actualiza su clasificación. Consulta [docs/ejecucion-local.md](docs/ejecucion-local.md) para los detalles.
+Abre `http://127.0.0.1:7860`. Permite cargar una pregunta aleatoria o la batería que devuelve `GET /questions`, descargar adjuntos, elegir el modelo razonador y ejecutar preguntas con capacidades configurables. El historial local permite comparar experimentos alineados por `task_id` y calcular el acierto por pregunta con el split de validación GAIA. El score oficial sigue siendo una acción separada que envía explícitamente las respuestas al evaluador del curso y actualiza su clasificación. Consulta [docs/ejecucion-local.md](docs/ejecucion-local.md) para los detalles.
 
 ## Desarrollo
 

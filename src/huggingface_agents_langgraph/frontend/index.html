@@ -45,21 +45,6 @@
         </div>
       </section>
 
-      <section class="control-panel" aria-label="Controles de preguntas">
-        <div class="control-copy">
-          <div class="control-label">ELIGE UNA SESIÓN</div>
-          <div class="control-hint">Las preguntas llegan desde la API oficial del curso.</div>
-        </div>
-        <div class="control-actions">
-          <button id="random-button" class="button button-secondary" type="button">
-            <span class="button-icon">↻</span> Pregunta aleatoria
-          </button>
-          <button id="batch-button" class="button button-primary" type="button">
-            <span class="button-icon">▦</span> Cargar batería de 20
-          </button>
-        </div>
-      </section>
-
       <section class="experiment-panel" aria-labelledby="experiment-title">
         <div>
           <div class="control-label">CONFIGURACIÓN DEL EXPERIMENTO</div>
@@ -69,6 +54,14 @@
         <label class="experiment-name-label">Nombre del experimento
           <input id="experiment-name" value="Completo" maxlength="80" />
         </label>
+        <label class="experiment-model-label">Modelo razonador
+          <select id="experiment-model" aria-describedby="experiment-model-help">
+            <option value="null">Consultando modelos locales…</option>
+          </select>
+        </label>
+        <p id="experiment-model-help" class="experiment-model-help">
+          Modelos disponibles en el endpoint configurado y en Ollama.
+        </p>
         <div class="experiment-presets">
           <button class="button button-secondary preset-button" data-profile="full" type="button">Completo</button>
           <button class="button button-secondary preset-button" data-profile="direct" type="button">Solo directo</button>
@@ -83,6 +76,21 @@
           <label><input type="checkbox" data-capability="multimedia" checked /> Imagen, audio y vídeo</label>
         </div>
         <p id="experiment-mode" class="experiment-mode">El router decide qué rama usar.</p>
+      </section>
+
+      <section class="control-panel" aria-label="Controles de preguntas">
+        <div class="control-copy">
+          <div class="control-label">CONFIGURACIÓN LISTA</div>
+          <div class="control-hint">Elige las preguntas para este experimento. Después pulsa “Lanzar experimento”.</div>
+        </div>
+        <div class="control-actions">
+          <button id="random-button" class="button button-secondary" type="button">
+            <span class="button-icon">↻</span> Pregunta aleatoria
+          </button>
+          <button id="batch-button" class="button button-primary" type="button">
+            <span class="button-icon">▦</span> Cargar preguntas (20)
+          </button>
+        </div>
       </section>
 
       <section id="score-panel" class="score-panel" hidden>
@@ -101,6 +109,12 @@
       <section id="experiment-history" class="experiment-history" hidden>
         <div class="control-label">EJECUCIONES LOCALES</div>
         <h2>Comparar experimentos</h2>
+        <p>Calcula el acierto local por pregunta con el split de validación GAIA. Este análisis no publica resultados.</p>
+        <div class="local-evaluation-controls">
+          <label>Experimento a evaluar<select id="local-score-experiment"></select></label>
+          <button id="local-score-button" class="button button-secondary" type="button">Evaluar aciertos localmente</button>
+        </div>
+        <p id="local-score-result" class="score-result" aria-live="polite"></p>
         <div id="experiment-history-list" class="experiment-history-list"></div>
         <div id="comparison-panel" class="comparison-panel" hidden>
           <h3>Respuestas por pregunta</h3>

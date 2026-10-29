@@ -58,7 +58,10 @@ def reasoning(state: AgentState) -> ReasoningUpdate:
     ]
     return {
         "submitted_answer": chat_completion(
-            messages, max_tokens=512, frequency_penalty=0.3
+            messages,
+            max_tokens=512,
+            frequency_penalty=0.3,
+            model=state.get("experiment", {}).get("model"),
         ).strip()
     }
 

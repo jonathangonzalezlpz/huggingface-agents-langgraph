@@ -153,8 +153,8 @@ h1 span {
 }
 .experiment-panel h2, .score-panel h2, .experiment-history h2 { margin: 6px 0 0; font-size: 16px; }
 .experiment-panel p, .score-panel p { margin: 4px 0 0; color: var(--quiet); font-size: 11px; line-height: 1.6; }
-.experiment-name-label, .score-panel label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
-.experiment-name-label input, .score-panel input, .score-panel select {
+.experiment-name-label, .experiment-model-label, .score-panel label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
+.experiment-name-label input, .experiment-model-label select, .score-panel input, .score-panel select {
   min-height: 38px;
   padding: 0 11px;
   border: 1px solid var(--line);
@@ -163,13 +163,15 @@ h1 span {
   background: #101827;
   font: inherit;
 }
+.experiment-model-help { margin-top: -9px !important; }
 .experiment-presets { display: flex; flex-wrap: wrap; gap: 8px; }
 .capability-list { display: flex; flex-wrap: wrap; gap: 10px 20px; }
 .capability-list label { display: flex; align-items: center; gap: 7px; color: #d4deed; font-size: 11px; }
 .capability-list input { accent-color: var(--cyan); }
 .experiment-mode, .score-result { color: var(--cyan) !important; }
 .experiment-history-list { display: grid; gap: 8px; }
-.experiment-history-row { display: grid; grid-template-columns: auto 150px 1fr auto; align-items: center; gap: 12px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; }
+.experiment-history-row { display: grid; grid-template-columns: auto 150px 1fr auto auto; align-items: center; gap: 12px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; }
+.experiment-delete-button { padding: 6px 9px; font-size: 10px; }
 .experiment-select-label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
 .experiment-select-label input { accent-color: var(--cyan); }
 .comparison-panel { min-width: 0; margin-top: 12px; }
@@ -190,13 +192,25 @@ h1 span {
 .experiment-history-row strong { color: #dce5f4; font-size: 11px; }
 .experiment-history-row span { color: var(--quiet); font-size: 10px; }
 .experiment-history-row .experiment-score { color: var(--cyan); }
+.experiment-run-review { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--line); padding-top: 10px; }
+.experiment-run-review summary { color: var(--cyan); cursor: pointer; font-size: 11px; }
+.experiment-run-answers { display: grid; gap: 11px; max-height: 560px; overflow: auto; margin: 12px 0 0; padding-left: 26px; }
+.experiment-run-answers li { padding-left: 4px; color: var(--quiet); }
+.experiment-run-question, .experiment-run-answer, .experiment-run-error { margin: 0 0 5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.experiment-run-question { color: #dce5f4 !important; }
+.experiment-run-answer { color: var(--muted) !important; }
+.experiment-run-error { color: #ffadad !important; }
+.experiment-run-answers small { color: var(--quiet); font-size: 9px; }
 .score-panel[hidden], .experiment-history[hidden] { display: none; }
+.local-evaluation-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.local-evaluation-controls label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
 
 .control-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  margin-top: 18px;
   padding: 22px 24px;
   border-radius: 16px;
 }

@@ -48,13 +48,15 @@ Cada pregunta aparece en una tarjeta con su `task_id`, el texto y si incluye un 
 
 ### Experimentos y evaluación
 
-Antes de ejecutar la batería se puede nombrar un experimento, aplicar perfiles rápidos o configurar cada capacidad por separado: código, Excel, documentos/PDF, multimedia y web/Wikipedia. “Solo directo” fuerza las veinte tareas a pasar del enunciado al razonador. Si se deshabilita la capacidad asociada a un adjunto, el sistema omite su descarga y procesamiento y entrega la pregunta al razonador sin esa evidencia. Cada lanzamiento captura la configuración para que no cambie durante la batería.
+Antes de ejecutar la batería se puede nombrar un experimento, seleccionar el modelo razonador, aplicar perfiles rápidos o configurar cada capacidad por separado: código, Excel, documentos/PDF, multimedia y web/Wikipedia. El selector descubre los modelos anunciados por `LLM_BASE_URL` y por Ollama (`OLLAMA_BASE_URL`); Ollama debe estar ejecutándose y puede cargar el modelo seleccionado al usarlo. “Solo directo” fuerza las veinte tareas a pasar del enunciado al razonador. Si se deshabilita la capacidad asociada a un adjunto, el sistema omite su descarga y procesamiento y entrega la pregunta al razonador sin esa evidencia. Cada lanzamiento captura la configuración, incluido el modelo, para que no cambie durante la batería.
 
 Durante la ejecución se puede detener la batería. El agente termina la pregunta que ya está procesando y se para antes de iniciar la siguiente; al reanudar continúa con las preguntas pendientes y conserva el perfil elegido.
 
-Las ejecuciones completas se guardan en el almacenamiento local del navegador con las respuestas y las rutas utilizadas. El historial permite seleccionar dos o más experimentos y compararlos por `task_id`; también marca si el texto de la pregunta es idéntico, distinto o falta en alguna ejecución. Este historial permanece en el navegador y no se sube al repositorio.
+Las ejecuciones completas se guardan en el almacenamiento local del navegador con las respuestas, el modelo y las rutas utilizadas. Cada ejecución se puede desplegar para volver a consultar sus preguntas, respuestas, rutas, tiempos y aciertos locales después de recargar el frontal. El historial también permite seleccionar dos o más experimentos y compararlos por `task_id`; marca si el texto de la pregunta es idéntico, distinto o falta en alguna ejecución. Estos registros no se suben al repositorio.
 
-La API `GET /questions` no proporciona las respuestas correctas, así que el frontal no puede calcular el porcentaje de acierto comparando localmente. En el panel de puntuación se puede elegir una ejecución y solicitar el score oficial. Solo al pulsar “Enviar y calcular score oficial” se envían usuario, código del agente y las veinte respuestas a `POST /submit`; el servicio devuelve el porcentaje y los aciertos sobre el total y actualiza la clasificación pública del curso. Ejecutar o comparar experimentos no hace ese envío. Las búsquedas web necesitan acceso a Internet; no requieren una clave adicional.
+El panel de ejecuciones permite evaluar localmente una batería completa contra las respuestas del split de validación `2023_level1` de GAIA. Requiere que la cuenta tenga acceso aprobado al dataset y `HF_TOKEN` esté configurado en `.env`. El evaluador aplica comparación exacta sin distinguir mayúsculas y espacios exteriores; guarda solo el porcentaje y el indicador de acierto por `task_id` en el navegador. No muestra ni persiste las respuestas de referencia. Este cálculo local no actualiza la clasificación.
+
+La puntuación oficial es independiente. Solo al pulsar “Enviar y calcular score oficial” se envían usuario, código del agente y las veinte respuestas a `POST /submit`; el servicio devuelve el porcentaje y los aciertos sobre el total y actualiza la clasificación pública del curso. Ejecutar, evaluar localmente o comparar experimentos no hace ese envío. Las búsquedas web necesitan acceso a Internet; no requieren una clave adicional.
 
 Para reducir la latencia, el razonador genera directamente la respuesta final en una llamada, en vez de razonar y hacer después una segunda llamada de reformateo. Las clasificaciones breves del router, código y plan Excel limitan su salida y desactivan el modo de pensamiento extendido de Qwen 3. La extracción de hasta tres páginas web se ejecuta en paralelo. En vídeo, los fotogramas se buscan mediante saltos temporales y solo se activa Whisper/AST si la pregunta pide información de audio; las preguntas visuales no transcriben sonido de fondo.
 
@@ -64,7 +66,7 @@ El modo `terminal` pregunta si quieres cargar una pregunta aleatoria o la bater�
 
 ## API del curso
 
-El proyecto usa los endpoints documentados en el [Hands-On de Unit 4](https://huggingface.co/learn/agents-course/unit4/hands-on):
+El frontal consulta directamente desde el navegador los endpoints documentados en el [Hands-On de Unit 4](https://huggingface.co/learn/agents-course/unit4/hands-on), cuyo servicio permite el origen local mediante CORS. Así, la carga de preguntas no depende de que el proceso Python local tenga salida a Internet:
 
 - `GET /random-question`: una pregunta aleatoria.
 - `GET /questions`: la batería de preguntas.

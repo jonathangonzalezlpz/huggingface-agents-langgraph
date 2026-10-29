@@ -1,6 +1,7 @@
 import pytest
 
 from huggingface_agents_langgraph import routing
+from huggingface_agents_langgraph.experiments import normalize_experiment
 
 
 @pytest.mark.parametrize("route", ["direct", "web", "wikipedia"])
@@ -18,7 +19,7 @@ def test_router_classifies_questions_without_attachments(
     state = {"task_id": "task-1", "question": "Question?", "file_name": ""}
 
     assert routing.router(state) == {"route": route}
-    assert captured[0][1] == {"max_tokens": 32}
+    assert captured[0][1] == {"max_tokens": 32, "model": None}
     assert captured[0][0][0]["content"].endswith("/no_think")
 
 
@@ -72,3 +73,23 @@ def test_router_rejects_invalid_llm_route(monkeypatch: pytest.MonkeyPatch) -> No
 
     with pytest.raises(ValueError, match="unsupported question route"):
         routing.router(state)
+
+
+def test_router_passes_selected_model_to_question_classifier(monkeypatch) -> None:
+    selected_model = {"provider": "ollama", "model_id": "qwen2-local:latest"}
+    captured_models = []
+
+    def classify(_question, model=None):
+        captured_models.append(model)
+        return "direct"
+
+    monkeypatch.setattr(routing, "_classify_question", classify)
+    state = {
+        "task_id": "task-1",
+        "question": "What is 2 + 2?",
+        "file_name": "",
+        "experiment": normalize_experiment({"model": selected_model}),
+    }
+
+    assert routing.router(state) == {"route": "direct"}
+    assert captured_models == [selected_model]

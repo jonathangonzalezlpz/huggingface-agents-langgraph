@@ -6,6 +6,7 @@ from typing import TypedDict
 
 from huggingface_agents_langgraph.experiments import (
     DEFAULT_EXPERIMENT,
+    ModelSelection,
     is_capability_enabled,
 )
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
@@ -74,13 +75,13 @@ def router(state: AgentState) -> RouterUpdate:
     if VIDEO_URL_PATTERN.search(state["question"]):
         return {"route": "multimedia"}
 
-    route = _classify_question(state["question"])
+    route = _classify_question(state["question"], experiment.get("model"))
     if route in {"web", "wikipedia"} and not is_capability_enabled(experiment, "web"):
         return {"route": "direct"}
     return {"route": route}
 
 
-def _classify_question(question: str) -> Route:
+def _classify_question(question: str, model: ModelSelection | None = None) -> Route:
     """Use the LLM to choose the required capability for a no-file task."""
     messages: list[ChatMessage] = [
         {
@@ -97,7 +98,12 @@ def _classify_question(question: str) -> Route:
         },
         {"role": "user", "content": question},
     ]
-    route = chat_completion(messages, max_tokens=32).strip().lower().strip("\"'` .")
+    route = (
+        chat_completion(messages, max_tokens=32, model=model)
+        .strip()
+        .lower()
+        .strip("\"'` .")
+    )
     if route == "direct":
         return "direct"
     if route == "web":

@@ -7,6 +7,7 @@ from typing import Any, TypedDict
 
 from openpyxl import load_workbook
 
+from huggingface_agents_langgraph.experiments import DEFAULT_EXPERIMENT, ModelSelection
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
@@ -70,7 +71,8 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
             ),
         },
     ]
-    plan_response = chat_completion(plan_messages, max_tokens=384)
+    model = state.get("experiment", DEFAULT_EXPERIMENT).get("model")
+    plan_response = chat_completion(plan_messages, max_tokens=384, model=model)
     try:
         plan = json.loads(plan_response)
     except json.JSONDecodeError:
@@ -86,7 +88,7 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
             }
             return {"evidence": [evidence]}
 
-    return _analyze_workbook(state["question"], workbook_data, path)
+    return _analyze_workbook(state["question"], workbook_data, path, model)
 
 
 def _compute_plan(
@@ -197,7 +199,7 @@ def _matches(cell: Any, operator: str, expected: Any) -> bool:
 
 
 def _analyze_workbook(
-    question: str, workbook_data: str, path: Path
+    question: str, workbook_data: str, path: Path, model: ModelSelection | None = None
 ) -> SpreadsheetProcessingUpdate:
     """Use the model's general analysis ability for plans beyond the DSL."""
     messages: list[ChatMessage] = [
@@ -219,7 +221,7 @@ def _analyze_workbook(
         },
     ]
     evidence: Evidence = {
-        "content": chat_completion(messages),
+        "content": chat_completion(messages, model=model),
         "source": str(path),
         "source_type": "spreadsheet_analysis",
     }

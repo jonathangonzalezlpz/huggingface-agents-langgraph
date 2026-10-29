@@ -12,6 +12,8 @@ from urllib.request import Request, urlopen
 from huggingface_agents_langgraph.attachments import get_attachment_path
 from huggingface_agents_langgraph.config import LLM_BASE_URL
 from huggingface_agents_langgraph.graph import build_state_graph
+from huggingface_agents_langgraph.llm import get_available_models
+from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
 from huggingface_agents_langgraph.multimedia_processing import (
     get_multimedia_model_status,
 )
@@ -43,6 +45,8 @@ class WebAppHandler(BaseHTTPRequestHandler):
                     "multimedia_models": get_multimedia_model_status(),
                 },
             )
+        elif request_path == "/api/models":
+            self._send_json(200, {"models": get_available_models()})
         elif request_path.startswith("/api/files/"):
             self._get_attachment(unquote(request_path.removeprefix("/api/files/")))
         else:
@@ -50,6 +54,9 @@ class WebAppHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Run a GAIA task through the local LangGraph workflow."""
+        if urlsplit(self.path).path == "/api/evaluate":
+            self._evaluate_locally()
+            return
         if urlsplit(self.path).path != "/api/run":
             if urlsplit(self.path).path == "/api/score":
                 self._submit_score()
@@ -79,6 +86,31 @@ class WebAppHandler(BaseHTTPRequestHandler):
             return
 
         result["duration_seconds"] = round(perf_counter() - started_at, 3)
+        self._send_json(200, result)
+
+    def _evaluate_locally(self) -> None:
+        try:
+            content_length = int(self.headers.get("Content-Length", "0"))
+            if content_length <= 0 or content_length > MAX_REQUEST_BYTES:
+                raise ValueError("Request body is empty or too large")
+            payload = json.loads(self.rfile.read(content_length))
+            answers = payload.get("answers") if isinstance(payload, dict) else None
+            if not isinstance(answers, list) or len(answers) != 20:
+                raise ValueError("Exactly 20 answers are required")
+            for answer in answers:
+                if (
+                    not isinstance(answer, dict)
+                    or not isinstance(answer.get("task_id"), str)
+                    or not isinstance(answer.get("submitted_answer"), str)
+                ):
+                    raise ValueError("Each answer needs task_id and submitted_answer")
+            result = evaluate_validation_answers(answers)
+        except (ValueError, TypeError, json.JSONDecodeError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        except RuntimeError as error:
+            self._send_json(503, {"error": str(error)})
+            return
         self._send_json(200, result)
 
     def _get_questions(self, request_path: str) -> None:

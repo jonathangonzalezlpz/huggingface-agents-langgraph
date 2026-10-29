@@ -26,6 +26,19 @@ def test_experiment_rejects_unknown_capability() -> None:
         normalize_experiment({"enabled_capabilities": ["chess"]})
 
 
+def test_experiment_keeps_selected_local_model() -> None:
+    model = {"provider": "ollama", "model_id": "qwen2-local:latest"}
+
+    experiment = normalize_experiment({"model": model})
+
+    assert experiment["model"] == model
+
+
+def test_experiment_rejects_unknown_model_provider() -> None:
+    with pytest.raises(ValueError, match="provider is unsupported"):
+        normalize_experiment({"model": {"provider": "remote", "model_id": "model-id"}})
+
+
 def test_direct_experiment_skips_attachment_download() -> None:
     state = {
         "task_id": "task-1",
@@ -78,7 +91,7 @@ def test_router_sends_attachment_direct_when_capability_disabled() -> None:
 def test_router_sends_web_question_direct_when_web_disabled(monkeypatch) -> None:
     monkeypatch.setattr(
         "huggingface_agents_langgraph.routing._classify_question",
-        lambda _question: "web",
+        lambda _question, _model=None: "web",
     )
     state = {
         "task_id": "task-1",

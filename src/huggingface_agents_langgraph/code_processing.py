@@ -8,6 +8,7 @@ from typing import TypedDict
 from huggingface_agents_langgraph.config import (
     CODE_EXECUTION_TIMEOUT_SECONDS,
 )
+from huggingface_agents_langgraph.experiments import DEFAULT_EXPERIMENT, ModelSelection
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
@@ -29,7 +30,8 @@ def code_processing(state: AgentState) -> CodeProcessingUpdate:
         raise FileNotFoundError(f"Python attachment does not exist: {path}")
 
     source = path.read_text(encoding="utf-8")
-    action = _choose_code_action(state["question"], source)
+    model = state.get("experiment", DEFAULT_EXPERIMENT).get("model")
+    action = _choose_code_action(state["question"], source, model)
     if action == "inspect":
         evidence: Evidence = {
             "content": source,
@@ -41,7 +43,9 @@ def code_processing(state: AgentState) -> CodeProcessingUpdate:
     return _execute_python(path, source)
 
 
-def _choose_code_action(question: str, source: str) -> str:
+def _choose_code_action(
+    question: str, source: str, model: ModelSelection | None = None
+) -> str:
     """Ask the configured chat model whether the task requires code execution."""
     messages: list[ChatMessage] = [
         {
@@ -59,7 +63,7 @@ def _choose_code_action(question: str, source: str) -> str:
             "content": f"Task question:\n{question}\n\nPython source:\n{source}",
         },
     ]
-    action = chat_completion(messages, max_tokens=32).lower()
+    action = chat_completion(messages, max_tokens=32, model=model).lower()
 
     if action not in {"execute", "inspect"}:
         raise ValueError(
