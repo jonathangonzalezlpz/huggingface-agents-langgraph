@@ -79,8 +79,13 @@ API local:
 
 Las trazas contienen el texto de las preguntas y de los recursos procesados. Si se cambia `RUNTIME_DIRECTORY`, debe mantenerse ese destino fuera del repositorio versionado. Las respuestas de referencia GAIA se usan exclusivamente en el evaluador local y no se entregan al pipeline.
 
-## Comparación pendiente
+## Comparación histórica
 
-La batería de referencia analizada obtuvo **3/20 (15 %)**, con **146 segundos** de tiempo acumulado y **7,3 segundos** de media. No se atribuye una mejora de acierto a v2 hasta repetir la misma batería con el mismo modelo y capacidades. El nuevo ciclo puede aumentar la latencia: el experimento debe comparar acierto, errores técnicos y tiempo, no únicamente rapidez.
+La evaluación posterior de la V2 obtuvo **6/20 (30 %)** con **47,3 segundos** de
+media. La configuración, revisión conservada, limitaciones y protocolo de evolución
+se recogen en [evolucion-pipeline.md](evolucion-pipeline.md). El siguiente párrafo
+describe el punto de partida anterior a esa evaluación.
+
+La batería previa analizada obtuvo **3/20 (15 %)**, con **146 segundos** de tiempo acumulado y **7,3 segundos** de media. El nuevo ciclo puede aumentar la latencia: el experimento debe comparar acierto, errores técnicos y tiempo, no únicamente rapidez. Las ejecuciones históricas no aíslan causalmente la contribución de cada cambio.
 
 Los tests normales aíslan las llamadas a modelos y servicios. La comparación real debe realizarse desde el panel, sin enviar resultados oficiales de forma automática.

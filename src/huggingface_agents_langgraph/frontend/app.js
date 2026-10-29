@@ -61,6 +61,8 @@ async function requestJson(url, options) {
   if (!response.ok) {
     const error = new Error(payload.error || `Error HTTP ${response.status}`);
     error.runId = payload.run_id;
+    error.pipelineVersion = payload.pipeline_version;
+    error.llmDurationSeconds = payload.llm_duration_seconds;
     throw error;
   }
   return payload;
@@ -106,6 +108,21 @@ function modelLabel(model) {
   return `${model.model_id} · ${provider}`;
 }
 
+function experimentLabel(record) {
+  return record.display_name || record.config.name;
+}
+
+function experimentVersion(record) {
+  return record.verified_pipeline_version || record.pipeline_version || "1";
+}
+
+function retainExperimentHistory(records) {
+  return [...records].sort((a, b) =>
+    Number(Boolean(b.is_reference)) - Number(Boolean(a.is_reference)) ||
+    b.created_at.localeCompare(a.created_at),
+  ).slice(0, 20);
+}
+
 function applyProfile(profile) {
   const allEnabled = profile === "full" || profile === "direct";
   experimentName.dataset.forceDirect = profile === "direct" ? "true" : "false";
@@ -130,7 +147,9 @@ function saveExperimentRecord() {
   );
   const record = {
     id: crypto.randomUUID(),
-    pipeline_version: cards.every((card) => card._result.pipeline_version === "2") ? "2" : "legacy/mixed",
+    pipeline_version: cards.every((card) => card._result.pipeline_version &&
+      card._result.pipeline_version === cards[0]._result.pipeline_version)
+      ? cards[0]._result.pipeline_version : "legacy/mixed",
     created_at: new Date().toISOString(),
     config: sameConfig
       ? configs[0]
@@ -151,7 +170,7 @@ function saveExperimentRecord() {
   };
   const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
   history.unshift(record);
-  localStorage.setItem("gaia-experiments", JSON.stringify(history.slice(0, 20)));
+  localStorage.setItem("gaia-experiments", JSON.stringify(retainExperimentHistory(history)));
   void persistExperiment(record);
   scorePanel.hidden = false;
   scoreResult.textContent = "Experimento guardado en este navegador; puedes calcular la puntuación oficial cuando quieras.";
@@ -174,11 +193,13 @@ async function loadSavedExperiments() {
     const { experiments } = await requestJson("/api/experiments");
     const local = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
     const merged = new Map(experiments.map((record) => [record.id, record]));
-    local.forEach((record) => merged.set(record.id, record));
-    const records = [...merged.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
-    localStorage.setItem("gaia-experiments", JSON.stringify(records.slice(0, 20)));
+    local.forEach((record) => {
+      if (!merged.get(record.id)?.is_reference) merged.set(record.id, record);
+    });
+    const records = retainExperimentHistory([...merged.values()]);
+    localStorage.setItem("gaia-experiments", JSON.stringify(records));
     renderExperimentHistory();
-    await Promise.all(local.map(persistExperiment));
+    await Promise.all(local.filter((record) => !merged.get(record.id)?.is_reference).map(persistExperiment));
   } catch (error) {
     showNotice(`Historial del navegador disponible; servidor inaccesible: ${error.message}`);
   }
@@ -203,7 +224,7 @@ function renderExperimentHistory() {
   history.forEach((record) => {
     const option = document.createElement("option");
     option.value = record.id;
-    option.textContent = `${record.config.name} · ${modelLabel(record.config.model)} · ${new Date(record.created_at).toLocaleString()}`;
+    option.textContent = `${experimentLabel(record)} · ${modelLabel(record.config.model)} · ${new Date(record.created_at).toLocaleString()}`;
     scoreExperimentSelect.append(option);
     localScoreExperimentSelect.append(option.cloneNode(true));
 
@@ -217,7 +238,7 @@ function renderExperimentHistory() {
     checkbox.addEventListener("change", renderExperimentComparison);
     selectLabel.append(checkbox, document.createTextNode("Comparar"));
     const title = document.createElement("strong");
-    title.textContent = `${record.config.name} · ${modelLabel(record.config.model)} · pipeline ${record.pipeline_version || "1"}`;
+    title.textContent = `${experimentLabel(record)} · ${modelLabel(record.config.model)} · pipeline ${experimentVersion(record)}`;
     const details = document.createElement("span");
     const routes = record.answers.reduce((counts, answer) => {
       counts[answer.route] = (counts[answer.route] || 0) + 1;
@@ -236,6 +257,8 @@ function renderExperimentHistory() {
     deleteButton.type = "button";
     deleteButton.className = "button button-secondary experiment-delete-button";
     deleteButton.textContent = "Eliminar";
+    deleteButton.disabled = Boolean(record.is_reference);
+    if (record.is_reference) deleteButton.title = "Referencia V2 conservada para comparación";
     deleteButton.setAttribute("aria-label", `Eliminar experimento ${record.config.name}`);
     deleteButton.addEventListener("click", () => deleteExperiment(record.id));
     const reviewDetails = document.createElement("details");
@@ -305,7 +328,7 @@ function renderExperimentComparison() {
   const table = document.createElement("table");
   table.className = "comparison-table";
   const header = document.createElement("tr");
-  ["Pregunta", ...selected.map((record) => `${record.config.name} · ${modelLabel(record.config.model)} · pipeline ${record.pipeline_version || "1"}`)].forEach((label) => {
+  ["Pregunta", ...selected.map((record) => `${experimentLabel(record)} · ${modelLabel(record.config.model)} · pipeline ${experimentVersion(record)}`)].forEach((label) => {
     const cell = document.createElement("th");
     cell.textContent = label;
     header.append(cell);
@@ -677,7 +700,10 @@ async function processQuestion(card) {
     card._duration.textContent = `Tiempo: ${formatDuration(card._durationSeconds)}`;
     card._status.className = "card-status";
     card._status.textContent = "Error";
-    card._result = { error: error.message, submitted_answer: "", route: "error", run_id: error.runId };
+    card._result = {
+      error: error.message, submitted_answer: "", route: "error", run_id: error.runId,
+      pipeline_version: error.pipelineVersion, llm_duration_seconds: error.llmDurationSeconds,
+    };
     if (error.runId) card._answer.parentElement.append(traceLink(error.runId));
     card._answer.className = "answer-value error";
     card._answer.textContent = error.message;

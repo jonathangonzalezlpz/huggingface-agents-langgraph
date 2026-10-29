@@ -20,6 +20,10 @@ from huggingface_agents_langgraph.config import (
     PIPELINE_TIMEOUT_SECONDS,
     RUNTIME_DIRECTORY,
 )
+from huggingface_agents_langgraph.pipeline_versions import (
+    PIPELINE_VERSION,
+    V2_REFERENCE_ID,
+)
 
 
 @dataclass
@@ -107,11 +111,17 @@ def write_record(kind: str, record: dict) -> None:
     record_id = str(UUID(record["id"]))
     directory = Path(RUNTIME_DIRECTORY) / kind
     directory.mkdir(parents=True, exist_ok=True)
+    destination = directory / f"{record_id}.json"
+    if kind == "experiments" and record_id == V2_REFERENCE_ID and destination.exists():
+        original = json.loads(destination.read_text(encoding="utf-8"))
+        if any(record.get(key) != value for key, value in original.items()):
+            raise ValueError("The V2 reference is immutable; save a new experiment")
+        return
     temporary = directory / f".{record_id}.{uuid4()}.tmp"
     temporary.write_text(
         json.dumps(record, ensure_ascii=False, default=str), encoding="utf-8"
     )
-    temporary.replace(directory / f"{record_id}.json")
+    temporary.replace(destination)
 
 
 def read_record(kind: str, record_id: str) -> dict:
@@ -131,6 +141,8 @@ def list_records(kind: str) -> list[dict]:
 
 def delete_record(kind: str, record_id: str) -> None:
     """Delete only the selected UUID-addressed record."""
+    if kind == "experiments" and str(UUID(record_id)) == V2_REFERENCE_ID:
+        raise ValueError("The V2 reference cannot be deleted from the experiment panel")
     (Path(RUNTIME_DIRECTORY) / kind / f"{UUID(record_id)}.json").unlink(missing_ok=True)
 
 
@@ -142,7 +154,7 @@ def run_pipeline(task: dict) -> dict:
     token = current_trace.set(trace)
     record = {
         "id": str(uuid4()),
-        "pipeline_version": "2",
+        "pipeline_version": PIPELINE_VERSION,
         "created_at": datetime.now(UTC).isoformat(),
         "task": task,
         "limits": {
@@ -159,7 +171,7 @@ def run_pipeline(task: dict) -> dict:
         record["result"] = result
         record["status"] = "completed"
         return result | {
-            "pipeline_version": "2",
+            "pipeline_version": PIPELINE_VERSION,
             "run_id": record["id"],
             "duration_seconds": round(perf_counter() - trace.started, 3),
             "llm_duration_seconds": round(
@@ -170,6 +182,10 @@ def run_pipeline(task: dict) -> dict:
         record["error"] = str(error)
         record["status"] = "error"
         error.run_id = record["id"]
+        error.pipeline_version = PIPELINE_VERSION
+        error.llm_duration_seconds = round(
+            sum(call["duration_seconds"] for call in trace.calls), 3
+        )
         raise
     finally:
         record.update(

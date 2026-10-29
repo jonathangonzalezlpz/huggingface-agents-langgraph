@@ -27,6 +27,9 @@ El diseño contempla rutas especializadas para código, hojas de cálculo, docum
 
 ## Estado actual
 
+La referencia V2 y el protocolo de evaluación individual y conjunta de las mejoras
+se conservan en [docs/evolucion-pipeline.md](docs/evolucion-pipeline.md).
+
 Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia, multimedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM. El revisor puede continuar investigando, abrir enlaces, calcular sin adjuntos o examinar otros instantes de un vídeo. El perfil Solo directo deshabilita las herramientas. `answer_production` presenta la solución y comprueba restricciones mecánicas del formato.
 
 El selector común divide y prioriza evidencias de cualquier fuente textual, mantiene referencias a páginas o URLs y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La ruta web usa DDGS y, cuando la pregunta menciona papers o artículos, añade Europe PMC para buscar publicaciones biomédicas y recuperar texto completo cuando está disponible en acceso abierto. No todos los artículos ni disciplinas están cubiertos por Europe PMC; DDGS sigue como búsqueda general. La ruta Wikipedia consulta la Wikipedia inglesa actual, no una revisión histórica concreta. La extracción PDF requiere una capa de texto; los PDF escaneados todavía necesitan OCR. El frontal permite lanzar experimentos sobre la batería de 20 preguntas y comparar sus resultados.

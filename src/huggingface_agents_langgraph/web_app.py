@@ -17,6 +17,7 @@ from huggingface_agents_langgraph.multimedia_processing import (
     get_gpu_status,
     get_multimedia_model_status,
 )
+from huggingface_agents_langgraph.pipeline_versions import experiment_presentation
 from huggingface_agents_langgraph.run_tracking import (
     delete_record,
     list_records,
@@ -56,7 +57,15 @@ class WebAppHandler(BaseHTTPRequestHandler):
         elif request_path == "/api/models":
             self._send_json(200, {"models": get_available_models()})
         elif request_path == "/api/experiments":
-            self._send_json(200, {"experiments": list_records("experiments")})
+            self._send_json(
+                200,
+                {
+                    "experiments": [
+                        experiment_presentation(record)
+                        for record in list_records("experiments")
+                    ]
+                },
+            )
         elif request_path.startswith("/api/runs/"):
             try:
                 record = read_record("runs", request_path.removeprefix("/api/runs/"))
@@ -98,6 +107,10 @@ class WebAppHandler(BaseHTTPRequestHandler):
                 {
                     "error": str(error),
                     "run_id": getattr(error, "run_id", None),
+                    "pipeline_version": getattr(error, "pipeline_version", None),
+                    "llm_duration_seconds": getattr(
+                        error, "llm_duration_seconds", None
+                    ),
                     "duration_seconds": round(perf_counter() - started_at, 3),
                 },
             )
@@ -108,6 +121,10 @@ class WebAppHandler(BaseHTTPRequestHandler):
                 {
                     "error": str(error),
                     "run_id": getattr(error, "run_id", None),
+                    "pipeline_version": getattr(error, "pipeline_version", None),
+                    "llm_duration_seconds": getattr(
+                        error, "llm_duration_seconds", None
+                    ),
                     "duration_seconds": round(perf_counter() - started_at, 3),
                 },
             )
@@ -124,8 +141,8 @@ class WebAppHandler(BaseHTTPRequestHandler):
             return
         try:
             delete_record("experiments", path.removeprefix("/api/experiments/"))
-        except ValueError:
-            self._send_json(400, {"error": "Invalid experiment ID"})
+        except ValueError as error:
+            self._send_json(400, {"error": str(error)})
             return
         self._send_json(200, {"deleted": True})
 
