@@ -109,7 +109,7 @@ try {
     Write-Host "Qwen is ready at $healthUrl"
 }
 
-$uvArguments = @("run")
+$uvArguments = @("run", "--extra", "multimedia")
 if (Test-Path -LiteralPath (Join-Path $repositoryRoot ".env")) {
     $uvArguments += @("--env-file", ".env")
 } else {

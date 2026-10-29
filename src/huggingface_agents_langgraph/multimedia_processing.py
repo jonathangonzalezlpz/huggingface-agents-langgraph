@@ -1,6 +1,7 @@
 """Extract question-focused evidence from local audio, images, and video."""
 
 import gc
+import math
 import re
 import tempfile
 from pathlib import Path
@@ -24,6 +25,17 @@ AUDIO_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav"}
 SOUND_QUESTION_TERMS = re.compile(
     r"\b(sound|music|song|sing|instrument|noise|birdsong|audio|sounds|"
     r"m\u00fasica|canci\u00f3n|canta|instrumento|ruido|sonido|sonidos)\b",
+    re.IGNORECASE,
+)
+SPEECH_QUESTION_TERMS = re.compile(
+    r"\b(transcrib\w*|transcript|speech|spoken|speaker|say|says|said|speak|"
+    r"talking|conversation|dialogue|lyrics|words|phrase|what is being said|"
+    r"qu[eé] dice|transcripci[oó]n|habla|hablando|cantando|letra)\b",
+    re.IGNORECASE,
+)
+ACOUSTIC_ONLY_QUESTION_TERMS = re.compile(
+    r"\b(sound(s)?|noise(s)?|instrument(s)?|birdsong|footsteps|"
+    r"audio event(s)?|sonido(s)?|ruido(s)?|instrumento(s)?)\b",
     re.IGNORECASE,
 )
 VIDEO_URL_PATTERN = re.compile(
@@ -73,16 +85,20 @@ def multimedia_processing(state: AgentState) -> MultimediaProcessingUpdate:
 
 
 def _inspect_audio(path: Path, question: str, source: str) -> list[Evidence]:
-    transcript = _transcribe(path)
-    evidence = []
-    if transcript:
-        evidence.append(
-            {
-                "content": f"Audio transcription:\n{transcript}",
-                "source": source,
-                "source_type": "audio_transcription",
-            }
-        )
+    evidence: list[Evidence] = []
+    needs_transcription = not ACOUSTIC_ONLY_QUESTION_TERMS.search(
+        question
+    ) or SPEECH_QUESTION_TERMS.search(question)
+    if needs_transcription:
+        transcript = _transcribe(path)
+        if transcript:
+            evidence.append(
+                {
+                    "content": f"Audio transcription:\n{transcript}",
+                    "source": source,
+                    "source_type": "audio_transcription",
+                }
+            )
 
     if SOUND_QUESTION_TERMS.search(question):
         labels = _classify_audio(path)
@@ -109,7 +125,14 @@ def _inspect_image(path: Path, question: str, source: str) -> Evidence:
 
 
 def _inspect_video(path: Path, question: str, source: str) -> list[Evidence]:
-    evidence = _inspect_audio(path, question, source) if _has_audio_stream(path) else []
+    asks_about_audio = bool(
+        SOUND_QUESTION_TERMS.search(question) or SPEECH_QUESTION_TERMS.search(question)
+    )
+    evidence = (
+        _inspect_audio(path, question, source)
+        if asks_about_audio and _has_audio_stream(path)
+        else []
+    )
     for timestamp, image in _sample_video_frames(path):
         description = _run_vision_model(image, question)
         evidence.append(
@@ -198,7 +221,7 @@ def _run_vision_model(image, question: str) -> str:
         with _vision_pipeline_manager.use() as vision_pipeline:
             response = vision_pipeline(
                 text=messages,
-                max_new_tokens=180,
+                max_new_tokens=120,
                 return_full_text=False,
             )
     except ImportError as error:
@@ -373,22 +396,44 @@ def _sample_video_frames(path: Path) -> list[tuple[float, object]]:
             raise ValueError("Video attachment contains no video stream")
         duration = (
             float(video_stream.duration * video_stream.time_base)
-            if video_stream.duration is not None
+            if video_stream.duration is not None and video_stream.time_base is not None
             else 0.0
         )
-        interval = max(
-            MEDIA_VIDEO_FRAME_INTERVAL_SECONDS,
-            duration / max(MEDIA_MAX_VIDEO_FRAMES - 1, 1),
-        )
-        next_timestamp = 0.0
-        for frame in container.decode(video_stream):
-            timestamp = float(frame.time or 0.0)
-            if timestamp < next_timestamp:
-                continue
-            frames.append((timestamp, frame.to_image()))
-            next_timestamp = timestamp + interval
-            if len(frames) >= MEDIA_MAX_VIDEO_FRAMES:
-                break
+        if duration > 0 and video_stream.time_base is not None:
+            interval = max(
+                MEDIA_VIDEO_FRAME_INTERVAL_SECONDS,
+                duration / max(MEDIA_MAX_VIDEO_FRAMES - 1, 1),
+            )
+            sample_count = min(
+                MEDIA_MAX_VIDEO_FRAMES,
+                math.floor(duration / interval) + 1,
+            )
+            start_ticks = video_stream.start_time or 0
+            start_seconds = float(start_ticks * video_stream.time_base)
+            for index in range(sample_count):
+                offset = min(index * interval, duration)
+                target_seconds = start_seconds + offset
+                target_ticks = start_ticks + round(offset / video_stream.time_base)
+                container.seek(target_ticks, stream=video_stream)
+                for frame in container.decode(video_stream):
+                    timestamp = frame.time
+                    if timestamp is None and frame.pts is not None:
+                        frame_time_base = frame.time_base or video_stream.time_base
+                        timestamp = float(frame.pts * frame_time_base)
+                    if timestamp is None or timestamp < target_seconds:
+                        continue
+                    frames.append((float(timestamp), frame.to_image()))
+                    break
+        else:
+            next_timestamp = 0.0
+            for frame in container.decode(video_stream):
+                timestamp = float(frame.time or 0.0)
+                if timestamp < next_timestamp:
+                    continue
+                frames.append((timestamp, frame.to_image()))
+                next_timestamp = timestamp + MEDIA_VIDEO_FRAME_INTERVAL_SECONDS
+                if len(frames) >= MEDIA_MAX_VIDEO_FRAMES:
+                    break
     return frames
 
 
@@ -409,8 +454,7 @@ def download_video(url: str, directory: Path) -> Path:
         ) from error
 
     options = {
-        "format": "bestvideo[height<=480]+bestaudio/best[height<=480]",
-        "merge_output_format": "mp4",
+        "format": "best[height<=480]/bestvideo*[height<=480]/bestvideo*/best",
         "outtmpl": str(directory / "source.%(ext)s"),
         "quiet": True,
         "no_warnings": True,

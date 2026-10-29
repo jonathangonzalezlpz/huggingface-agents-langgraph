@@ -1,5 +1,7 @@
+import sys
 from pathlib import Path
 from time import sleep
+from types import SimpleNamespace
 
 import pytest
 
@@ -63,7 +65,11 @@ def test_audio_classification_is_added_for_sound_questions(
 ) -> None:
     audio_path = tmp_path / "song.mp3"
     audio_path.touch()
-    monkeypatch.setattr(media, "_transcribe", lambda _path: "")
+
+    def unexpected_transcription(_path):
+        raise AssertionError("Acoustic-only questions should skip transcription")
+
+    monkeypatch.setattr(media, "_transcribe", unexpected_transcription)
     monkeypatch.setattr(
         media,
         "_classify_audio",
@@ -97,7 +103,7 @@ def test_video_processing_uses_transcript_and_sampled_frames(
     result = media.multimedia_processing(
         {
             "task_id": "task-1",
-            "question": "How many birds are visible?",
+            "question": "How many birds are visible and what does the narrator say?",
             "file_name": "clip.mp4",
             "file_path": video_path,
         }
@@ -108,6 +114,79 @@ def test_video_processing_uses_transcript_and_sampled_frames(
         "video_frame_vlm",
     ]
     assert result["evidence"][1]["source"].endswith("#t=2.5s")
+
+
+def test_video_skips_audio_models_for_visual_question(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    video_path = tmp_path / "birds.mp4"
+    video_path.touch()
+
+    def unexpected_audio_call(_path):
+        raise AssertionError("Visual-only video questions should skip audio analysis")
+
+    monkeypatch.setattr(media, "_has_audio_stream", unexpected_audio_call)
+    monkeypatch.setattr(media, "_transcribe", unexpected_audio_call)
+    monkeypatch.setattr(media, "_sample_video_frames", lambda _path: [(4.0, object())])
+    monkeypatch.setattr(
+        media, "_run_vision_model", lambda _image, _question: "Three birds are visible."
+    )
+
+    result = media.multimedia_processing(
+        {
+            "task_id": "task-1",
+            "question": "How many bird species are visible at once?",
+            "file_name": "birds.mp4",
+            "file_path": video_path,
+        }
+    )
+
+    assert [item["source_type"] for item in result["evidence"]] == ["video_frame_vlm"]
+
+
+def test_video_sampling_seeks_to_sparse_timestamps(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seeks = []
+    stream = SimpleNamespace(type="video", duration=20, time_base=1, start_time=0)
+    target_stream = stream
+
+    class FakeFrame:
+        def __init__(self, timestamp: float) -> None:
+            self.time = timestamp
+            self.pts = None
+
+        def to_image(self) -> float:
+            return self.time
+
+    class FakeContainer:
+        streams = [stream]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def seek(self, offset: int, *, stream: object) -> None:
+            assert stream is target_stream
+            seeks.append(offset)
+
+        def decode(self, _stream):
+            return iter([FakeFrame(float(seeks[-1]))])
+
+    monkeypatch.setitem(
+        sys.modules,
+        "av",
+        SimpleNamespace(open=lambda _path: FakeContainer()),
+    )
+
+    frames = media._sample_video_frames(tmp_path / "clip.mp4")
+
+    assert seeks == [0, 5, 10, 15, 20]
+    assert [timestamp for timestamp, _frame in frames] == [0, 5, 10, 15, 20]
 
 
 def test_media_processing_rejects_missing_attachment() -> None:
