@@ -237,9 +237,11 @@ h1 span {
 
 .session-bar strong { display: block; margin-top: 4px; font-size: 13px; }
 .session-progress { flex: 1; margin-left: auto; color: var(--muted); font-size: 11px; text-align: right; }
+.timing-summary { display: block; margin-top: 5px; color: var(--cyan); font-family: "DM Mono", Consolas, monospace; }
 .progress-track { width: 100%; height: 3px; margin-top: 8px; overflow: hidden; border-radius: 8px; background: rgba(255,255,255,.1); }
 .progress-track span { display: block; width: 0; height: 100%; background: linear-gradient(90deg, var(--cyan), var(--purple)); transition: width 180ms ease; }
 .button-run-all { min-height: 36px; color: #d9d2ff; border-color: rgba(169, 154, 255, 0.3); background: rgba(169, 154, 255, 0.1); }
+.button-stop { min-height: 36px; color: #ffd0ae; border-color: rgba(255, 177, 126, .32); background: rgba(255, 177, 126, .09); }
 
 .notice { margin-top: 18px; padding: 12px 15px; border: 1px solid rgba(255, 177, 126, .25); border-radius: 10px; color: #ffd0ae; background: rgba(255, 177, 126, .07); font-size: 12px; }
 .notice[hidden], .session-bar[hidden] { display: none; }
@@ -269,6 +271,8 @@ h1 span {
 .card-actions { display: flex; justify-content: flex-end; margin-top: 19px; }
 .run-button { min-height: 37px; color: #d7fff7; border-color: rgba(102,228,210,.22); background: rgba(102,228,210,.08); }
 .answer-panel { display: grid; grid-template-columns: 130px 1fr; gap: 14px; padding: 15px 20px; border-top: 1px solid var(--line); background: rgba(0,0,0,.12); }
+.answer-meta { display: grid; gap: 5px; }
+.answer-duration { color: var(--muted); font-family: "DM Mono", Consolas, monospace; font-size: 10px; }
 .answer-label { padding-top: 4px; color: var(--quiet); font-family: "DM Mono", Consolas, monospace; font-size: 9px; letter-spacing: .1em; }
 .answer-value { color: #d5e1f3; font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .answer-value.pending { color: #74839a; }

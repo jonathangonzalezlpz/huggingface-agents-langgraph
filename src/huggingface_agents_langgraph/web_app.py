@@ -4,6 +4,7 @@ import json
 import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from time import perf_counter
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -56,6 +57,7 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Not found"})
             return
 
+        started_at = perf_counter()
         try:
             content_length = int(self.headers.get("Content-Length", "0"))
             if content_length <= 0 or content_length > MAX_REQUEST_BYTES:
@@ -67,9 +69,16 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": str(error)})
             return
         except Exception as error:
-            self._send_json(500, {"error": str(error)})
+            self._send_json(
+                500,
+                {
+                    "error": str(error),
+                    "duration_seconds": round(perf_counter() - started_at, 3),
+                },
+            )
             return
 
+        result["duration_seconds"] = round(perf_counter() - started_at, 3)
         self._send_json(200, result)
 
     def _get_questions(self, request_path: str) -> None:

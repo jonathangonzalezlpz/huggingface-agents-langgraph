@@ -1,10 +1,12 @@
 const randomButton = document.querySelector("#random-button");
 const batchButton = document.querySelector("#batch-button");
 const runAllButton = document.querySelector("#run-all-button");
+const stopAllButton = document.querySelector("#stop-all-button");
 const questionList = document.querySelector("#question-list");
 const sessionBar = document.querySelector("#session-bar");
 const sessionTitle = document.querySelector("#session-title");
 const progressLabel = document.querySelector("#progress-label");
+const timingSummary = document.querySelector("#timing-summary");
 const progressFill = document.querySelector("#progress-fill");
 const notice = document.querySelector("#notice");
 const modelStatusList = document.querySelector("#model-status-list");
@@ -21,6 +23,10 @@ const experimentHistoryList = document.querySelector("#experiment-history-list")
 const comparisonPanel = document.querySelector("#comparison-panel");
 const comparisonContent = document.querySelector("#comparison-content");
 let activeExperimentSnapshot = null;
+let sessionExperimentSnapshot = null;
+let stopRequested = false;
+let currentBatchIndex = null;
+let batchLaunched = false;
 const MODEL_STATE_LABELS = {
   ready: "En memoria",
   loaded: "En memoria",
@@ -55,7 +61,8 @@ async function requestJson(url, options) {
 function setBusy(busy) {
   randomButton.disabled = busy;
   batchButton.disabled = busy;
-  runAllButton.disabled = busy;
+  runAllButton.disabled = busy || batchLaunched;
+  stopAllButton.disabled = !busy || stopRequested;
 }
 
 function getExperiment() {
@@ -102,8 +109,10 @@ function saveExperimentRecord() {
       question: card._question.question,
       submitted_answer: card._result.submitted_answer || "",
       route: card._result.route || "error",
+      duration_seconds: card._durationSeconds,
       experiment: card._experimentUsed,
     })),
+    average_duration_seconds: averageDuration(cards),
   };
   const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
   history.unshift(record);
@@ -220,8 +229,41 @@ function renderExperimentComparison() {
 }
 
 function setProgress(processed, total) {
-  progressLabel.textContent = `${processed} / ${total} procesadas`;
+  const current = currentBatchIndex === null
+    ? ""
+    : ` · procesando ${currentBatchIndex}/${total}`;
+  progressLabel.textContent = `${processed} / ${total} procesadas${current}`;
   progressFill.style.width = total ? `${(processed / total) * 100}%` : "0%";
+}
+
+function averageDuration(cards) {
+  const durations = cards.map((card) => card._durationSeconds).filter(Number.isFinite);
+  return durations.length
+    ? durations.reduce((sum, duration) => sum + duration, 0) / durations.length
+    : null;
+}
+
+function formatDuration(seconds) {
+  return `${seconds.toFixed(1)} s`;
+}
+
+function updateTimingSummary() {
+  const cards = [...questionList.querySelectorAll(".question-card")];
+  const durations = cards.map((card) => card._durationSeconds).filter(Number.isFinite);
+  if (!durations.length) {
+    timingSummary.textContent = "";
+    return;
+  }
+  const average = durations.reduce((sum, duration) => sum + duration, 0) / durations.length;
+  timingSummary.textContent = `Media: ${formatDuration(average)} · ${durations.length} medida${durations.length === 1 ? "" : "s"}`;
+}
+
+function setExperimentControlsDisabled(disabled) {
+  experimentName.disabled = disabled;
+  capabilityInputs.forEach((input) => { input.disabled = disabled; });
+  document.querySelectorAll(".preset-button").forEach((button) => {
+    button.disabled = disabled;
+  });
 }
 
 function renderModelStatus(model) {
@@ -335,7 +377,12 @@ function renderQuestion(question, index, total) {
   const answerValue = document.createElement("span");
   answerValue.className = "answer-value pending";
   answerValue.textContent = "Pendiente de ejecutar";
-  answerPanel.append(answerLabel, answerValue);
+  const answerMeta = document.createElement("div");
+  answerMeta.className = "answer-meta";
+  const duration = document.createElement("span");
+  duration.className = "answer-duration";
+  answerMeta.append(answerLabel, duration);
+  answerPanel.append(answerMeta, answerValue);
   card.append(cardTop, body, answerPanel);
   card._question = {
     task_id: question.task_id,
@@ -344,12 +391,17 @@ function renderQuestion(question, index, total) {
   };
   card._status = status;
   card._answer = answerValue;
+  card._duration = duration;
+  card._durationSeconds = null;
   card._runButton = runButton;
   card._result = null;
   return card;
 }
 
 function displayQuestions(questions, title) {
+  sessionExperimentSnapshot = null;
+  batchLaunched = false;
+  setExperimentControlsDisabled(false);
   questionList.replaceChildren();
   const fragment = document.createDocumentFragment();
   questions.forEach((question, index) => {
@@ -359,7 +411,12 @@ function displayQuestions(questions, title) {
   sessionTitle.textContent = title;
   sessionBar.hidden = false;
   runAllButton.hidden = questions.length < 2;
+  runAllButton.disabled = false;
+  runAllButton.textContent = "▶ Lanzar experimento";
+  stopAllButton.hidden = true;
+  stopAllButton.disabled = true;
   setProgress(0, questions.length);
+  timingSummary.textContent = "";
 }
 
 async function loadRandomQuestion() {
@@ -394,6 +451,7 @@ async function loadQuestionBatch() {
 }
 
 async function processQuestion(card) {
+  const startedAt = performance.now();
   clearNotice();
   card._status.className = "card-status running";
   card._status.textContent = "Procesando";
@@ -408,6 +466,10 @@ async function processQuestion(card) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...card._question, experiment }),
     });
+    card._durationSeconds = Number.isFinite(result.duration_seconds)
+      ? result.duration_seconds
+      : (performance.now() - startedAt) / 1000;
+    card._duration.textContent = `Tiempo: ${formatDuration(card._durationSeconds)}`;
     card._result = result;
     card._status.className = "card-status done";
     card._status.textContent = result.submitted_answer ? "Respondida" : "Sin respuesta";
@@ -419,6 +481,8 @@ async function processQuestion(card) {
       card._answer.textContent = `Ruta «${result.route || "desconocida"}» todavía no implementada`;
     }
   } catch (error) {
+    card._durationSeconds = (performance.now() - startedAt) / 1000;
+    card._duration.textContent = `Tiempo: ${formatDuration(card._durationSeconds)}`;
     card._status.className = "card-status";
     card._status.textContent = "Error";
     card._result = { error: error.message, submitted_answer: "", route: "error" };
@@ -427,6 +491,7 @@ async function processQuestion(card) {
   } finally {
     card._runButton.disabled = false;
     updateBatchProgress();
+    updateTimingSummary();
     saveExperimentRecord();
     void refreshModelStatus();
   }
@@ -473,26 +538,66 @@ function updateBatchProgress() {
 
 async function processAllQuestions() {
   clearNotice();
+  if (batchLaunched) return;
+  const cards = [...questionList.querySelectorAll(".question-card")];
+  const pendingCards = cards.filter((card) => !card._result);
+  if (!pendingCards.length) return;
+
+  if (!sessionExperimentSnapshot) {
+    sessionExperimentSnapshot = structuredClone(getExperiment());
+  }
+  activeExperimentSnapshot = sessionExperimentSnapshot;
+  batchLaunched = true;
+  stopRequested = false;
   setBusy(true);
-  activeExperimentSnapshot = structuredClone(getExperiment());
-  capabilityInputs.forEach((input) => { input.disabled = true; });
-  document.querySelectorAll(".preset-button").forEach((button) => { button.disabled = true; });
+  setExperimentControlsDisabled(true);
+  stopAllButton.hidden = false;
+  stopAllButton.disabled = false;
+  stopAllButton.textContent = "■ Detener";
+  runAllButton.textContent = "Procesando batería…";
   try {
-    const cards = [...questionList.querySelectorAll(".question-card")];
-    for (const card of cards) {
+    for (const card of pendingCards) {
+      if (stopRequested) break;
+      currentBatchIndex = cards.indexOf(card) + 1;
+      setProgress(
+        cards.filter((item) => item._result).length,
+        cards.length,
+      );
       await processQuestion(card);
     }
   } finally {
     activeExperimentSnapshot = null;
-    capabilityInputs.forEach((input) => { input.disabled = false; });
-    document.querySelectorAll(".preset-button").forEach((button) => { button.disabled = false; });
+    currentBatchIndex = null;
+    const hasPendingCards = cards.some((card) => !card._result);
+    sessionExperimentSnapshot = null;
+    if (!hasPendingCards) {
+      runAllButton.textContent = "Batería completada";
+    } else {
+      runAllButton.textContent = "Batería detenida";
+      setProgress(cards.filter((card) => card._result).length, cards.length);
+    }
+    stopAllButton.hidden = true;
+    stopAllButton.disabled = true;
+    stopAllButton.textContent = "■ Detener";
     setBusy(false);
+    setExperimentControlsDisabled(false);
+    if (stopRequested && hasPendingCards) {
+      progressLabel.textContent += " · detenido tras completar la pregunta en curso";
+    } else if (!hasPendingCards) {
+      progressLabel.textContent = `${cards.length} / ${cards.length} procesadas · experimento completado`;
+    }
   }
 }
 
 randomButton.addEventListener("click", loadRandomQuestion);
 batchButton.addEventListener("click", loadQuestionBatch);
 runAllButton.addEventListener("click", processAllQuestions);
+stopAllButton.addEventListener("click", () => {
+  stopRequested = true;
+  stopAllButton.disabled = true;
+  stopAllButton.textContent = "Deteniendo tras esta pregunta…";
+  progressLabel.textContent += " · se detendrá al terminar la pregunta en curso";
+});
 refreshModelsButton.addEventListener("click", refreshModelStatus);
 document.querySelectorAll(".preset-button").forEach((button) => {
   button.addEventListener("click", () => applyProfile(button.dataset.profile));
