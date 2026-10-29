@@ -1,16 +1,33 @@
+---
+title: GAIA LangGraph Agent
+emoji: 🧭
+colorFrom: indigo
+colorTo: green
+sdk: static
+app_file: space/index.html
+license: mit
+short_description: Local LangGraph agent for GAIA tasks and experiment tracking
+tags:
+  - agents
+  - langgraph
+  - gaia
+  - evaluation
+  - portfolio
+---
+
 # huggingface-agents-langgraph
 
 Implementación en desarrollo de la asignación final de la Unidad 4 del [Hugging Face Agents Course](https://huggingface.co/learn/agents-course/unit4/introduction). El objetivo es construir con LangGraph un sistema que resuelva tareas GAIA de nivel 1 mediante capacidades especializadas. Las respuestas finales deben respetar la restricción **Exact Match**: devolver la respuesta solicitada sin explicación ni texto adicional.
 
 ## Diseño
 
-La arquitectura es un workflow controlado e híbrido. Usa señales deterministas, como la extensión del adjunto, para seleccionar capacidades conocidas; deja al LLM las decisiones que requieren interpretar la pregunta. El flujo resuelve adjuntos, obtiene evidencias, razona sobre ellas y genera la respuesta final en una sola llamada de razonamiento.
+La arquitectura es un workflow controlado e híbrido. Usa señales deterministas, como la extensión del adjunto, para seleccionar capacidades conocidas; deja al LLM las decisiones que requieren interpretar la pregunta. El pipeline v2 revisa la suficiencia de las evidencias y puede encadenar herramientas dentro de límites configurables antes de resolver y producir la respuesta final en etapas separadas.
 
 El diseño contempla rutas especializadas para código, hojas de cálculo, documentos, investigación web y preguntas resolubles directamente. `Evidence` ya está definido con `content`, `source_type` y `source`, para asociar la información obtenida con su procedencia. La arquitectura y las decisiones están desarrolladas en [docs/analisis-inicial-gaia.md](docs/analisis-inicial-gaia.md); este README resume el estado actual.
 
 ## Estado actual
 
-Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia, multimedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM: la ruta web busca y lee páginas, Wikipedia usa su API y la ruta directa llega al razonador solo con la pregunta. El razonador produce directamente `submitted_answer` para evitar una segunda llamada de formato.
+Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia, multimedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM. El revisor puede continuar investigando, abrir enlaces, calcular sin adjuntos o examinar otros instantes de un vídeo. El perfil Solo directo deshabilita las herramientas. `answer_production` presenta la solución y comprueba restricciones mecánicas del formato.
 
 El selector común divide y prioriza evidencias de cualquier fuente textual, mantiene referencias a páginas o URLs y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La ruta web usa DDGS y, cuando la pregunta menciona papers o artículos, añade Europe PMC para buscar publicaciones biomédicas y recuperar texto completo cuando está disponible en acceso abierto. No todos los artículos ni disciplinas están cubiertos por Europe PMC; DDGS sigue como búsqueda general. La ruta Wikipedia consulta la Wikipedia inglesa actual, no una revisión histórica concreta. La extracción PDF requiere una capa de texto; los PDF escaneados todavía necesitan OCR. El frontal permite lanzar experimentos sobre la batería de 20 preguntas y comparar sus resultados.
 
@@ -147,3 +164,9 @@ Se pueden cambiar `MEDIA_ASR_MODEL`, `MEDIA_AUDIO_CLASSIFIER_MODEL` y `MEDIA_VLM
 ## Pipeline v2
 
 El agente puede encadenar investigación, seguir enlaces y papers, calcular sin adjuntos y revisar fotogramas adicionales dentro de límites configurables. La resolución dispone de un presupuesto propio y la respuesta final tiene validación de formato. Las trazas y los experimentos se conservan en el servidor local, además de la copia del navegador. Consulta [docs/pipeline-v2.md](docs/pipeline-v2.md) para el grafo, la configuración, las métricas y sus límites.
+
+## Publicación y autoría
+
+El [Space público](https://huggingface.co/spaces/jonyglez/huggingface-agents-langgraph) presenta el proyecto y su código. El agente y el panel de experimentos se ejecutan en local; la presentación estática no ejecuta inferencias ni recibe las credenciales del entorno local. Consulta [docs/publicacion-space.md](docs/publicacion-space.md) para preparar y auditar las publicaciones.
+
+Autor: [Jonathan González López](https://www.linkedin.com/in/jonathan-gonz%C3%A1lez-l%C3%B3pez-31b578209/). Código distribuido bajo la [licencia MIT](LICENSE). Los modelos y datasets conservan sus propias licencias y condiciones de acceso.

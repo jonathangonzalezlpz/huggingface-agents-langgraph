@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Un agente con LangGraph para investigar tareas GAIA. Proyecto de Jonathan González López con modelos locales, herramientas y experimentos reproducibles." />
+  <meta name="color-scheme" content="dark" />
+  <title>GAIA Agent · Jonathan González López</title>
+  <style>
+    :root { --bg: #101619; --panel: #182126; --line: #314047; --ink: #f2f4ee; --muted: #b0bcbf; --lime: #d2f58c; --mint: #8de2ca; --mono: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.65 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    a { color: inherit; text-underline-offset: 4px; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--mint); outline-offset: 6px; }
+    .wrap { width: min(1180px, calc(100% - 64px)); margin-inline: auto; }
+    .skip { position: absolute; top: -80px; left: 20px; padding: 10px; background: var(--lime); color: var(--bg); z-index: 2; }
+    .skip:focus { top: 15px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 26px 0; border-bottom: 1px solid var(--line); }
+    .brand { display: inline-flex; align-items: center; gap: 12px; font-weight: 650; font-size: 14px; text-decoration: none; }
+    .mark { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid var(--lime); border-radius: 11px; color: var(--lime); font: 14px var(--mono); }
+    nav { display: flex; flex-wrap: wrap; gap: 24px; font-size: 13px; color: var(--muted); }
+    nav a { text-decoration: none; }
+    nav a:hover { color: var(--lime); }
+    .eyebrow, .section-label { display: flex; align-items: center; gap: 10px; color: var(--mint); font: 11px/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 16px #8de2ca50; }
+    .hero { display: grid; grid-template-columns: 1.15fr 1fr; gap: 65px; align-items: center; padding: 80px 0 65px; }
+    h1 { margin: 22px 0; font-size: clamp(43px, 5.4vw, 73px); line-height: 1.06; letter-spacing: -.065em; font-weight: 640; }
+    h1 em { color: var(--lime); font-style: normal; }
+    .intro { color: var(--muted); max-width: 510px; font-size: 17px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 16px; padding: 12px 18px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 650; transition: background .2s, transform .2s; }
+    .button:hover { background: #26353c; transform: translateY(-2px); }
+    .button.primary { background: var(--lime); color: #152014; border-color: var(--lime); }
+    .button.primary:hover { background: #e1ffac; }
+    .hero-note { margin-top: 20px; color: var(--muted); font: 11px/1.8 var(--mono); }
+    .flow { position: relative; border: 1px solid var(--line); border-radius: 20px; background: radial-gradient(ellipse at 100% 0, #30584d38, transparent 65%), var(--panel); padding: 24px; box-shadow: 0 28px 65px #0003; }
+    .flow-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 10px var(--mono); color: var(--muted); margin-bottom: 24px; }
+    .pill { border: 1px solid #a8ce7840; border-radius: 30px; padding: 4px 9px; color: var(--lime); font: 10px var(--mono); }
+    .node { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 9px; background: #111b20; }
+    .node .number { color: var(--mint); font: 11px var(--mono); }
+    .node strong { font-size: 13px; font-weight: 600; }
+    .node small { display: block; color: var(--muted); font-size: 11px; }
+    .connector { height: 20px; width: 1px; background: var(--line); margin-left: 26px; }
+    .tool-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 13px 0; }
+    .tool { border: 1px solid #344c4c; border-radius: 7px; color: #c6dfd7; padding: 9px 4px; text-align: center; font: 10px/1.7 var(--mono); }
+    .loop { display: flex; align-items: center; gap: 9px; margin: 10px 0 10px 27px; color: var(--mint); font: 10px/1.6 var(--mono); }
+    .result { border-color: #d2f58c60; background: #d2f58c0a; }
+    .result .number { color: var(--lime); }
+    .principles { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 24px 0; gap: 28px; }
+    .principles strong { font-size: 15px; font-weight: 600; }
+    .principles p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+    section.content { padding-top: 68px; }
+    .section-top { display: flex; justify-content: space-between; align-items: end; gap: 25px; margin-bottom: 26px; }
+    h2 { margin: 9px 0 0; font-size: clamp(27px, 3.3vw, 38px); line-height: 1.2; letter-spacing: -.04em; font-weight: 600; }
+    .section-top > p { max-width: 390px; margin: 0; color: var(--muted); font-size: 14px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 25px; background: #18212680; }
+    .card .icon { display: inline-block; color: var(--lime); font: 19px var(--mono); height: 30px; }
+    h3 { margin: 16px 0 8px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+    .card p { margin: 0; color: var(--muted); font-size: 13px; }
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    .experiment { border: 1px solid var(--line); border-radius: 14px; padding: 28px; background: var(--panel); }
+    .experiment h3 { margin-top: 0; }
+    .experiment p, .disclosure p { color: var(--muted); font-size: 14px; }
+    .checks { list-style: none; padding: 0; margin: 22px 0; }
+    .checks li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .checks li::before { content: "+"; color: var(--lime); font-family: var(--mono); margin-right: 12px; }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 20px; }
+    .tag { padding: 5px 9px; border-radius: 5px; background: #ffffff08; border: 1px solid var(--line); color: var(--muted); font: 10px var(--mono); }
+    details { padding: 15px 0; border-bottom: 1px solid var(--line); }
+    summary { cursor: pointer; color: var(--ink); font-size: 14px; }
+    details p { margin-bottom: 0; }
+    .author { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 35px; margin-top: 70px; padding: 35px; background: var(--lime); color: #152014; border-radius: 15px; }
+    .author .section-label { color: #40532b; }
+    .author h2 { margin: 6px 0 10px; font-size: clamp(25px, 3.2vw, 37px); }
+    .author p { margin: 0; max-width: 600px; font-size: 14px; }
+    .author .button { background: #17231c; color: #f2f4ee; border-color: #17231c; white-space: nowrap; }
+    .author .button:hover { background: #2c4333; }
+    footer { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 30px 0; font: 10px/1.8 var(--mono); color: var(--muted); }
+    footer a { text-decoration: none; }
+    @media (max-width: 900px) { .hero { gap: 35px; padding-top: 55px; } .wrap { width: calc(100% - 40px); } .cards { grid-template-columns: repeat(2, 1fr); } .author { grid-template-columns: 1fr; gap: 20px; } .author .button { justify-self: start; } }
+    @media (max-width: 680px) { header { align-items: start; } nav { gap: 12px; justify-content: end; max-width: 180px; } .hero, .details-grid { grid-template-columns: 1fr; } .hero { gap: 32px; padding-bottom: 38px; } h1 { max-width: 530px; } .principles { grid-template-columns: 1fr; gap: 20px; } .section-top { display: block; } .section-top > p { margin-top: 15px; } .cards { grid-template-columns: 1fr; } section.content { padding-top: 45px; } .author { margin-top: 45px; padding: 25px; } .flow { padding: 20px; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .button { transition: none; } }
+  </style>
+</head>
+<body>
+  <a href="#main" class="skip">Saltar al contenido</a>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="#main"><span class="mark" aria-hidden="true">JG</span> GAIA / LangGraph</a>
+      <nav aria-label="Navegación principal"><a href="#capabilities">Capacidades</a><a href="#experiments">Experimentos</a><a href="https://www.linkedin.com/in/jonathan-gonz%C3%A1lez-l%C3%B3pez-31b578209/" target="_blank" rel="noopener noreferrer">LinkedIn ↗</a></nav>
+    </header>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <div class="eyebrow"><span class="dot" aria-hidden="true"></span> Agents Course · Proyecto final · Unit 4</div>
+          <h1 id="hero-title">De la pregunta<br />a la <em>evidencia.</em></h1>
+          <p class="intro">Un agente con LangGraph que combina modelos locales, investigación y cálculo para abordar tareas GAIA. Con decisiones observables y experimentos que se pueden comparar.</p>
+          <div class="actions"><a class="button primary" href="https://huggingface.co/spaces/jonyglez/huggingface-agents-langgraph/tree/main" target="_blank" rel="noopener noreferrer">Explorar el código <span aria-hidden="true">↗</span></a><a class="button" href="https://www.linkedin.com/in/jonathan-gonz%C3%A1lez-l%C3%B3pez-31b578209/" target="_blank" rel="noopener noreferrer">Conectar en LinkedIn <span aria-hidden="true">↗</span></a></div>
+          <p class="hero-note">Python 3.12 / LangGraph / modelos locales<br />Presentación estática · El agente se ejecuta en local</p>
+        </div>
+        <div class="flow" role="img" aria-label="El pipeline recibe una pregunta, selecciona herramientas, revisa la evidencia y, si necesita más información, investiga de nuevo. Después razona y valida el formato final.">
+          <div class="flow-header"><span>PIPELINE / 02</span><span class="pill">Investigación acotada</span></div>
+          <div class="node"><span class="number">01</span><div><strong>Entender la pregunta</strong><small>Enunciado, recursos y capacidades habilitadas</small></div></div>
+          <div class="connector"></div>
+          <div class="tool-grid"><span class="tool">{ } Código</span><span class="tool">∑ Cálculo</span><span class="tool">▤ Excel / PDF</span><span class="tool">↗ Web</span><span class="tool">◉ Imagen</span><span class="tool">▷ Audio / vídeo</span></div>
+          <div class="node"><span class="number">02</span><div><strong>Revisar la evidencia</strong><small>Fuentes, suficiencia y siguiente acción</small></div></div>
+          <div class="loop"><span aria-hidden="true">↳</span> Investigar de nuevo si hace falta</div>
+          <div class="node"><span class="number">03</span><div><strong>Resolver y comprobar</strong><small>Razonamiento con presupuesto propio</small></div></div>
+          <div class="connector"></div>
+          <div class="node result"><span class="number">04</span><div><strong>Respuesta final + traza</strong><small>Formato validado y tiempos por etapa</small></div></div>
+        </div>
+      </section>
+      <div class="principles"><div><strong>Enfoque híbrido</strong><p>El modelo interpreta; las herramientas ejecutan las operaciones verificables.</p></div><div><strong>Control de recursos</strong><p>Investigación con límites y modelos multimedia cargados bajo demanda.</p></div><div><strong>Resultados observables</strong><p>Fuentes, llamadas y tiempos para comprender cada ejecución.</p></div></div>
+      <section class="content" id="capabilities" aria-labelledby="capabilities-title">
+        <div class="section-top"><div><div class="section-label">01 / Herramientas</div><h2 id="capabilities-title">Distintas fuentes.<br />Un mismo flujo de trabajo.</h2></div><p>Cada procesador aporta evidencias con procedencia. El revisor decide si son suficientes o necesita continuar.</p></div>
+        <div class="cards">
+          <article class="card"><span class="icon" aria-hidden="true">{ }</span><h3>Código y cálculo</h3><p>Inspección o ejecución de adjuntos Python y expresiones restringidas para verificar operaciones sin adjunto.</p></article>
+          <article class="card"><span class="icon" aria-hidden="true">∑</span><h3>Hojas de cálculo</h3><p>Planes de agregación deterministas, filtros explícitos y contexto original para revisar los resultados.</p></article>
+          <article class="card"><span class="icon" aria-hidden="true">▤</span><h3>Documentos y PDFs</h3><p>Extracción de texto y selección de fragmentos relevantes, conservando referencias a páginas.</p></article>
+          <article class="card"><span class="icon" aria-hidden="true">↗</span><h3>Web y publicaciones</h3><p>Búsqueda, Wikipedia, seguimiento de enlaces y lectura de papers disponibles en HTML o PDF.</p></article>
+          <article class="card"><span class="icon" aria-hidden="true">◉</span><h3>Información visual</h3><p>Un modelo de visión local examina imágenes y una selección de fotogramas guiada por la pregunta.</p></article>
+          <article class="card"><span class="icon" aria-hidden="true">▷</span><h3>Audio y vídeo</h3><p>Transcripción con marcas de tiempo, clasificación de eventos acústicos y revisión de instantes adicionales.</p></article>
+        </div>
+      </section>
+      <section class="content" id="experiments" aria-labelledby="experiments-title">
+        <div class="section-top"><div><div class="section-label">02 / Evaluación</div><h2 id="experiments-title">Las decisiones también<br />se ponen a prueba.</h2></div><p>Un laboratorio local para observar qué cambia al elegir otro modelo o deshabilitar una capacidad.</p></div>
+        <div class="details-grid">
+          <article class="experiment"><h3>Un panel para comparar experimentos</h3><p>El panel local permite procesar preguntas individuales o la batería de 20 tareas del curso, consultar respuestas y comparar ejecuciones.</p><ul class="checks"><li>Modelos y capacidades configurables</li><li>Historial persistente y trazas por pregunta</li><li>Tiempo total y tiempo de llamadas al LLM</li><li>Evaluación local y envío oficial separado</li></ul><a href="https://huggingface.co/spaces/jonyglez/huggingface-agents-langgraph/blob/main/docs/pipeline-v2.md" target="_blank" rel="noopener noreferrer">Leer la arquitectura del pipeline ↗</a><div class="tag-row"><span class="tag">LangGraph</span><span class="tag">uv.lock</span><span class="tag">Exact Match</span><span class="tag">MIT</span></div></article>
+          <div class="disclosure"><div class="section-label">Diseño con límites explícitos</div><details open><summary>¿Qué se ejecuta en este Space?</summary><p>Esta página presenta el proyecto y enlaza a su código. El agente, el panel de evaluación y los modelos se ejecutan en el equipo local siguiendo las instrucciones del repositorio.</p></details><details><summary>¿Cómo se mide la calidad?</summary><p>Se contrastan las respuestas con la evaluación GAIA del curso y se revisan fuentes, fallos y latencia. El proyecto está en desarrollo; esta página no declara certificación ni una puntuación garantizada.</p></details><details><summary>¿Dónde puedo reproducirlo?</summary><p>El código incluye la configuración del entorno con uv, el lockfile, las pruebas y los lanzadores. Consulta la <a href="https://huggingface.co/spaces/jonyglez/huggingface-agents-langgraph/blob/main/docs/ejecucion-local.md" target="_blank" rel="noopener noreferrer">guía de ejecución local ↗</a>. El acceso a GAIA requiere autorización del dataset.</p></details><details><summary>¿Qué queda por mejorar?</summary><p>La precisión de los modelos, el equilibrio entre razonamiento y latencia y la cobertura de las evidencias siguen siendo áreas de trabajo. El muestreo parcial de vídeo y la extracción de PDFs tienen límites documentados.</p></details></div>
+        </div>
+      </section>
+      <section class="author" aria-labelledby="author-title"><div><div class="section-label">03 / Detrás del proyecto</div><h2 id="author-title">Jonathan González López</h2><p>Este proyecto forma parte de mi portfolio: una exploración práctica de agentes, herramientas y evaluación reproducible. Si te interesa el trabajo, podemos conectar.</p></div><a class="button" href="https://www.linkedin.com/in/jonathan-gonz%C3%A1lez-l%C3%B3pez-31b578209/" target="_blank" rel="noopener noreferrer">Ver mi LinkedIn <span aria-hidden="true">↗</span></a></section>
+    </main>
+    <footer><span>JG / GAIA LangGraph Agent · Proyecto en desarrollo</span><span><a href="https://huggingface.co/spaces/jonyglez/huggingface-agents-langgraph/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">Licencia MIT</a> · <a href="https://huggingface.co/learn/agents-course/unit4/hands-on" target="_blank" rel="noopener noreferrer">Hugging Face Agents Course ↗</a></span></footer>
+  </div>
+</body>
+</html>

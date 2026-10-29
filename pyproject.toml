@@ -7,6 +7,7 @@ name = "huggingface-agents-langgraph"
 version = "0.1.0"
 description = "A modular agent project for reproducible GAIA benchmark evaluation."
 readme = "README.md"
+license = "MIT"
 requires-python = "==3.12.*"
 dependencies = [
     "datasets>=4,<5",
