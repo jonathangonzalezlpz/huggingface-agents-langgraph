@@ -318,3 +318,7 @@ h1 span {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+.gpu-status { margin-top: 15px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
+.gpu-status-active { color: var(--green); border-color: rgba(141, 232, 187, .23); background: rgba(141, 232, 187, .06); }
+.gpu-status-inactive { color: #ffd08a; border-color: rgba(255, 208, 138, .23); background: rgba(255, 208, 138, .06); }

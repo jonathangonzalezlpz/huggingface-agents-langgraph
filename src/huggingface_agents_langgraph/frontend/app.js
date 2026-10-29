@@ -10,6 +10,7 @@ const timingSummary = document.querySelector("#timing-summary");
 const progressFill = document.querySelector("#progress-fill");
 const notice = document.querySelector("#notice");
 const modelStatusList = document.querySelector("#model-status-list");
+const gpuStatus = document.querySelector("#gpu-status");
 const refreshModelsButton = document.querySelector("#refresh-models-button");
 const experimentName = document.querySelector("#experiment-name");
 const experimentModel = document.querySelector("#experiment-model");
@@ -378,11 +379,18 @@ function renderModelStatus(model) {
 async function refreshModelStatus() {
   try {
     const status = await requestJson("/api/status", { cache: "no-store" });
+    gpuStatus.textContent = status.gpu.available
+      ? `GPU disponible · ${status.gpu.name} · CUDA`
+      : `GPU no disponible · multimedia en CPU (${status.gpu.backend})`;
+    gpuStatus.classList.toggle("gpu-status-active", status.gpu.available);
+    gpuStatus.classList.toggle("gpu-status-inactive", !status.gpu.available);
     modelStatusList.replaceChildren(
       renderModelStatus(status.llm),
       ...status.multimedia_models.map(renderModelStatus),
     );
   } catch {
+    gpuStatus.textContent = "No se pudo consultar el estado de la GPU";
+    gpuStatus.classList.remove("gpu-status-active", "gpu-status-inactive");
     modelStatusList.replaceChildren(
       renderModelStatus({ name: "LLM razonador", state: "unavailable" }),
       renderModelStatus({ name: "VLM", state: "error" }),

@@ -15,6 +15,7 @@ from huggingface_agents_langgraph.graph import build_state_graph
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
 from huggingface_agents_langgraph.multimedia_processing import (
+    get_gpu_status,
     get_multimedia_model_status,
 )
 
@@ -42,6 +43,7 @@ class WebAppHandler(BaseHTTPRequestHandler):
                 200,
                 {
                     "llm": _get_llm_status(),
+                    "gpu": get_gpu_status(),
                     "multimedia_models": get_multimedia_model_status(),
                 },
             )

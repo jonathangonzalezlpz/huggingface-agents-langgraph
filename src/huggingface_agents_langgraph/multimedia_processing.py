@@ -3,6 +3,7 @@
 import gc
 import math
 import re
+import sys
 import tempfile
 from pathlib import Path
 from threading import Condition, Timer
@@ -177,12 +178,13 @@ def _classify_audio(path: Path) -> list[dict[str, float | str]]:
 
 
 def _load_audio_classifier():
+    import torch
     from transformers import pipeline
 
     return pipeline(
         "audio-classification",
         model=MEDIA_AUDIO_CLASSIFIER_MODEL,
-        device="cpu",
+        device=0 if torch.cuda.is_available() else "cpu",
     )
 
 
@@ -238,9 +240,14 @@ def _run_vision_model(image, question: str) -> str:
 
 
 def _get_vision_pipeline():
+    import torch
     from transformers import pipeline
 
-    return pipeline("image-text-to-text", model=MEDIA_VLM_MODEL, device="cpu")
+    return pipeline(
+        "image-text-to-text",
+        model=MEDIA_VLM_MODEL,
+        device=0 if torch.cuda.is_available() else "cpu",
+    )
 
 
 class IdleModelManager:
@@ -329,6 +336,9 @@ class IdleModelManager:
             self._model = None
             self._timer = None
         gc.collect()
+        torch = sys.modules.get("torch")
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 class _ModelUse:
@@ -467,3 +477,21 @@ def download_video(url: str, directory: Path) -> Path:
     if not downloaded_path.is_file():
         raise FileNotFoundError("The video downloader produced no media file")
     return downloaded_path
+
+
+def get_gpu_status() -> dict[str, str | bool | None]:
+    """Report whether CUDA is available to multimedia models."""
+    try:
+        import torch
+    except ImportError:
+        return {"available": False, "name": None, "backend": "PyTorch no instalado"}
+
+    try:
+        available = torch.cuda.is_available()
+        return {
+            "available": available,
+            "name": torch.cuda.get_device_name(0) if available else None,
+            "backend": "CUDA" if available else "CPU",
+        }
+    except Exception:
+        return {"available": False, "name": None, "backend": "CUDA no disponible"}
