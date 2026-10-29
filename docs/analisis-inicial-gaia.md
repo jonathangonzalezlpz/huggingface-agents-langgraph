@@ -588,3 +588,15 @@ Para reducir trabajo innecesario y hacer el flujo más ágil, se probaron estos 
 - Hacer que el script de arranque instale también el grupo opcional de dependencias multimedia para que las preguntas de vídeo dispongan de sus dependencias.
 
 Estos cambios buscan reducir llamadas, cómputo y esperas evitables. Aún no se ha realizado una comparación controlada de tiempos antes y después; por tanto, no se atribuye una mejora cuantificada. El procesamiento local de modelos y la descarga o lectura de recursos externos todavía pueden añadir latencia, y conviene medir la batería completa con configuraciones comparables para identificar qué ramas concentran la demora.
+
+## Segunda versión del pipeline: revisión de evidencias y capacidad de continuar
+
+La batería analizada completó las veinte tareas con tres aciertos según el evaluador local (15 %), 146 segundos acumulados y 7,3 segundos de media. Completar una tarjeta no implica acertar: aparecieron errores de herramientas, respuestas incompletas, interpretaciones incorrectas y formatos que no respetaban la pregunta. Estos resultados motivan revisar tanto la configuración del modelo como la forma de obtener y comprobar evidencias.
+
+Se conserva la separación por modalidades y el uso de LangGraph. Se incorpora un revisor común que puede solicitar búsquedas reformuladas, abrir enlaces HTML o PDF, realizar cálculos sin un adjunto de código y ampliar el muestreo de un vídeo. Después de cada acción se vuelve a revisar la suficiencia de la información, con límites de acciones, llamadas y tiempo. La ruta directa inicial puede continuar investigando; el perfil Solo directo mantiene deshabilitadas las herramientas para poder medir esa alternativa.
+
+La resolución vuelve a disponer de un presupuesto independiente de la producción de respuesta. Se permite el conocimiento general estable y se reserva la evidencia para respaldar los hechos vinculados a fuentes concretas. La respuesta final comprueba algunas restricciones mecánicas y permite una reparación. Se detecta el truncamiento del LLM, se conservan los fallos recuperables de adquisición y se elimina el atajo específico de contar filas de Wikipedia en el razonador.
+
+La reducción de contexto sigue siendo necesaria. El revisor recibe fragmentos seleccionados y procedencia, además de enlaces que permiten continuar la investigación. La selección léxica conserva sus límites: puede omitir relaciones relevantes y no reemplaza una comprobación semántica de suficiencia. La nueva capacidad de pedir más información permite recuperar parte de lo que una sola extracción habría descartado.
+
+Cada pregunta conserva una traza local con decisiones, fuentes, entradas y salidas de modelos, datos de terminación y tiempos por etapa. Los experimentos completos se persisten también en el servidor. Así se podrá distinguir una mejora real de acierto de un cambio de latencia o de formato, comparando el mismo conjunto de tareas y configuración. La v2 aún no tiene una puntuación de batería medida; no se presupone que añadir pasos garantice mejores respuestas. El detalle del grafo y de los límites implementados se recoge en [pipeline-v2.md](pipeline-v2.md).

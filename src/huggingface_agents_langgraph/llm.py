@@ -1,6 +1,7 @@
 """Small client for the local OpenAI-compatible chat-completions endpoint."""
 
 import json
+from copy import deepcopy
 from typing import TypedDict
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -11,6 +12,11 @@ from huggingface_agents_langgraph.config import (
     OLLAMA_BASE_URL,
 )
 from huggingface_agents_langgraph.experiments import ModelSelection
+from huggingface_agents_langgraph.run_tracking import (
+    current_trace,
+    remaining_seconds,
+    traced_completion,
+)
 
 
 class ChatMessage(TypedDict):
@@ -20,23 +26,35 @@ class ChatMessage(TypedDict):
     content: str
 
 
+class CompletionTruncatedError(ValueError):
+    """The server exhausted its token allowance before completing a response."""
+
+
+@traced_completion
 def chat_completion(
     messages: list[ChatMessage],
     *,
     max_tokens: int | None = None,
     frequency_penalty: float | None = None,
+    repeat_penalty: float | None = None,
     model: ModelSelection | None = None,
+    temperature: float = 0,
 ) -> str:
     """Return the model's response text for a chat-completions request."""
-    request_body = {"messages": messages, "temperature": 0}
+    request_body = {"messages": messages, "temperature": temperature}
     if max_tokens is not None:
         request_body["max_tokens"] = max_tokens
     if frequency_penalty is not None:
         request_body["frequency_penalty"] = frequency_penalty
+    if repeat_penalty is not None:
+        request_body["repeat_penalty"] = repeat_penalty
     base_url = LLM_BASE_URL
     if model is not None:
         base_url = OLLAMA_BASE_URL if model["provider"] == "ollama" else LLM_BASE_URL
         request_body["model"] = model["model_id"]
+    trace = current_trace.get()
+    if trace is not None:
+        trace.calls[-1]["request"] = deepcopy(request_body)
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",
         data=json.dumps(request_body).encode("utf-8"),
@@ -45,18 +63,25 @@ def chat_completion(
     )
 
     try:
-        with urlopen(request, timeout=LLM_TIMEOUT_SECONDS) as response:
+        with urlopen(
+            request, timeout=min(LLM_TIMEOUT_SECONDS, remaining_seconds())
+        ) as response:
             result = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError) as error:
         raise RuntimeError(
             f"Could not get a response from the configured LLM: {error}"
         ) from error
 
+    trace = current_trace.get()
+    if trace is not None:
+        trace.calls[-1].update(response=result, endpoint=base_url)
     try:
         content = result["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:
         raise ValueError("LLM returned an invalid chat-completions response") from error
 
+    if result["choices"][0].get("finish_reason") == "length":
+        raise CompletionTruncatedError("LLM output was truncated by the token limit")
     if not isinstance(content, str) or not content.strip():
         raise ValueError("LLM returned an empty response")
     return content.rsplit("</think>", 1)[-1].strip()

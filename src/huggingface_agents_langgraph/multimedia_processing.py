@@ -4,11 +4,11 @@ import gc
 import math
 import re
 import sys
-import tempfile
 from pathlib import Path
 from threading import Condition, Timer
 from time import monotonic
-from typing import TypedDict
+from typing import NotRequired, TypedDict
+from uuid import uuid4
 
 from huggingface_agents_langgraph.config import (
     MEDIA_ASR_MODEL,
@@ -17,14 +17,16 @@ from huggingface_agents_langgraph.config import (
     MEDIA_MODELS_IDLE_SECONDS,
     MEDIA_VIDEO_FRAME_INTERVAL_SECONDS,
     MEDIA_VLM_MODEL,
+    RUNTIME_DIRECTORY,
 )
+from huggingface_agents_langgraph.run_tracking import remaining_seconds
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".avi", ".mkv", ".mov", ".mp4", ".webm"}
 AUDIO_EXTENSIONS = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav"}
 SOUND_QUESTION_TERMS = re.compile(
-    r"\b(sound|music|song|sing|instrument|noise|birdsong|audio|sounds|"
+    r"\b(sound|music|song|sing|instrument|noise|birdsong|sounds|audio events?|"
     r"m\u00fasica|canci\u00f3n|canta|instrumento|ruido|sonido|sonidos)\b",
     re.IGNORECASE,
 )
@@ -49,6 +51,7 @@ class MultimediaProcessingUpdate(TypedDict):
     """State fields produced by multimedia processing."""
 
     evidence: list[Evidence]
+    video_path: NotRequired[Path]
 
 
 def multimedia_processing(state: AgentState) -> MultimediaProcessingUpdate:
@@ -60,10 +63,11 @@ def multimedia_processing(state: AgentState) -> MultimediaProcessingUpdate:
             raise ValueError(
                 "file_path is required unless the question contains a YouTube URL"
             )
-        with tempfile.TemporaryDirectory(prefix="gaia-video-") as temporary_directory:
-            path = download_video(match.group(), Path(temporary_directory))
-            evidence = _inspect_video(path, state["question"], match.group())
-        return {"evidence": evidence}
+        directory = Path(RUNTIME_DIRECTORY) / "media" / str(uuid4())
+        directory.mkdir(parents=True, exist_ok=True)
+        path = download_video(match.group(), directory)
+        evidence = _inspect_video(path, state["question"], match.group())
+        return {"evidence": evidence, "video_path": path}
 
     path = Path(file_path)
     if not path.is_file():
@@ -82,6 +86,8 @@ def multimedia_processing(state: AgentState) -> MultimediaProcessingUpdate:
 
     if not any(item["content"].strip() for item in evidence):
         raise ValueError("Multimedia processing produced no usable evidence")
+    if extension in VIDEO_EXTENSIONS:
+        return {"evidence": evidence, "video_path": path}
     return {"evidence": evidence}
 
 
@@ -150,11 +156,14 @@ def _transcribe(path: Path) -> str:
     try:
         with _asr_model_manager.use() as asr_model:
             segments, _ = asr_model.transcribe(str(path), vad_filter=True)
+            return " ".join(
+                f"[{segment.start:.1f}-{segment.end:.1f}s] {segment.text.strip()}"
+                for segment in segments
+            ).strip()
     except ImportError as error:
         raise RuntimeError(
             "Audio transcription requires the optional 'multimedia' dependencies"
         ) from error
-    return " ".join(segment.text.strip() for segment in segments).strip()
 
 
 def _load_asr_model():
@@ -166,7 +175,13 @@ def _load_asr_model():
 def _classify_audio(path: Path) -> list[dict[str, float | str]]:
     try:
         with _audio_classifier_manager.use() as classifier:
-            predictions = classifier(str(path), top_k=5)
+            from faster_whisper.audio import decode_audio
+
+            sampling_rate = classifier.feature_extractor.sampling_rate
+            waveform = decode_audio(str(path), sampling_rate=sampling_rate)
+            predictions = classifier(
+                {"raw": waveform, "sampling_rate": sampling_rate}, top_k=5
+            )
     except ImportError as error:
         raise RuntimeError(
             "Audio event recognition requires the optional 'multimedia' dependencies"
@@ -189,6 +204,8 @@ def _load_audio_classifier():
 
 
 def _run_vision_model(image, question: str) -> str:
+    if remaining_seconds() <= 0:
+        raise TimeoutError("Pipeline time budget exhausted before visual inference")
     try:
         from PIL import Image
     except ImportError as error:
@@ -243,11 +260,8 @@ def _get_vision_pipeline():
     import torch
     from transformers import pipeline
 
-    return pipeline(
-        "image-text-to-text",
-        model=MEDIA_VLM_MODEL,
-        device=0 if torch.cuda.is_available() else "cpu",
-    )
+    device = 0 if torch.cuda.is_available() else "cpu"
+    return pipeline("image-text-to-text", model=MEDIA_VLM_MODEL, device=device)
 
 
 class IdleModelManager:
@@ -389,6 +403,53 @@ def get_multimedia_model_status() -> list[dict[str, str | int | float | None]]:
     ]
 
 
+def get_gpu_status() -> dict[str, str | bool | None]:
+    """Report whether CUDA is available to multimedia models."""
+    try:
+        import torch
+    except ImportError:
+        return {"available": False, "name": None, "backend": "PyTorch no instalado"}
+
+    try:
+        available = torch.cuda.is_available()
+        return {
+            "available": available,
+            "name": torch.cuda.get_device_name(0) if available else None,
+            "backend": "CUDA" if available else "CPU",
+        }
+    except Exception:
+        return {"available": False, "name": None, "backend": "CUDA no disponible"}
+
+
+def inspect_video_timestamps(
+    path: Path, timestamps: list[float], question: str
+) -> list[Evidence]:
+    """Inspect a bounded set of requested instants without downloading again."""
+    import av
+
+    evidence: list[Evidence] = []
+    with av.open(str(path)) as container:
+        stream = next((s for s in container.streams if s.type == "video"), None)
+        if stream is None or stream.time_base is None:
+            raise ValueError("Video has no seekable video stream")
+        start = stream.start_time or 0
+        for timestamp in sorted(set(timestamps))[:MEDIA_MAX_VIDEO_FRAMES]:
+            offset = start + round(timestamp / stream.time_base)
+            container.seek(offset, stream=stream)
+            for frame in container.decode(stream):
+                if frame.pts is not None and frame.pts >= offset:
+                    description = _run_vision_model(frame.to_image(), question)
+                    evidence.append(
+                        {
+                            "content": f"Frame at {timestamp:.1f}s: {description}",
+                            "source": f"{path}#t={timestamp:.1f}s",
+                            "source_type": "video_frame_vlm",
+                        }
+                    )
+                    break
+    return evidence
+
+
 def _sample_video_frames(path: Path) -> list[tuple[float, object]]:
     try:
         import av
@@ -477,21 +538,3 @@ def download_video(url: str, directory: Path) -> Path:
     if not downloaded_path.is_file():
         raise FileNotFoundError("The video downloader produced no media file")
     return downloaded_path
-
-
-def get_gpu_status() -> dict[str, str | bool | None]:
-    """Report whether CUDA is available to multimedia models."""
-    try:
-        import torch
-    except ImportError:
-        return {"available": False, "name": None, "backend": "PyTorch no instalado"}
-
-    try:
-        available = torch.cuda.is_available()
-        return {
-            "available": available,
-            "name": torch.cuda.get_device_name(0) if available else None,
-            "backend": "CUDA" if available else "CPU",
-        }
-    except Exception:
-        return {"available": False, "name": None, "backend": "CUDA no disponible"}

@@ -65,7 +65,7 @@ def test_spreadsheet_processing_passes_workbook_data_to_llm(
         ["Burger", "Food", 10.5],
         ["Soda", "Drink", 2],
     ]
-    assert update == {
+    assert {"evidence": update["evidence"][:1]} == {
         "evidence": [
             {
                 "content": "Sum of Sales: 10.5",
@@ -74,6 +74,8 @@ def test_spreadsheet_processing_passes_workbook_data_to_llm(
             }
         ]
     }
+    assert update["evidence"][1]["source_type"] == "spreadsheet_plan"
+    assert update["evidence"][2]["source_type"] == "spreadsheet_data"
 
 
 def test_spreadsheet_processing_falls_back_for_complex_questions(

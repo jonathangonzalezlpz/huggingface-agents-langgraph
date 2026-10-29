@@ -44,11 +44,13 @@ def test_audio_recognition_runs_only_when_question_needs_it(
     monkeypatch.setattr(
         media,
         "_classify_audio",
-        lambda _path: [{"label": "speech", "score": 0.9}],
+        lambda _path: (_ for _ in ()).throw(
+            AssertionError("Transcription questions should skip audio classification")
+        ),
     )
     state = {
         "task_id": "task-1",
-        "question": "Transcribe the recipe.",
+        "question": "Transcribe the recipe from this audio recording.",
         "file_name": "memo.mp3",
         "file_path": audio_path,
     }
@@ -218,3 +220,55 @@ def test_multimedia_model_is_reloaded_after_idle_timeout() -> None:
     with manager.use() as reloaded_model:
         assert reloaded_model is not first_model
     assert load_count == 2
+
+
+def test_transcription_consumes_segments_before_releasing_model(monkeypatch):
+    from contextlib import contextmanager
+
+    active = []
+
+    def segments():
+        assert active == [True]
+        yield SimpleNamespace(start=1.0, end=2.0, text="Study pages 10 and 20.")
+
+    model = SimpleNamespace(transcribe=lambda *_a, **_k: (segments(), None))
+
+    @contextmanager
+    def use():
+        active.append(True)
+        try:
+            yield model
+        finally:
+            active.clear()
+
+    monkeypatch.setattr(media, "_asr_model_manager", SimpleNamespace(use=use))
+    assert (
+        media._transcribe(Path("recording.mp3")) == "[1.0-2.0s] Study pages 10 and 20."
+    )
+    assert active == []
+
+
+def test_audio_classifier_receives_waveform_instead_of_filename(monkeypatch):
+    from contextlib import nullcontext
+
+    waveform = object()
+    calls = []
+
+    def classify(inputs, **kwargs):
+        calls.append(inputs)
+        return [{"label": "Music", "score": 0.9}]
+
+    classify.feature_extractor = SimpleNamespace(sampling_rate=16000)
+    monkeypatch.setattr(
+        media,
+        "_audio_classifier_manager",
+        SimpleNamespace(use=lambda: nullcontext(classify)),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "faster_whisper.audio",
+        SimpleNamespace(decode_audio=lambda *_a, **_k: waveform),
+    )
+    result = media._classify_audio(Path("sample.mp3"))
+    assert calls == [{"raw": waveform, "sampling_rate": 16000}]
+    assert result[0]["label"] == "Music"

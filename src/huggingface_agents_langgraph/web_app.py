@@ -11,12 +11,18 @@ from urllib.request import Request, urlopen
 
 from huggingface_agents_langgraph.attachments import get_attachment_path
 from huggingface_agents_langgraph.config import LLM_BASE_URL
-from huggingface_agents_langgraph.graph import build_state_graph
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
 from huggingface_agents_langgraph.multimedia_processing import (
     get_gpu_status,
     get_multimedia_model_status,
+)
+from huggingface_agents_langgraph.run_tracking import (
+    delete_record,
+    list_records,
+    read_record,
+    run_pipeline,
+    write_record,
 )
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
@@ -49,6 +55,14 @@ class WebAppHandler(BaseHTTPRequestHandler):
             )
         elif request_path == "/api/models":
             self._send_json(200, {"models": get_available_models()})
+        elif request_path == "/api/experiments":
+            self._send_json(200, {"experiments": list_records("experiments")})
+        elif request_path.startswith("/api/runs/"):
+            try:
+                record = read_record("runs", request_path.removeprefix("/api/runs/"))
+                self._send_json(200, record)
+            except (ValueError, FileNotFoundError):
+                self._send_json(404, {"error": "Run not found"})
         elif request_path.startswith("/api/files/"):
             self._get_attachment(unquote(request_path.removeprefix("/api/files/")))
         else:
@@ -56,13 +70,17 @@ class WebAppHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Run a GAIA task through the local LangGraph workflow."""
-        if urlsplit(self.path).path == "/api/evaluate":
+        request_path = urlsplit(self.path).path
+        if request_path == "/api/experiments":
+            self._save_experiment()
+            return
+        if request_path == "/api/score":
+            self._submit_score()
+            return
+        if request_path == "/api/evaluate":
             self._evaluate_locally()
             return
-        if urlsplit(self.path).path != "/api/run":
-            if urlsplit(self.path).path == "/api/score":
-                self._submit_score()
-                return
+        if request_path != "/api/run":
             self._send_json(404, {"error": "Not found"})
             return
 
@@ -73,15 +91,23 @@ class WebAppHandler(BaseHTTPRequestHandler):
                 raise ValueError("Request body is empty or too large")
             payload = json.loads(self.rfile.read(content_length))
             task = self._validate_task(payload)
-            result = build_state_graph().invoke(task)
+            result = run_pipeline(task)
         except (ValueError, TypeError, json.JSONDecodeError) as error:
-            self._send_json(400, {"error": str(error)})
+            self._send_json(
+                400,
+                {
+                    "error": str(error),
+                    "run_id": getattr(error, "run_id", None),
+                    "duration_seconds": round(perf_counter() - started_at, 3),
+                },
+            )
             return
         except Exception as error:
             self._send_json(
                 500,
                 {
                     "error": str(error),
+                    "run_id": getattr(error, "run_id", None),
                     "duration_seconds": round(perf_counter() - started_at, 3),
                 },
             )
@@ -89,6 +115,37 @@ class WebAppHandler(BaseHTTPRequestHandler):
 
         result["duration_seconds"] = round(perf_counter() - started_at, 3)
         self._send_json(200, result)
+
+    def do_DELETE(self) -> None:
+        """Remove a selected persisted experiment without deleting other runs."""
+        path = urlsplit(self.path).path
+        if not path.startswith("/api/experiments/"):
+            self._send_json(404, {"error": "Not found"})
+            return
+        try:
+            delete_record("experiments", path.removeprefix("/api/experiments/"))
+        except ValueError:
+            self._send_json(400, {"error": "Invalid experiment ID"})
+            return
+        self._send_json(200, {"deleted": True})
+
+    def _save_experiment(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= MAX_REQUEST_BYTES:
+                raise ValueError("Invalid experiment size")
+            record = json.loads(self.rfile.read(length))
+            if (
+                not isinstance(record, dict)
+                or not isinstance(record.get("answers"), list)
+                or len(record["answers"]) > 20
+            ):
+                raise ValueError("Invalid experiment record")
+            write_record("experiments", record)
+        except (ValueError, KeyError, TypeError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(200, {"saved": True})
 
     def _evaluate_locally(self) -> None:
         try:

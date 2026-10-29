@@ -5,9 +5,10 @@ import re
 import xml.etree.ElementTree as ElementTree
 from concurrent.futures import ThreadPoolExecutor
 from html.parser import HTMLParser
+from io import BytesIO
 from typing import TypedDict
 from urllib.error import URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 from ddgs import DDGS
@@ -19,6 +20,7 @@ from huggingface_agents_langgraph.config import (
     WEB_SEARCH_TIMEOUT_SECONDS,
 )
 from huggingface_agents_langgraph.evidence_selection import select_relevant_evidence
+from huggingface_agents_langgraph.llm import chat_completion
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
@@ -117,7 +119,22 @@ def web_research(state: AgentState) -> WebResearchUpdate:
     if route == "wikipedia":
         source_evidence = _search_wikipedia(state["question"])
     elif route == "web":
-        source_evidence = _search_web(state["question"])
+        query = chat_completion(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Write one concise web search query for the task. "
+                        "Retain names, dates and source constraints. "
+                        "Return only the query. /no_think"
+                    ),
+                },
+                {"role": "user", "content": state["question"]},
+            ],
+            max_tokens=160,
+            model=state.get("experiment", {}).get("model"),
+        )
+        source_evidence = _search_web(query)
     else:
         raise ValueError(f"web_research does not support route: {route!r}")
 
@@ -127,6 +144,75 @@ def web_research(state: AgentState) -> WebResearchUpdate:
     if not evidence:
         raise RuntimeError("No relevant evidence was extracted from the source pages")
     return {"evidence": evidence}
+
+
+class _LinkedTextParser(_WikipediaHTMLTextParser):
+    """Preserve navigation targets alongside readable HTML text."""
+
+    def __init__(self, url: str) -> None:
+        super().__init__()
+        self.url = url
+        self.links: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        super().handle_starttag(tag, attrs)
+        if tag == "a" and len(self.links) < 500:
+            href = dict(attrs).get("href")
+            target = urljoin(self.url, href or "")
+            if (
+                href
+                and target.startswith(("https://", "http://"))
+                and target not in self.links
+            ):
+                self.links.append(target)
+
+
+def fetch_source(url: str) -> list[Evidence]:
+    """Read an HTML page or PDF, retaining links and page provenance."""
+    if urlsplit(url).scheme not in {"http", "https"}:
+        raise ValueError("Source URL must use HTTP or HTTPS")
+    request = Request(url, headers={"User-Agent": "GAIA-course-agent/0.2"})
+    with urlopen(request, timeout=WEB_SEARCH_TIMEOUT_SECONDS) as response:
+        data = response.read(10_000_001)
+        final_url = response.geturl()
+        encoding = response.headers.get_content_charset() or "utf-8"
+    if len(data) > 10_000_000:
+        raise ValueError("Source exceeds the 10 MB download limit")
+    if data.startswith(b"%PDF"):
+        from pypdf import PdfReader
+
+        return [
+            {
+                "content": text,
+                "source": f"{final_url}#page={index}",
+                "source_type": "pdf_text",
+            }
+            for index, page in enumerate(PdfReader(BytesIO(data)).pages, 1)
+            if (text := (page.extract_text() or "").strip())
+        ]
+    parser = _LinkedTextParser(final_url)
+    parser.feed(data.decode(encoding, errors="replace"))
+    text = parser.get_text()
+    links = sorted(
+        parser.links,
+        key=lambda link: (
+            not any(
+                term in link.lower() for term in ("doi.org", "arxiv", ".pdf", "paper")
+            )
+        ),
+    )[:80]
+    return (
+        [
+            {
+                "content": text,
+                "source": final_url,
+                "source_type": "web_page",
+                "links": links,
+            }
+        ]
+        if text
+        else []
+    )
 
 
 def _search_web(question: str) -> list[Evidence]:

@@ -1,8 +1,9 @@
 """Deterministic routing based on task attachment extensions."""
 
+import json
 import re
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from huggingface_agents_langgraph.experiments import (
     DEFAULT_EXPERIMENT,
@@ -55,6 +56,7 @@ class RouterUpdate(TypedDict):
     """State fields produced by the router node."""
 
     route: Route
+    research_notes: NotRequired[list[str]]
 
 
 def router(state: AgentState) -> RouterUpdate:
@@ -75,7 +77,10 @@ def router(state: AgentState) -> RouterUpdate:
     if VIDEO_URL_PATTERN.search(state["question"]):
         return {"route": "multimedia"}
 
-    route = _classify_question(state["question"], experiment.get("model"))
+    try:
+        route = _classify_question(state["question"], experiment.get("model"))
+    except ValueError as error:
+        return {"route": "direct", "research_notes": [f"Router fallback: {error}"]}
     if route in {"web", "wikipedia"} and not is_capability_enabled(experiment, "web"):
         return {"route": "direct"}
     return {"route": route}
@@ -90,7 +95,7 @@ def _classify_question(question: str, model: ModelSelection | None = None) -> Ro
                 "Classify the task into exactly one route and return only its name: "
                 "direct, web, or wikipedia. Use direct when the answer can be "
                 "derived from the question using language understanding, reasoning, "
-                "or calculation, without external facts. Use wikipedia when the "
+                "or calculation and stable general knowledge. Use wikipedia when the "
                 "question explicitly requests Wikipedia or an encyclopedia source. "
                 "Otherwise use web when external research or current/source-specific "
                 "facts are needed. /no_think"
@@ -98,16 +103,32 @@ def _classify_question(question: str, model: ModelSelection | None = None) -> Ro
         },
         {"role": "user", "content": question},
     ]
-    route = (
-        chat_completion(messages, max_tokens=32, model=model)
-        .strip()
-        .lower()
-        .strip("\"'` .")
-    )
-    if route == "direct":
-        return "direct"
-    if route == "web":
-        return "web"
-    if route == "wikipedia":
-        return "wikipedia"
-    raise ValueError(f"LLM returned an unsupported question route: {route!r}")
+    for _ in range(2):
+        route = (
+            chat_completion(messages, max_tokens=32, model=model)
+            .strip()
+            .lower()
+            .strip("\"'` .")
+        )
+        if route in {"direct", "web", "wikipedia"}:
+            return route
+        try:
+            parsed = json.loads(route)
+            if isinstance(parsed, dict) and parsed.get("route") in {
+                "direct",
+                "web",
+                "wikipedia",
+            }:
+                return parsed["route"]
+        except ValueError:
+            pass
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    "Invalid route. Return exactly direct, web, or wikipedia. "
+                    "Do not answer the question. /no_think"
+                ),
+            }
+        )
+    raise ValueError("Classifier returned invalid routes twice")

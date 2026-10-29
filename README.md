@@ -143,3 +143,7 @@ La rama `multimedia_processing` reconoce adjuntos de audio, imagen y video, y en
 Se pueden cambiar `MEDIA_ASR_MODEL`, `MEDIA_AUDIO_CLASSIFIER_MODEL` y `MEDIA_VLM_MODEL` en `.env`. Descargar videos de YouTube requiere acceso de red y puede depender de la disponibilidad del sitio y del contenido. El muestreo limitado puede no capturar eventos visuales breves.
 
 `MEDIA_MODELS_IDLE_SECONDS` controla cuanto tiempo permanecen cargados Whisper, AST y el VLM despues de terminar su uso; por defecto son cinco minutos. Al vencer el periodo se liberan de memoria y se vuelven a cargar cuando se necesitan otra vez.
+
+## Pipeline v2
+
+El agente puede encadenar investigación, seguir enlaces y papers, calcular sin adjuntos y revisar fotogramas adicionales dentro de límites configurables. La resolución dispone de un presupuesto propio y la respuesta final tiene validación de formato. Las trazas y los experimentos se conservan en el servidor local, además de la copia del navegador. Consulta [docs/pipeline-v2.md](docs/pipeline-v2.md) para el grafo, la configuración, las métricas y sus límites.

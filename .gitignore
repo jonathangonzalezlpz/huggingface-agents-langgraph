@@ -221,6 +221,7 @@ __marimo__/
 
 # Local uv caches (keep uv.lock and .python-version in version control)
 .uv-cache/
+.runtime/
 .uv/
 
 # IDE settings

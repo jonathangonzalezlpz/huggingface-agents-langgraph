@@ -5,7 +5,7 @@ from time import perf_counter
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-from huggingface_agents_langgraph.graph import build_state_graph
+from huggingface_agents_langgraph.run_tracking import run_pipeline
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
 
@@ -46,7 +46,7 @@ def _run_task(task: dict[str, object], index: int, total: int) -> float | None:
 
     started_at = perf_counter()
     try:
-        result = build_state_graph().invoke(
+        result = run_pipeline(
             {
                 "task_id": task_id,
                 "question": question,

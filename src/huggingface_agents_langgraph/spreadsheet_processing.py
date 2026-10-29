@@ -7,6 +7,7 @@ from typing import Any, TypedDict
 
 from openpyxl import load_workbook
 
+from huggingface_agents_langgraph.evidence_selection import select_relevant_evidence
 from huggingface_agents_langgraph.experiments import DEFAULT_EXPERIMENT, ModelSelection
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
 from huggingface_agents_langgraph.state import AgentState, Evidence
@@ -45,6 +46,16 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
         raise ValueError("Excel attachment contains no non-empty cells")
 
     workbook_data = json.dumps(sheets, ensure_ascii=False, default=str)
+    workbook_evidence = select_relevant_evidence(
+        state["question"],
+        [
+            {
+                "content": workbook_data,
+                "source": str(path),
+                "source_type": "spreadsheet_data",
+            }
+        ],
+    )
     plan_messages: list[ChatMessage] = [
         {
             "role": "system",
@@ -86,9 +97,20 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
                 "source": str(path),
                 "source_type": "spreadsheet_calculation",
             }
-            return {"evidence": [evidence]}
+            return {
+                "evidence": [
+                    evidence,
+                    {
+                        "content": json.dumps(plan, ensure_ascii=False),
+                        "source": str(path),
+                        "source_type": "spreadsheet_plan",
+                    },
+                    *workbook_evidence,
+                ]
+            }
 
-    return _analyze_workbook(state["question"], workbook_data, path, model)
+    update = _analyze_workbook(state["question"], workbook_data, path, model)
+    return {"evidence": [*update["evidence"], *workbook_evidence]}
 
 
 def _compute_plan(
@@ -199,7 +221,10 @@ def _matches(cell: Any, operator: str, expected: Any) -> bool:
 
 
 def _analyze_workbook(
-    question: str, workbook_data: str, path: Path, model: ModelSelection | None = None
+    question: str,
+    workbook_data: str,
+    path: Path,
+    model: ModelSelection | None = None,
 ) -> SpreadsheetProcessingUpdate:
     """Use the model's general analysis ability for plans beyond the DSL."""
     messages: list[ChatMessage] = [

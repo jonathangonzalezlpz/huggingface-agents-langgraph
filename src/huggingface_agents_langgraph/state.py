@@ -23,6 +23,7 @@ class Evidence(TypedDict):
     content: str
     source: str
     source_type: str
+    links: NotRequired[list[str]]
 
 
 class AgentState(TypedDict):
@@ -36,3 +37,13 @@ class AgentState(TypedDict):
     evidence: NotRequired[list[Evidence]]
     submitted_answer: NotRequired[str]
     experiment: NotRequired[ExperimentConfig]
+    draft_answer: NotRequired[str]
+    research_action: NotRequired[dict]
+    research_steps: NotRequired[int]
+    action_history: NotRequired[list[str]]
+    research_notes: NotRequired[list[str]]
+    answer_warnings: NotRequired[list[str]]
+    reasoning_warnings: NotRequired[list[str]]
+    video_path: NotRequired[Path]
+    run_id: NotRequired[str]
+    source_links: NotRequired[list[str]]

@@ -59,7 +59,9 @@ async function requestJson(url, options) {
   const response = await fetch(url, options);
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || `Error HTTP ${response.status}`);
+    const error = new Error(payload.error || `Error HTTP ${response.status}`);
+    error.runId = payload.run_id;
+    throw error;
   }
   return payload;
 }
@@ -128,6 +130,7 @@ function saveExperimentRecord() {
   );
   const record = {
     id: crypto.randomUUID(),
+    pipeline_version: cards.every((card) => card._result.pipeline_version === "2") ? "2" : "legacy/mixed",
     created_at: new Date().toISOString(),
     config: sameConfig
       ? configs[0]
@@ -140,6 +143,8 @@ function saveExperimentRecord() {
       error: card._result.error || "",
       route: card._result.route || "error",
       duration_seconds: card._durationSeconds,
+      llm_duration_seconds: card._result.llm_duration_seconds,
+      run_id: card._result.run_id,
       experiment: card._experimentUsed,
     })),
     average_duration_seconds: averageDuration(cards),
@@ -147,9 +152,46 @@ function saveExperimentRecord() {
   const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
   history.unshift(record);
   localStorage.setItem("gaia-experiments", JSON.stringify(history.slice(0, 20)));
+  void persistExperiment(record);
   scorePanel.hidden = false;
   scoreResult.textContent = "Experimento guardado en este navegador; puedes calcular la puntuación oficial cuando quieras.";
   renderExperimentHistory();
+}
+
+async function persistExperiment(record) {
+  try {
+    await requestJson("/api/experiments", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(record),
+    });
+  } catch (error) {
+    showNotice(`Copia local conservada; no se pudo guardar en el servidor: ${error.message}`);
+  }
+}
+
+async function loadSavedExperiments() {
+  try {
+    const { experiments } = await requestJson("/api/experiments");
+    const local = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+    const merged = new Map(experiments.map((record) => [record.id, record]));
+    local.forEach((record) => merged.set(record.id, record));
+    const records = [...merged.values()].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    localStorage.setItem("gaia-experiments", JSON.stringify(records.slice(0, 20)));
+    renderExperimentHistory();
+    await Promise.all(local.map(persistExperiment));
+  } catch (error) {
+    showNotice(`Historial del navegador disponible; servidor inaccesible: ${error.message}`);
+  }
+}
+
+function traceLink(runId) {
+  const link = document.createElement("a");
+  link.className = "run-trace-link";
+  link.href = `/api/runs/${encodeURIComponent(runId)}`;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "Ver traza de ejecución (JSON)";
+  return link;
 }
 
 function renderExperimentHistory() {
@@ -175,7 +217,7 @@ function renderExperimentHistory() {
     checkbox.addEventListener("change", renderExperimentComparison);
     selectLabel.append(checkbox, document.createTextNode("Comparar"));
     const title = document.createElement("strong");
-    title.textContent = `${record.config.name} · ${modelLabel(record.config.model)}`;
+    title.textContent = `${record.config.name} · ${modelLabel(record.config.model)} · pipeline ${record.pipeline_version || "1"}`;
     const details = document.createElement("span");
     const routes = record.answers.reduce((counts, answer) => {
       counts[answer.route] = (counts[answer.route] || 0) + 1;
@@ -219,8 +261,11 @@ function renderExperimentHistory() {
       const correctness = answer.locally_correct === true
         ? " · Acierto local"
         : answer.locally_correct === false ? " · Error local" : "";
-      metadata.textContent = `${answer.task_id} · Ruta: ${answer.route || "sin dato"}${timing}${correctness}`;
+      const modelTiming = Number.isFinite(answer.llm_duration_seconds)
+        ? ` · LLM: ${formatDuration(answer.llm_duration_seconds)}` : "";
+      metadata.textContent = `${answer.task_id} · Ruta inicial: ${answer.route || "sin dato"}${timing}${modelTiming}${correctness}`;
       item.append(question, response, metadata);
+      if (answer.run_id) item.append(traceLink(answer.run_id));
       reviewList.append(item);
     });
     reviewDetails.append(reviewSummary, reviewList);
@@ -228,6 +273,21 @@ function renderExperimentHistory() {
     experimentHistoryList.append(row);
   });
   renderExperimentComparison();
+}
+
+async function deleteExperiment(experimentId) {
+  try {
+    await requestJson(`/api/experiments/${encodeURIComponent(experimentId)}`, { method: "DELETE" });
+  } catch (error) {
+    showNotice(`No se pudo eliminar el experimento: ${error.message}`);
+    return;
+  }
+  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+  localStorage.setItem(
+    "gaia-experiments",
+    JSON.stringify(history.filter((record) => record.id !== experimentId)),
+  );
+  renderExperimentHistory();
 }
 
 function renderExperimentComparison() {
@@ -245,7 +305,7 @@ function renderExperimentComparison() {
   const table = document.createElement("table");
   table.className = "comparison-table";
   const header = document.createElement("tr");
-  ["Pregunta", ...selected.map((record) => `${record.config.name} · ${modelLabel(record.config.model)}`)].forEach((label) => {
+  ["Pregunta", ...selected.map((record) => `${record.config.name} · ${modelLabel(record.config.model)} · pipeline ${record.pipeline_version || "1"}`)].forEach((label) => {
     const cell = document.createElement("th");
     cell.textContent = label;
     header.append(cell);
@@ -585,6 +645,7 @@ async function processQuestion(card) {
   card._answer.className = "answer-value pending";
   card._answer.textContent = "El agente está trabajando…";
   card._runButton.disabled = true;
+  card.querySelector(".run-trace-link")?.remove();
   const experiment = structuredClone(getExperiment());
   card._experimentUsed = experiment;
   try {
@@ -597,6 +658,10 @@ async function processQuestion(card) {
       ? result.duration_seconds
       : (performance.now() - startedAt) / 1000;
     card._duration.textContent = `Tiempo: ${formatDuration(card._durationSeconds)}`;
+    if (Number.isFinite(result.llm_duration_seconds)) {
+      card._duration.textContent += ` · LLM: ${formatDuration(result.llm_duration_seconds)}`;
+    }
+    if (result.run_id) card._answer.parentElement.append(traceLink(result.run_id));
     card._result = result;
     card._status.className = "card-status done";
     card._status.textContent = result.submitted_answer ? "Respondida" : "Sin respuesta";
@@ -612,7 +677,8 @@ async function processQuestion(card) {
     card._duration.textContent = `Tiempo: ${formatDuration(card._durationSeconds)}`;
     card._status.className = "card-status";
     card._status.textContent = "Error";
-    card._result = { error: error.message, submitted_answer: "", route: "error" };
+    card._result = { error: error.message, submitted_answer: "", route: "error", run_id: error.runId };
+    if (error.runId) card._answer.parentElement.append(traceLink(error.runId));
     card._answer.className = "answer-value error";
     card._answer.textContent = error.message;
   } finally {
@@ -649,6 +715,7 @@ async function calculateOfficialScore() {
     scoreResult.textContent = `${percentage}% · ${correct}/${total} aciertos · ${result.message || "Puntuación recibida"}`;
     record.score = { score: percentage, correct_count: correct, total_attempted: total };
     localStorage.setItem("gaia-experiments", JSON.stringify(history));
+    void persistExperiment(record);
     renderExperimentHistory();
   } catch (error) {
     scoreResult.textContent = error.message;
@@ -685,6 +752,7 @@ async function calculateLocalScore() {
     };
     localStorage.setItem("gaia-experiments", JSON.stringify(history));
     localScoreResult.textContent = `${result.score}% · ${result.correct_count}/${result.total_attempted} aciertos locales. Las respuestas esperadas no se guardan.`;
+    void persistExperiment(record);
     renderExperimentHistory();
   } catch (error) {
     localScoreResult.textContent = error.message;
@@ -777,12 +845,7 @@ scoreButton.addEventListener("click", calculateOfficialScore);
 localScoreButton.addEventListener("click", calculateLocalScore);
 applyProfile("full");
 renderExperimentHistory();
+void loadSavedExperiments();
 void refreshModelStatus();
 void refreshAvailableModels();
 window.setInterval(refreshModelStatus, 5000);
-
-function deleteExperiment(experimentId) {
-  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
-  localStorage.setItem("gaia-experiments", JSON.stringify(history.filter((record) => record.id !== experimentId)));
-  renderExperimentHistory();
-}

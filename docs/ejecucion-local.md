@@ -52,13 +52,13 @@ Antes de ejecutar la batería se puede nombrar un experimento, seleccionar el mo
 
 Durante la ejecución se puede detener la batería. El agente termina la pregunta que ya está procesando y se para antes de iniciar la siguiente; al reanudar continúa con las preguntas pendientes y conserva el perfil elegido.
 
-Las ejecuciones completas se guardan en el almacenamiento local del navegador con las respuestas, el modelo y las rutas utilizadas. Cada ejecución se puede desplegar para volver a consultar sus preguntas, respuestas, rutas, tiempos y aciertos locales después de recargar el frontal. El historial también permite seleccionar dos o más experimentos y compararlos por `task_id`; marca si el texto de la pregunta es idéntico, distinto o falta en alguna ejecución. Estos registros no se suben al repositorio.
+Las ejecuciones completas se guardan en el navegador y en el servidor local con las respuestas, el modelo y las rutas utilizadas. Cada ejecución se puede desplegar para volver a consultar sus preguntas, respuestas, rutas, tiempos y aciertos locales después de recargar el frontal. El historial también permite seleccionar dos o más experimentos y compararlos por `task_id`; marca si el texto de la pregunta es idéntico, distinto o falta en alguna ejecución. Estos registros no se suben al repositorio.
 
 El panel de ejecuciones permite evaluar localmente una batería completa contra las respuestas del split de validación `2023_level1` de GAIA. Requiere que la cuenta tenga acceso aprobado al dataset y `HF_TOKEN` esté configurado en `.env`. El evaluador aplica comparación exacta sin distinguir mayúsculas y espacios exteriores; guarda solo el porcentaje y el indicador de acierto por `task_id` en el navegador. No muestra ni persiste las respuestas de referencia. Este cálculo local no actualiza la clasificación.
 
 La puntuación oficial es independiente. Solo al pulsar “Enviar y calcular score oficial” se envían usuario, código del agente y las veinte respuestas a `POST /submit`; el servicio devuelve el porcentaje y los aciertos sobre el total y actualiza la clasificación pública del curso. Ejecutar, evaluar localmente o comparar experimentos no hace ese envío. Las búsquedas web necesitan acceso a Internet; no requieren una clave adicional.
 
-Para reducir la latencia, el razonador genera directamente la respuesta final en una llamada, en vez de razonar y hacer después una segunda llamada de reformateo. Las clasificaciones breves del router, código y plan Excel limitan su salida y desactivan el modo de pensamiento extendido de Qwen 3. La extracción de hasta tres páginas web se ejecuta en paralelo. En vídeo, los fotogramas se buscan mediante saltos temporales y solo se activa Whisper/AST si la pregunta pide información de audio; las preguntas visuales no transcriben sonido de fondo.
+En el pipeline v2 el razonamiento y la respuesta final vuelven a tener llamadas y presupuestos separados. `LLM_REASONING_MAX_TOKENS` controla la resolución y `LLM_FINAL_ANSWER_MAX_TOKENS` la presentación final. La revisión puede encadenar herramientas dentro de los límites configurados. La extracción de páginas web independientes se mantiene en paralelo y el vídeo empieza con un muestreo limitado que puede ampliarse. Consulta [pipeline-v2.md](pipeline-v2.md) para el flujo y las mediciones.
 
 ## Modo terminal
 
@@ -76,3 +76,9 @@ Los adjuntos se obtienen del repositorio GAIA a través de `huggingface_hub`; no
 ## Estado de los modelos en el frontal
 
 El frontal consulta periodicamente `/api/status` y muestra el estado del LLM razonador y de los tres modelos multimedia: VLM, Whisper y AST. El sondeo usa los endpoints de solo lectura `/health` y `/props` de llama.cpp para distinguir el modelo listo del modelo dormido sin despertarlo. Para cada modelo multimedia se muestra si aun no se ha cargado, esta cargando, en uso, residente en memoria o descargado tras inactividad.
+
+## Ejecución con el pipeline v2
+
+Sincroniza con `uv sync --extra multimedia` y reinicia el servidor para aplicar los cambios de Python y las variables nuevas de `.env.example`. El lanzador sigue siendo `./scripts/start_agent.ps1 -Mode frontend`. Recarga la página para usar los enlaces a trazas y recuperar los experimentos del servidor.
+
+El indicador de GPU comprueba CUDA en PyTorch: VLM y AST la utilizan cuando está disponible; Whisper continúa en CPU. Cada pregunta muestra tiempo total y tiempo de llamadas al LLM. Las trazas JSON incluyen las etapas y sus evidencias; se conservan incluso si falla la pregunta. El historial se copia a `.runtime/experiments/`, excluido de Git, y conserva la copia del navegador. Consulta [pipeline-v2.md](pipeline-v2.md) para las variables, el flujo y la interpretación de las mediciones.
