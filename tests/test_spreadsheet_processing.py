@@ -41,7 +41,7 @@ def test_spreadsheet_processing_passes_workbook_data_to_llm(
         ]
     )
 
-    def chat_completion_mock(messages):
+    def chat_completion_mock(messages, **_kwargs):
         captured_messages.extend(messages)
         return next(responses)
 
@@ -87,7 +87,7 @@ def test_spreadsheet_processing_falls_back_for_complex_questions(
     workbook.save(workbook_path)
     responses = iter([json.dumps({"strategy": "analyze"}), "Top item: Burger"])
 
-    def chat_completion_mock(_messages):
+    def chat_completion_mock(_messages, **_kwargs):
         return next(responses)
 
     monkeypatch.setattr(spreadsheet_processing, "chat_completion", chat_completion_mock)

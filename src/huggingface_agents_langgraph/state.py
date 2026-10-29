@@ -34,6 +34,5 @@ class AgentState(TypedDict):
     file_path: NotRequired[Path | None]
     route: NotRequired[Route]
     evidence: NotRequired[list[Evidence]]
-    answer_candidate: NotRequired[str]
     submitted_answer: NotRequired[str]
     experiment: NotRequired[ExperimentConfig]

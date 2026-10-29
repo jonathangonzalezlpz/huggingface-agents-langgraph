@@ -15,9 +15,18 @@ class ChatMessage(TypedDict):
     content: str
 
 
-def chat_completion(messages: list[ChatMessage]) -> str:
+def chat_completion(
+    messages: list[ChatMessage],
+    *,
+    max_tokens: int | None = None,
+    frequency_penalty: float | None = None,
+) -> str:
     """Return the model's response text for a chat-completions request."""
     request_body = {"messages": messages, "temperature": 0}
+    if max_tokens is not None:
+        request_body["max_tokens"] = max_tokens
+    if frequency_penalty is not None:
+        request_body["frequency_penalty"] = frequency_penalty
     request = Request(
         f"{LLM_BASE_URL.rstrip('/')}/chat/completions",
         data=json.dumps(request_body).encode("utf-8"),
@@ -30,7 +39,7 @@ def chat_completion(messages: list[ChatMessage]) -> str:
             result = json.loads(response.read().decode("utf-8"))
     except (URLError, TimeoutError, json.JSONDecodeError) as error:
         raise RuntimeError(
-            "Could not get a response from the configured LLM"
+            f"Could not get a response from the configured LLM: {error}"
         ) from error
 
     try:

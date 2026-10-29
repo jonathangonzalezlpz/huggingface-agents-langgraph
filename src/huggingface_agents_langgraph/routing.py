@@ -92,12 +92,12 @@ def _classify_question(question: str) -> Route:
                 "or calculation, without external facts. Use wikipedia when the "
                 "question explicitly requests Wikipedia or an encyclopedia source. "
                 "Otherwise use web when external research or current/source-specific "
-                "facts are needed."
+                "facts are needed. /no_think"
             ),
         },
         {"role": "user", "content": question},
     ]
-    route = chat_completion(messages).strip().lower().strip("\"'` .")
+    route = chat_completion(messages, max_tokens=32).strip().lower().strip("\"'` .")
     if route == "direct":
         return "direct"
     if route == "web":

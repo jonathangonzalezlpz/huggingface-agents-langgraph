@@ -59,7 +59,7 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
                 "comparison, ranking, multi-step calculation, or anything this "
                 "simple plan cannot represent, return only "
                 '{"strategy":"analyze"}. Never simplify a question to fit '
-                "the calculation plan."
+                "the calculation plan. /no_think"
             ),
         },
         {
@@ -70,7 +70,7 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
             ),
         },
     ]
-    plan_response = chat_completion(plan_messages)
+    plan_response = chat_completion(plan_messages, max_tokens=384)
     try:
         plan = json.loads(plan_response)
     except json.JSONDecodeError:

@@ -5,7 +5,6 @@ from typing import Literal
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from huggingface_agents_langgraph.answer_production import answer_production
 from huggingface_agents_langgraph.attachments import attachment_resolver
 from huggingface_agents_langgraph.code_processing import code_processing
 from huggingface_agents_langgraph.document_processing import document_processing
@@ -85,7 +84,6 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
     graph.add_node("multimedia_processing", multimedia_processing)
     graph.add_node("web_research", web_research)
     graph.add_node("reasoning", reasoning)
-    graph.add_node("answer_production", answer_production)
 
     graph.add_edge(START, "preprocessing")
     graph.add_conditional_edges(
@@ -115,7 +113,6 @@ def build_state_graph() -> CompiledStateGraph[AgentState, None, AgentState, Agen
     graph.add_edge("document_processing", "reasoning")
     graph.add_edge("multimedia_processing", "reasoning")
     graph.add_edge("web_research", "reasoning")
-    graph.add_edge("reasoning", "answer_production")
-    graph.add_edge("answer_production", END)
+    graph.add_edge("reasoning", END)
 
     return graph.compile()

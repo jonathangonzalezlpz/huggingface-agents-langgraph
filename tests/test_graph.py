@@ -32,15 +32,10 @@ def test_direct_route_reaches_reasoning_without_external_evidence(
 
     def reasoning_mock(state):
         reasoning_states.append(state)
-        return {"answer_candidate": "right"}
+        return {"submitted_answer": "right"}
 
     monkeypatch.setattr(graph_module, "router", lambda _state: {"route": "direct"})
     monkeypatch.setattr(graph_module, "reasoning", reasoning_mock)
-    monkeypatch.setattr(
-        graph_module,
-        "answer_production",
-        lambda _state: {"submitted_answer": "right"},
-    )
     graph = build_state_graph()
     input_state = {
         "task_id": "task-1",

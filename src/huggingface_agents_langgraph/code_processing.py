@@ -51,7 +51,7 @@ def _choose_code_action(question: str, source: str) -> str:
                 "Return exactly one word: execute if answering requires the "
                 "program's runtime output; otherwise return inspect. Questions "
                 "asking to explain, review, or identify something in the source "
-                "should use inspect."
+                "should use inspect. /no_think"
             ),
         },
         {
@@ -59,7 +59,7 @@ def _choose_code_action(question: str, source: str) -> str:
             "content": f"Task question:\n{question}\n\nPython source:\n{source}",
         },
     ]
-    action = chat_completion(messages).lower()
+    action = chat_completion(messages, max_tokens=32).lower()
 
     if action not in {"execute", "inspect"}:
         raise ValueError(
