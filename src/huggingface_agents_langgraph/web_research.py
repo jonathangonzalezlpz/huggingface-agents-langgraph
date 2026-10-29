@@ -3,6 +3,8 @@
 import json
 import re
 import xml.etree.ElementTree as ElementTree
+from concurrent.futures import ThreadPoolExecutor
+from html.parser import HTMLParser
 from typing import TypedDict
 from urllib.error import URLError
 from urllib.parse import urlencode
@@ -29,6 +31,78 @@ SCHOLARLY_TERMS = re.compile(
     r"artículos?|articulos?|estudios|publicaciones?|revistas?)\b",
     re.IGNORECASE,
 )
+WIKIPEDIA_SOURCE_INSTRUCTION = re.compile(
+    r"\b(?:you can use|use)\s+(?:the\s+)?(?:latest\s+)?(?:\d{4}\s+)?"
+    r"version of (?:the )?(?:english|en)\s+wikipedia\b.*$",
+    re.IGNORECASE,
+)
+WIKIPEDIA_SUBJECT_PATTERN = re.compile(
+    r"\b(?:by|about|regarding|concerning|written by|performed by|"
+    r"directed by|created by|of)\s+([A-Z][\w’'.-]*(?:\s+[A-Z][\w’'.-]*){0,4})"
+)
+WIKIPEDIA_TITLE_PATTERN = re.compile(r"\b[A-Z][\w’'.-]*(?:\s+[A-Z][\w’'.-]*)+\b")
+WIKIPEDIA_GENERIC_TITLES = {
+    "english wikipedia",
+    "wikipedia",
+}
+WIKIPEDIA_IGNORED_CLASSES = {
+    "catlinks",
+    "mw-editsection",
+    "mw-jump-link",
+    "mw-references-wrap",
+    "navbox",
+    "references",
+    "toc",
+}
+
+
+class _WikipediaHTMLTextParser(HTMLParser):
+    """Convert article HTML into text while preserving table rows and cells."""
+
+    _BLOCK_TAGS = {"br", "div", "li", "p", "tr"}
+    _HEADING_TAGS = {"h2": "==", "h3": "===", "h4": "===="}
+    _CELL_TAGS = {"td", "th"}
+    _IGNORED_TAGS = {"script", "style", "sup"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+        self._ignored_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self._ignored_depth:
+            self._ignored_depth += 1
+            return
+        classes = set((dict(attrs).get("class") or "").split())
+        if tag in self._IGNORED_TAGS or classes & WIKIPEDIA_IGNORED_CLASSES:
+            self._ignored_depth = 1
+            return
+        if tag in self._HEADING_TAGS:
+            self._parts.append(f"\n{self._HEADING_TAGS[tag]} ")
+        elif tag in self._BLOCK_TAGS:
+            self._parts.append("\n")
+        elif tag in self._CELL_TAGS:
+            self._parts.append(" | ")
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._ignored_depth:
+            self._ignored_depth -= 1
+            return
+        if tag in self._HEADING_TAGS:
+            self._parts.append(f" {self._HEADING_TAGS[tag]}\n")
+        elif tag in self._BLOCK_TAGS:
+            self._parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self._ignored_depth:
+            self._parts.append(data)
+
+    def get_text(self) -> str:
+        lines = [
+            re.sub(r"\s+", " ", line).strip()
+            for line in "".join(self._parts).splitlines()
+        ]
+        return "\n".join(line for line in lines if line)
 
 
 class WebResearchUpdate(TypedDict):
@@ -65,44 +139,59 @@ def _search_web(question: str) -> list[Evidence]:
     except DDGSException:
         search_results = []
 
-    evidence = (
-        _search_scholarly_literature(question)
-        if _is_scholarly_question(question)
-        else []
-    )
-    extracted_pages = 0
+    page_results = []
     for result in search_results:
-        if extracted_pages >= WEB_PAGE_LIMIT:
+        if len(page_results) >= WEB_PAGE_LIMIT:
             break
         url = result.get("href", "")
-        if not url.startswith(("http://", "https://")):
-            continue
-        title = result.get("title", "").strip()
-        snippet = result.get("body", "").strip()
-        content = snippet
-        try:
-            extracted = DDGS(timeout=WEB_SEARCH_TIMEOUT_SECONDS).extract(
-                url,
-                fmt="text_markdown",
-            )
-            extracted_content = extracted.get("content", "")
-            if isinstance(extracted_content, str) and extracted_content.strip():
-                content = extracted_content.strip()
-        except DDGSException:
-            pass
+        if url.startswith(("http://", "https://")):
+            page_results.append(result)
 
-        if content:
-            evidence.append(
-                {
-                    "content": f"{title}\n\n{content}" if title else content,
-                    "source": url,
-                    "source_type": "web_page",
-                }
-            )
-            extracted_pages += 1
+    needs_scholarly_search = _is_scholarly_question(question)
+    worker_count = len(page_results) + int(needs_scholarly_search)
+    with ThreadPoolExecutor(max_workers=max(1, worker_count)) as executor:
+        literature_future = (
+            executor.submit(_search_scholarly_literature, question)
+            if needs_scholarly_search
+            else None
+        )
+        page_evidence = [
+            page
+            for page in executor.map(_extract_web_result, page_results)
+            if page is not None
+        ]
+        evidence = (
+            literature_future.result() if literature_future is not None else []
+        ) + page_evidence
+
     if not evidence and not search_results:
         raise RuntimeError("Web and scholarly searches failed")
     return evidence
+
+
+def _extract_web_result(result: dict[str, str]) -> Evidence | None:
+    """Extract one result page, falling back to its search snippet."""
+    url = result["href"]
+    title = result.get("title", "").strip()
+    content = result.get("body", "").strip()
+    try:
+        extracted = DDGS(timeout=WEB_SEARCH_TIMEOUT_SECONDS).extract(
+            url,
+            fmt="text_markdown",
+        )
+        extracted_content = extracted.get("content", "")
+        if isinstance(extracted_content, str) and extracted_content.strip():
+            content = extracted_content.strip()
+    except DDGSException:
+        pass
+
+    if not content:
+        return None
+    return {
+        "content": f"{title}\n\n{content}" if title else content,
+        "source": url,
+        "source_type": "web_page",
+    }
 
 
 def _is_scholarly_question(question: str) -> bool:
@@ -191,15 +280,90 @@ def _fetch_europe_pmc_full_text(pmcid: str) -> str:
 
 def _search_wikipedia(question: str) -> list[Evidence]:
     """Search English Wikipedia and return plaintext article evidence."""
+    search_text = WIKIPEDIA_SOURCE_INSTRUCTION.sub("", question).strip()
+    subjects = [
+        match.group(1).strip()
+        for match in WIKIPEDIA_SUBJECT_PATTERN.finditer(search_text)
+    ]
+    subjects.extend(
+        match.group(0).strip()
+        for match in WIKIPEDIA_TITLE_PATTERN.finditer(search_text)
+        if match.group(0).strip().lower() not in WIKIPEDIA_GENERIC_TITLES
+    )
+    search_queries = list(dict.fromkeys(subjects)) or [search_text]
+
+    for search_query in search_queries:
+        evidence = _get_wikipedia_page(search_query)
+        if evidence:
+            return evidence
+        evidence = _search_wikipedia_subject(search_query)
+        if evidence:
+            if search_query in subjects:
+                exact_title = [
+                    item
+                    for item in evidence
+                    if item["content"].split("\n", 1)[0].casefold()
+                    == search_query.casefold()
+                ]
+                if exact_title:
+                    return exact_title[:1]
+            return evidence
+    return []
+
+
+def _get_wikipedia_page(title: str) -> list[Evidence]:
+    """Fetch a rendered article, including tables, for an exact page title."""
+    parameters = {
+        "action": "parse",
+        "page": title,
+        "prop": "text",
+        "format": "json",
+    }
+    request = Request(
+        f"{WIKIPEDIA_API_URL}?{urlencode(parameters)}",
+        headers={
+            "User-Agent": "huggingface-agents-langgraph/0.1 (GAIA course project)"
+        },
+    )
+    try:
+        with urlopen(request, timeout=WEB_SEARCH_TIMEOUT_SECONDS) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, json.JSONDecodeError):
+        return []
+
+    parsed = payload.get("parse", {})
+    page_title = parsed.get("title", title)
+    html_response = parsed.get("text", "")
+    html = (
+        html_response.get("*", "") if isinstance(html_response, dict) else html_response
+    )
+    if not page_title or not html:
+        return []
+
+    text_parser = _WikipediaHTMLTextParser()
+    text_parser.feed(html)
+    content = text_parser.get_text()
+    page_id = parsed.get("pageid")
+    if not content or not page_id:
+        return []
+    return [
+        {
+            "content": f"{page_title}\n{content}",
+            "source": f"https://en.wikipedia.org/?curid={page_id}",
+            "source_type": "wikipedia",
+        }
+    ]
+
+
+def _search_wikipedia_subject(search_query: str) -> list[Evidence]:
+    """Search for a concise subject or title and return its article extracts."""
     parameters = {
         "action": "query",
         "generator": "search",
-        "gsrsearch": question,
+        "gsrsearch": search_query,
         "gsrnamespace": "0",
         "gsrlimit": str(WEB_PAGE_LIMIT),
-        "prop": "extracts",
-        "explaintext": "1",
-        "exsectionformat": "plain",
+        "prop": "info",
         "redirects": "1",
         "format": "json",
     }
@@ -212,21 +376,13 @@ def _search_wikipedia(question: str) -> list[Evidence]:
     try:
         with urlopen(request, timeout=WEB_SEARCH_TIMEOUT_SECONDS) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (URLError, TimeoutError, json.JSONDecodeError) as error:
-        raise RuntimeError("Wikipedia search failed") from error
+    except (URLError, TimeoutError, json.JSONDecodeError):
+        return []
 
     pages = payload.get("query", {}).get("pages", {})
-    evidence: list[Evidence] = []
-    for page in pages.values():
+    evidence = []
+    for page in sorted(pages.values(), key=lambda item: item.get("index", 0)):
         title = page.get("title", "")
-        content = page.get("extract", "").strip()
-        page_id = page.get("pageid")
-        if content and title and page_id:
-            evidence.append(
-                {
-                    "content": content,
-                    "source": f"https://en.wikipedia.org/?curid={page_id}",
-                    "source_type": "wikipedia",
-                }
-            )
+        if title:
+            evidence.extend(_get_wikipedia_page(title))
     return evidence

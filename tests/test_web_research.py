@@ -49,14 +49,10 @@ def test_web_research_queries_wikipedia_api_and_returns_article_source(
     monkeypatch,
 ) -> None:
     payload = {
-        "query": {
-            "pages": {
-                "123": {
-                    "title": "Paris",
-                    "pageid": 123,
-                    "extract": "Paris is the capital and largest city of France.",
-                }
-            }
+        "parse": {
+            "title": "Paris",
+            "pageid": 123,
+            "text": {"*": "<p>Paris is the capital and largest city of France.</p>"},
         }
     }
 
@@ -69,13 +65,15 @@ def test_web_research_queries_wikipedia_api_and_returns_article_source(
 
     def urlopen_mock(request, timeout: int):
         assert request.full_url.startswith(web_research.WIKIPEDIA_API_URL)
+        assert "action=parse" in request.full_url
+        assert "page=Paris" in request.full_url
         assert timeout == web_research.WEB_SEARCH_TIMEOUT_SECONDS
         return FakeResponse(json.dumps(payload).encode())
 
     monkeypatch.setattr(web_research, "urlopen", urlopen_mock)
     state = {
         "task_id": "task-1",
-        "question": "What is the capital of France according to Wikipedia?",
+        "question": "What is the capital of Paris according to Wikipedia?",
         "file_name": "",
         "route": "wikipedia",
     }
@@ -84,7 +82,7 @@ def test_web_research_queries_wikipedia_api_and_returns_article_source(
 
     assert update["evidence"] == [
         {
-            "content": "Paris is the capital and largest city of France.",
+            "content": "Paris\nParis is the capital and largest city of France.",
             "source": "https://en.wikipedia.org/?curid=123",
             "source_type": "wikipedia",
         }
