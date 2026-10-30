@@ -9,6 +9,7 @@ from huggingface_agents_langgraph.config import (
     DOCUMENT_CHUNK_OVERLAP_CHARACTERS,
     DOCUMENT_MAX_EVIDENCE_CHARACTERS,
 )
+from huggingface_agents_langgraph.experiments import improvement_enabled
 from huggingface_agents_langgraph.state import Evidence
 
 TOKEN_PATTERN = re.compile(r"[a-z0-9]{2,}")
@@ -55,8 +56,17 @@ def select_relevant_evidence(
     The selector is independent of source type. Callers provide text with its
     provenance, such as a PDF page, a web page, or a Wikipedia article.
     """
+    improved = improvement_enabled(None, "web_sources")
+    if improved:
+        from huggingface_agents_langgraph.source_store import retain_sources
+
+        source_evidence = retain_sources(
+            [item for item in source_evidence if not item.get("source_id")]
+        ) + [item for item in source_evidence if item.get("source_id")]
     chunks = [
-        Evidence(
+        (item | {"content": chunk})
+        if improved
+        else Evidence(
             content=chunk,
             source=item["source"],
             source_type=item["source_type"],

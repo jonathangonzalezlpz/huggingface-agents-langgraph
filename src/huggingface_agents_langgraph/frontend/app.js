@@ -14,6 +14,13 @@ const gpuStatus = document.querySelector("#gpu-status");
 const refreshModelsButton = document.querySelector("#refresh-models-button");
 const experimentName = document.querySelector("#experiment-name");
 const experimentModel = document.querySelector("#experiment-model");
+const pipelineVersion = document.querySelector("#pipeline-version");
+const improvementInputs = [...document.querySelectorAll("[data-improvement]")];
+const reasoningMode = document.querySelector("#reasoning-mode");
+const thinkingTokens = document.querySelector("#thinking-tokens");
+const solutionTokens = document.querySelector("#solution-tokens");
+let sessionRecordId = null;
+let sessionCreatedAt = null;
 const capabilityInputs = [...document.querySelectorAll("[data-capability]")];
 const experimentMode = document.querySelector("#experiment-mode");
 const scorePanel = document.querySelector("#score-panel");
@@ -99,6 +106,12 @@ function getExperiment() {
       .filter((input) => input.checked)
       .map((input) => input.dataset.capability),
     model,
+    pipeline_version: pipelineVersion.value,
+    improvements: pipelineVersion.value === "3"
+      ? improvementInputs.filter((input) => input.checked).map((input) => input.dataset.improvement) : [],
+    reasoning_mode: reasoningMode.value,
+    thinking_tokens: Number(thinkingTokens.value),
+    solution_tokens: Number(solutionTokens.value),
   };
 }
 
@@ -133,24 +146,30 @@ function applyProfile(profile) {
   experimentName.value = {
     full: "Completo", direct: "Solo directo", "no-web": "Sin web", "no-files": "Sin adjuntos",
   }[profile];
+  experimentName.value = `V${pipelineVersion.value} · ${experimentName.value}`;
   experimentMode.textContent = profile === "direct"
     ? "Todas las preguntas irán directamente al razonador."
     : "El router decide entre las capacidades habilitadas.";
 }
 
 function saveExperimentRecord() {
-  const cards = [...questionList.querySelectorAll(".question-card")];
-  if (cards.length !== 20 || cards.some((card) => !card._result)) return;
+  const allCards = [...questionList.querySelectorAll(".question-card")];
+  const cards = allCards.filter((card) => card._result);
+  if (allCards.length !== 20 || !cards.length) return;
+  sessionRecordId ||= crypto.randomUUID();
+  sessionCreatedAt ||= new Date().toISOString();
   const configs = cards.map((card) => card._experimentUsed);
   const sameConfig = configs.every(
     (config) => JSON.stringify(config) === JSON.stringify(configs[0]),
   );
   const record = {
-    id: crypto.randomUUID(),
+    id: sessionRecordId,
     pipeline_version: cards.every((card) => card._result.pipeline_version &&
       card._result.pipeline_version === cards[0]._result.pipeline_version)
       ? cards[0]._result.pipeline_version : "legacy/mixed",
-    created_at: new Date().toISOString(),
+    created_at: sessionCreatedAt,
+    status: cards.length === allCards.length ? "completed" : "partial",
+    questions: allCards.map((card) => card._question),
     config: sameConfig
       ? configs[0]
       : { name: "Configuración mixta", force_direct: false, enabled_capabilities: [], model: null },
@@ -168,12 +187,15 @@ function saveExperimentRecord() {
     })),
     average_duration_seconds: averageDuration(cards),
   };
-  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+  const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]")
+    .filter((item) => item.id !== record.id);
   history.unshift(record);
   localStorage.setItem("gaia-experiments", JSON.stringify(retainExperimentHistory(history)));
   void persistExperiment(record);
   scorePanel.hidden = false;
-  scoreResult.textContent = "Experimento guardado en este navegador; puedes calcular la puntuación oficial cuando quieras.";
+  scoreResult.textContent = cards.length === 20
+    ? "Experimento completado; puedes calcular la puntuación cuando quieras."
+    : `Progreso guardado: ${cards.length}/20. La puntuación requiere completar la batería.`;
   renderExperimentHistory();
 }
 
@@ -192,14 +214,15 @@ async function loadSavedExperiments() {
   try {
     const { experiments } = await requestJson("/api/experiments");
     const local = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
+    const serverIds = new Set(experiments.map((record) => record.id));
     const merged = new Map(experiments.map((record) => [record.id, record]));
     local.forEach((record) => {
-      if (!merged.get(record.id)?.is_reference) merged.set(record.id, record);
+      if (!merged.has(record.id)) merged.set(record.id, record);
     });
     const records = retainExperimentHistory([...merged.values()]);
     localStorage.setItem("gaia-experiments", JSON.stringify(records));
     renderExperimentHistory();
-    await Promise.all(local.filter((record) => !merged.get(record.id)?.is_reference).map(persistExperiment));
+    await Promise.all(local.filter((record) => !serverIds.has(record.id)).map(persistExperiment));
   } catch (error) {
     showNotice(`Historial del navegador disponible; servidor inaccesible: ${error.message}`);
   }
@@ -216,6 +239,10 @@ function traceLink(runId) {
 }
 
 function renderExperimentHistory() {
+  const checkedIds = new Set([...experimentHistoryList.querySelectorAll("input:checked")]
+    .map((input) => input.dataset.experimentId));
+  const previousScore = scoreExperimentSelect.value;
+  const previousLocalScore = localScoreExperimentSelect.value;
   const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
   experimentHistory.hidden = history.length === 0;
   scoreExperimentSelect.replaceChildren();
@@ -235,6 +262,7 @@ function renderExperimentHistory() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.dataset.experimentId = record.id;
+    checkbox.checked = checkedIds.has(record.id);
     checkbox.addEventListener("change", renderExperimentComparison);
     selectLabel.append(checkbox, document.createTextNode("Comparar"));
     const title = document.createElement("strong");
@@ -245,6 +273,11 @@ function renderExperimentHistory() {
       return counts;
     }, {});
     details.textContent = `${new Date(record.created_at).toLocaleString()} · ${record.answers.length}/20 respuestas · ${Object.entries(routes).map(([route, count]) => `${route}: ${count}`).join(" · ")}`;
+    if (Number.isFinite(record.average_duration_seconds)) details.textContent += ` · Media: ${formatDuration(record.average_duration_seconds)}`;
+    if (record.metrics) {
+      details.textContent += ` · Mediana: ${formatDuration(record.metrics.median_seconds)} · P95: ${formatDuration(record.metrics.p95_seconds)} · Errores técnicos: ${record.metrics.technical_errors}`;
+    }
+    details.textContent += ` · Mejoras: ${(record.config.improvements || []).join(", ") || "ninguna"}`;
     const score = document.createElement("span");
     score.className = "experiment-score";
     score.textContent = record.score
@@ -295,6 +328,8 @@ function renderExperimentHistory() {
     row.append(selectLabel, title, details, score, deleteButton, reviewDetails);
     experimentHistoryList.append(row);
   });
+  if ([...scoreExperimentSelect.options].some((option) => option.value === previousScore)) scoreExperimentSelect.value = previousScore;
+  if ([...localScoreExperimentSelect.options].some((option) => option.value === previousLocalScore)) localScoreExperimentSelect.value = previousLocalScore;
   renderExperimentComparison();
 }
 
@@ -343,14 +378,16 @@ function renderExperimentComparison() {
     const answers = selected.map((record) => record.answers.find((answer) => answer.task_id === taskId));
     const prompts = answers.map((answer) => answer?.question || "");
     const nonemptyPrompts = [...new Set(prompts.filter(Boolean))];
+    const resources = new Set(answers.filter(Boolean).map((answer) => answer.file_name || ""));
+    const sameInputs = nonemptyPrompts.length === 1 && prompts.every(Boolean) && resources.size === 1;
     const row = document.createElement("tr");
     const questionCell = document.createElement("td");
     questionCell.className = "comparison-question";
     const taskLabel = document.createElement("strong");
     taskLabel.textContent = taskId;
     const variation = document.createElement("span");
-    variation.className = `question-variation ${nonemptyPrompts.length === 1 && prompts.every(Boolean) ? "same" : "changed"}`;
-    variation.textContent = nonemptyPrompts.length === 1 && prompts.every(Boolean)
+    variation.className = `question-variation ${sameInputs ? "same" : "changed"}`;
+    variation.textContent = sameInputs
       ? "Pregunta idéntica"
       : "Pregunta distinta o ausente";
     questionCell.append(taskLabel, variation);
@@ -374,6 +411,8 @@ function renderExperimentComparison() {
         ? "Acierto local"
         : answer?.locally_correct === false ? "Error local" : "Sin evaluar localmente";
       route.textContent = `Ruta: ${answer?.route || "sin dato"} · ${localStatus}`;
+      if (Number.isFinite(answer?.duration_seconds)) route.textContent += ` · Total: ${formatDuration(answer.duration_seconds)}`;
+      if (Number.isFinite(answer?.llm_duration_seconds)) route.textContent += ` · LLM: ${formatDuration(answer.llm_duration_seconds)}`;
       cell.append(document.createElement("br"), route);
       row.append(cell);
     });
@@ -416,6 +455,8 @@ function updateTimingSummary() {
 function setExperimentControlsDisabled(disabled) {
   experimentName.disabled = disabled;
   experimentModel.disabled = disabled;
+  [pipelineVersion, reasoningMode, thinkingTokens, solutionTokens].forEach((input) => { input.disabled = disabled; });
+  improvementInputs.forEach((input) => { input.disabled = disabled || pipelineVersion.value !== "3"; });
   capabilityInputs.forEach((input) => { input.disabled = disabled; });
   document.querySelectorAll(".preset-button").forEach((button) => {
     button.disabled = disabled;
@@ -609,6 +650,8 @@ function renderQuestion(question, index, total) {
 }
 
 function displayQuestions(questions, title) {
+  sessionRecordId = null;
+  sessionCreatedAt = null;
   sessionExperimentSnapshot = null;
   batchLaunched = false;
   setExperimentControlsDisabled(false);
@@ -847,6 +890,13 @@ async function processAllQuestions() {
 }
 
 randomButton.addEventListener("click", loadRandomQuestion);
+pipelineVersion.addEventListener("change", () => {
+  improvementInputs.forEach((input) => { input.disabled = pipelineVersion.value !== "3"; });
+  if (["Completo", "V2 · Completo", "V3 · Completo"].includes(experimentName.value)) {
+    experimentName.value = `V${pipelineVersion.value} · Completo`;
+  }
+});
+experimentName.value = "V3 · Completo";
 batchButton.addEventListener("click", loadQuestionBatch);
 runAllButton.addEventListener("click", processAllQuestions);
 stopAllButton.addEventListener("click", () => {
@@ -875,3 +925,6 @@ void loadSavedExperiments();
 void refreshModelStatus();
 void refreshAvailableModels();
 window.setInterval(refreshModelStatus, 5000);
+window.setInterval(() => {
+  if (!activeExperimentSnapshot) void loadSavedExperiments();
+}, 15000);

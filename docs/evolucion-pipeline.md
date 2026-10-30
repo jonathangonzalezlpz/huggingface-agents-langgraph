@@ -130,11 +130,11 @@ configurarse otro puerto. Esta reproducción aún no se ha ejecutado como bater�
 Se conserva el código y el lockfile exactos; no se garantiza identidad de resultados
 ante cambios del servidor, pesos, buscador o páginas externas.
 
-## V3: plan aprobado, pendiente de evaluación
+## V3: plan aprobado para la evaluación
 
-El trabajo comienza preservando la referencia. El pipeline de resolución sigue
-siendo V2 hasta introducir las mejoras. Las siguientes variantes son un plan,
-no experimentos ejecutados ni resultados atribuidos a la V3.
+El trabajo comenzó preservando la referencia, antes de introducir las mejoras.
+Las siguientes variantes recogen el diseño experimental aprobado. Su ejecución
+posterior y sus resultados se detallan en el cierre de V3 al final del documento.
 
 | Variante prevista | Cambio principal | Comparación |
 |---|---|---|
@@ -184,8 +184,8 @@ se hayan ejecutado; no se crean fichas con resultados simulados.
 | Archivo de código y registros V2 | Realizado localmente | Manifiesto SHA-256 verificado |
 | Identificación de la referencia en el panel | Implementado | Nombre visible separado del registro original |
 | Versión y tiempo LLM en respuestas de error | Implementado | Prueba de API con fallo del grafo |
-| Variantes individuales V3 | Pendiente | Sin baterías ejecutadas |
-| Comparación conjunta V3 | Pendiente | Sin resultados atribuidos |
+| Variantes individuales V3 | Completadas | Seis baterías de veinte tareas |
+| Comparación conjunta V3 | Completada | 4/20, 20 %, 32,8 segundos de media |
 
 ### Validación del paso de conservación
 
@@ -199,3 +199,120 @@ prueba coinciden con la V2 archivada, salvo los finales de línea de Windows.
 La evaluación de la rama web deberá aislar esa dependencia antes de atribuir
 resultados a una mejora. No se ha ejecutado una batería ni inferencia de modelos
 durante este paso.
+
+## Implementación experimental V3 y primera serie de mediciones
+
+La V3 añade seis controles independientes: razonamiento, presentación determinista,
+fuentes consultables, cálculo multicolumna de Excel, adquisición multimedia y
+operaciones restringidas sobre texto/listas. Se conservan LangGraph y los modelos
+de la referencia. El detalle de qué está implementado y qué sigue siendo una
+alternativa pendiente se recoge en [pipeline-v3.md](pipeline-v3.md).
+
+La validación previa a las mediciones obtiene 123 pruebas correctas, con Ruff y
+sintaxis JavaScript correctos. La consulta externa no simulada de la prueba web
+se ha aislado en el test; no se cambia por ello el comportamiento web de V2.
+
+La serie `v3-ablation-20261030` ha completado ocho baterías: un control V2,
+seis mejoras aisladas y una combinación, con 160 respuestas en total. Las ocho
+comparten un mismo hash de código y un mismo conjunto de entradas. Los resultados
+se recogen en [resultados-v3.md](resultados-v3.md), sin publicar respuestas de
+referencia. No se han realizado envíos oficiales.
+
+## Cierre de V3: resultados, análisis y decisión
+
+| Configuración | Aciertos | Media por pregunta | Errores técnicos |
+|---|---:|---:|---:|
+| V2 histórica conservada | 6/20 (30 %) | 47,3 s | 3 |
+| V2 control contemporáneo | 5/20 (25 %) | 49,6 s | 1 |
+| V3 control del razonamiento | 4/20 (20 %) | 31,6 s | 1 |
+| V3 presentación determinista | 5/20 (25 %) | 47,8 s | 2 |
+| V3 fuentes consultables | 3/20 (15 %) | 45,0 s | 1 |
+| V3 Excel ampliado | 4/20 (20 %) | 49,2 s | 1 |
+| V3 adquisición multimedia | 4/20 (20 %) | 45,0 s | 2 |
+| V3 calculadora ampliada | 6/20 (30 %) | 42,4 s | 2 |
+| V3 completa | 4/20 (20 %) | 32,8 s | 3 |
+
+La combinación reduce un 33,84 % el tiempo medio frente al control contemporáneo,
+pero pierde un acierto. Frente a la referencia histórica pierde dos. Por tanto,
+la estrategia no cumple el objetivo de aumentar acierto sin degradar calidad.
+No se promueve V3 completa como sustituta de V2: el panel vuelve a seleccionar
+V2 por defecto y mantiene V3 como alternativa experimental reproducible.
+
+La calculadora ampliada obtiene el mejor resultado entre las variantes de esta
+serie: iguala el 30 % histórico y supera al control contemporáneo. Es una candidata
+a conservar, pero una pasada no demuestra que explique todas las ganancias:
+también cambian respuestas de tareas que no requieren sus operaciones nuevas.
+El control contemporáneo pierde un acierto respecto al histórico; las fuentes
+externas y el muestreo del razonador introducen variación.
+
+### Hallazgos de las trazas
+
+- **Razonamiento:** el control nativo reduce generación y tiempo, pero el presupuesto
+  utilizado no demuestra conservación de acierto. En V3 completa los dos fallos
+  de truncamiento fatales se producen en llamadas del revisor de 768 tokens,
+  no en la llamada principal de resolución. El tercer error es la validación
+  del movimiento de ajedrez. La recuperación de JSON y truncamientos del revisor
+  sigue siendo un punto pendiente.
+- **Presentación:** gana la tarea de páginas del audio y pierde la de álbumes frente
+  al control. La receta deja de fallar por orden, pero su contenido no coincide
+  con la referencia. Evitar un error mecánico no garantiza exactitud semántica.
+- **Fuentes:** pierde dos aciertos del control. Se observan solicitudes de relectura,
+  pero una búsqueda literal no encuentra el texto pedido. Conservar fuentes completas
+  y disponer de más acciones no garantiza seleccionar ni interpretar mejor la evidencia.
+  No se ha demostrado una mejora global con el extractor y la política ensayados.
+- **Excel:** el modelo selecciona las columnas de comida, pero inventa un filtro
+  de localidad atribuyéndolo a una exclusión de bebidas. La validación rechaza
+  ese plan y pasa a análisis general. La tarea gana un acierto en la variante
+  individual, aunque no mediante el cálculo determinista previsto; en la combinación
+  vuelve a fallar. No se atribuye ese acierto al nuevo agregador. La recuperación
+  necesita corregir el plan de forma acotada antes de recurrir a aritmética del LLM.
+- **Multimedia:** la tarea de diálogo descarga audio real, produce transcripción
+  y no usa fotogramas. La transcripción contiene la respuesta, pero el formateador
+  añade una frase con Markdown y falla Exact Match, también en la combinación.
+  Se corrige un defecto de adquisición, sin demostrar una ganancia de puntuación.
+  La interpretación del tablero continúa fallando con el VLM de 256M.
+- **Calculadora:** gana las tareas 3 y 15 y pierde la 1 frente al control. La
+  operación de texto aporta una ganancia compatible con su propósito; la ganancia
+  en investigación de un artículo no puede atribuirse directamente a esa ampliación.
+
+La mejora conjunta no equivale a sumar ventajas individuales: gana las tareas 6
+y 14, pero pierde 1, 13 y 20 respecto al control. Los tiempos por etapa, llamadas,
+truncamientos y cambios por pregunta quedan en el informe y en el panel.
+
+### Reproducibilidad y límites de la conclusión
+
+El código medido tiene hash
+`c3a98a76290be2cccf6396b1a13e68efd8b8548656c69055ef48c98f4d5b0853`.
+Su revisión Git de partida es `2692fe7`; había cambios pendientes durante la serie.
+Se conserva una copia local en `.runtime/v3-evaluation/source-frozen.zip`, con
+manifiesto y hash del archivo. Los experimentos se guardan en `.runtime/experiments/`
+y sus trazas en `.runtime/runs/`, fuera de Git. La revisión posterior de selección
+por defecto del panel no cambia las configuraciones ya ejecutadas.
+
+Solo hay una repetición por variante, con descargas/modelos en caché y fuentes
+externas cambiantes. No se realiza una prueba estadística de superioridad ni una
+medición separada en frío y caliente. Tampoco se ha evaluado un conjunto externo
+de generalización. Las 123 pruebas automatizadas validan comportamiento de código;
+no sustituyen la evaluación de calidad de los modelos.
+
+### Decisión para la siguiente versión
+
+Se cierra V3 conservando implementación, resultados positivos y regresiones. No se
+añaden correcciones ni nuevos modelos dentro de esta serie después de medirla.
+El siguiente trabajo debe distinguir capacidad del modelo y efecto del pipeline:
+
+1. Probar un razonador y un VLM mayores cuantizados, manteniendo fijo el pipeline
+   de cada comparación.
+2. Gestionar la GPU con un único modelo cargado: descargar LLM para utilizar VLM
+   y recargar el razonador después. Medir carga, recarga, inferencia y pico de VRAM.
+3. Comparar cambios del LLM, del VLM y de ambos por separado antes de combinarlos
+   con revisiones adicionales de herramientas y contratos.
+4. Resolver de forma general la recuperación de planes, los truncamientos del
+   revisor y la presentación mínima; no incorporar respuestas específicas de GAIA.
+
+Se han investigado Qwen3-14B Q5_K_M y Qwen3-VL-8B-Instruct Q4_K_M. Se verificó que
+el llama.cpp instalado ofrece `--models-max 1`, pero no la opción más reciente
+`--models-memory-margin`. Se comprobó el arranque del router y se iniciaron sus
+descargas, posteriormente pausadas para reservar esta línea a la siguiente versión.
+No se ha ejecutado inferencia ni batería con esos modelos y no se les atribuyen
+resultados V3. El servidor vuelve al Qwen3-8B de la comparación.

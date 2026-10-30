@@ -1,5 +1,6 @@
 """Per-run tracing, bounded execution, and local JSON persistence."""
 
+import hashlib
 import json
 from contextvars import ContextVar
 from copy import deepcopy
@@ -20,10 +21,8 @@ from huggingface_agents_langgraph.config import (
     PIPELINE_TIMEOUT_SECONDS,
     RUNTIME_DIRECTORY,
 )
-from huggingface_agents_langgraph.pipeline_versions import (
-    PIPELINE_VERSION,
-    V2_REFERENCE_ID,
-)
+from huggingface_agents_langgraph.experiments import normalize_experiment
+from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
 
 
 @dataclass
@@ -33,6 +32,8 @@ class RunTrace:
     started: float = field(default_factory=perf_counter)
     calls: list[dict] = field(default_factory=list)
     steps: list[dict] = field(default_factory=list)
+    experiment: dict = field(default_factory=dict)
+    sources: dict = field(default_factory=dict)
 
 
 current_trace: ContextVar[RunTrace | None] = ContextVar("run_trace", default=None)
@@ -150,11 +151,16 @@ def run_pipeline(task: dict) -> dict:
     """Execute the graph and retain its trace even when a node fails."""
     from huggingface_agents_langgraph.graph import build_state_graph
 
-    trace = RunTrace()
+    task = task | {"experiment": normalize_experiment(task.get("experiment"))}
+    version = task["experiment"]["pipeline_version"]
+    trace = RunTrace(experiment=task["experiment"])
     token = current_trace.set(trace)
     record = {
         "id": str(uuid4()),
-        "pipeline_version": PIPELINE_VERSION,
+        "pipeline_version": version,
+        "configuration_sha256": hashlib.sha256(
+            json.dumps(task["experiment"], sort_keys=True).encode()
+        ).hexdigest(),
         "created_at": datetime.now(UTC).isoformat(),
         "task": task,
         "limits": {
@@ -171,7 +177,7 @@ def run_pipeline(task: dict) -> dict:
         record["result"] = result
         record["status"] = "completed"
         return result | {
-            "pipeline_version": PIPELINE_VERSION,
+            "pipeline_version": version,
             "run_id": record["id"],
             "duration_seconds": round(perf_counter() - trace.started, 3),
             "llm_duration_seconds": round(
@@ -182,7 +188,7 @@ def run_pipeline(task: dict) -> dict:
         record["error"] = str(error)
         record["status"] = "error"
         error.run_id = record["id"]
-        error.pipeline_version = PIPELINE_VERSION
+        error.pipeline_version = version
         error.llm_duration_seconds = round(
             sum(call["duration_seconds"] for call in trace.calls), 3
         )
@@ -191,6 +197,7 @@ def run_pipeline(task: dict) -> dict:
         record.update(
             steps=trace.steps,
             calls=trace.calls,
+            sources=trace.sources,
             duration_seconds=round(perf_counter() - trace.started, 3),
         )
         current_trace.reset(token)

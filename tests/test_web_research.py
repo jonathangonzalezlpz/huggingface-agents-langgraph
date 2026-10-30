@@ -27,6 +27,7 @@ def test_web_research_searches_extracts_and_selects_page_text(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(web_research, "DDGS", FakeDDGS)
+    monkeypatch.setattr(web_research, "_search_scholarly_literature", lambda _query: [])
     monkeypatch.setattr(
         web_research, "chat_completion", lambda *_a, **_k: "city article"
     )

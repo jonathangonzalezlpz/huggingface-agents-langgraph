@@ -24,6 +24,7 @@ class Evidence(TypedDict):
     source: str
     source_type: str
     links: NotRequired[list[str]]
+    source_id: NotRequired[str]
 
 
 class AgentState(TypedDict):

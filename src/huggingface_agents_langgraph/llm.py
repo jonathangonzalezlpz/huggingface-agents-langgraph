@@ -11,7 +11,7 @@ from huggingface_agents_langgraph.config import (
     LLM_TIMEOUT_SECONDS,
     OLLAMA_BASE_URL,
 )
-from huggingface_agents_langgraph.experiments import ModelSelection
+from huggingface_agents_langgraph.experiments import ModelSelection, improvement_enabled
 from huggingface_agents_langgraph.run_tracking import (
     current_trace,
     remaining_seconds,
@@ -29,6 +29,10 @@ class ChatMessage(TypedDict):
 class CompletionTruncatedError(ValueError):
     """The server exhausted its token allowance before completing a response."""
 
+    def __init__(self, message: str, partial_content: str = "") -> None:
+        super().__init__(message)
+        self.partial_content = partial_content
+
 
 @traced_completion
 def chat_completion(
@@ -39,6 +43,8 @@ def chat_completion(
     repeat_penalty: float | None = None,
     model: ModelSelection | None = None,
     temperature: float = 0,
+    thinking: bool | None = None,
+    thinking_budget: int | None = None,
 ) -> str:
     """Return the model's response text for a chat-completions request."""
     request_body = {"messages": messages, "temperature": temperature}
@@ -52,6 +58,15 @@ def chat_completion(
     if model is not None:
         base_url = OLLAMA_BASE_URL if model["provider"] == "ollama" else LLM_BASE_URL
         request_body["model"] = model["model_id"]
+    if improvement_enabled(None, "reasoning_control") or thinking is not None:
+        enabled = bool(thinking)
+        if model and model["provider"] == "ollama":
+            request_body["reasoning_effort"] = "medium" if enabled else "none"
+        else:
+            request_body["chat_template_kwargs"] = {"enable_thinking": enabled}
+            request_body["reasoning_format"] = "deepseek"
+            if enabled and thinking_budget is not None:
+                request_body["reasoning_budget_tokens"] = thinking_budget
     trace = current_trace.get()
     if trace is not None:
         trace.calls[-1]["request"] = deepcopy(request_body)
@@ -81,7 +96,10 @@ def chat_completion(
         raise ValueError("LLM returned an invalid chat-completions response") from error
 
     if result["choices"][0].get("finish_reason") == "length":
-        raise CompletionTruncatedError("LLM output was truncated by the token limit")
+        raise CompletionTruncatedError(
+            "LLM output was truncated by the token limit",
+            content if isinstance(content, str) else "",
+        )
     if not isinstance(content, str) or not content.strip():
         raise ValueError("LLM returned an empty response")
     return content.rsplit("</think>", 1)[-1].strip()

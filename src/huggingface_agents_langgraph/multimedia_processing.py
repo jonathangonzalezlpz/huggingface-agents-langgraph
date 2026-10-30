@@ -1,6 +1,7 @@
 """Extract question-focused evidence from local audio, images, and video."""
 
 import gc
+import json
 import math
 import re
 import sys
@@ -19,6 +20,7 @@ from huggingface_agents_langgraph.config import (
     MEDIA_VLM_MODEL,
     RUNTIME_DIRECTORY,
 )
+from huggingface_agents_langgraph.experiments import improvement_enabled
 from huggingface_agents_langgraph.run_tracking import remaining_seconds
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
@@ -57,6 +59,13 @@ class MultimediaProcessingUpdate(TypedDict):
 def multimedia_processing(state: AgentState) -> MultimediaProcessingUpdate:
     """Transcribe or inspect the attachment, then return concise evidence."""
     file_path = state.get("file_path")
+    if improvement_enabled(state.get("experiment", {}), "multimedia_tools"):
+        match = VIDEO_URL_PATTERN.search(state["question"])
+        extension = Path(file_path).suffix.lower() if file_path else ""
+        if (file_path is None and match) or extension in VIDEO_EXTENSIONS:
+            return _process_video_modalities(
+                state, file_path, match.group() if match else None
+            )
     if file_path is None:
         match = VIDEO_URL_PATTERN.search(state["question"])
         if match is None:
@@ -515,7 +524,7 @@ def _has_audio_stream(path: Path) -> bool:
         return any(stream.type == "audio" for stream in container.streams)
 
 
-def download_video(url: str, directory: Path) -> Path:
+def download_video(url: str, directory: Path, *, audio_only: bool = False) -> Path:
     """Download a video URL to a temporary directory using yt-dlp."""
     try:
         import yt_dlp
@@ -525,8 +534,12 @@ def download_video(url: str, directory: Path) -> Path:
         ) from error
 
     options = {
-        "format": "best[height<=480]/bestvideo*[height<=480]/bestvideo*/best",
-        "outtmpl": str(directory / "source.%(ext)s"),
+        "format": "bestaudio/best"
+        if audio_only
+        else "best[height<=480]/bestvideo*[height<=480]/bestvideo*/best",
+        "outtmpl": str(
+            directory / ("audio.%(ext)s" if audio_only else "source.%(ext)s")
+        ),
         "quiet": True,
         "no_warnings": True,
     }
@@ -538,3 +551,75 @@ def download_video(url: str, directory: Path) -> Path:
     if not downloaded_path.is_file():
         raise FileNotFoundError("The video downloader produced no media file")
     return downloaded_path
+
+
+def _process_video_modalities(state: AgentState, file_path, url: str | None) -> dict:
+    """Acquire and verify the modalities selected from the question's intent."""
+    from huggingface_agents_langgraph.llm import chat_completion
+
+    reply = chat_completion(
+        [
+            {
+                "role": "system",
+                "content": "Choose required video modalities for the question. "
+                "Return JSON with audio and vision booleans. "
+                "Dialogue, speech and quotations require audio. "
+                "Visible entities, actions and counts require vision. Choose both when "
+                "both are relevant or uncertain. Do not answer the question. /no_think",
+            },
+            {"role": "user", "content": state["question"]},
+        ],
+        max_tokens=128,
+        model=state.get("experiment", {}).get("model"),
+    )
+    try:
+        modalities = json.loads(reply)
+        if (
+            not isinstance(modalities, dict)
+            or any(type(modalities.get(key)) is not bool for key in ("audio", "vision"))
+            or not any(modalities.values())
+        ):
+            raise ValueError("Invalid modality selection")
+    except (ValueError, TypeError):
+        modalities = {"audio": True, "vision": True}
+    directory = Path(RUNTIME_DIRECTORY) / "media" / str(uuid4())
+    directory.mkdir(parents=True, exist_ok=True)
+    video_path = Path(file_path) if file_path else None
+    if modalities["vision"] and video_path is None:
+        video_path = download_video(url, directory)
+    evidence = []
+    if modalities["audio"]:
+        audio_path = video_path
+        if audio_path is None or not _has_audio_stream(audio_path):
+            if not url:
+                raise ValueError(
+                    "The question requires audio but the local file has no audio stream"
+                )
+            audio_path = download_video(url, directory, audio_only=True)
+        if not _has_audio_stream(audio_path):
+            raise ValueError("The downloaded media has no required audio stream")
+        evidence.extend(
+            _inspect_audio(audio_path, state["question"], url or str(audio_path))
+        )
+    if modalities["vision"]:
+        for timestamp, image in _sample_video_frames(video_path):
+            observation = _run_vision_model(
+                image,
+                state["question"]
+                + " Describe only visible evidence, distinguishing observed entities "
+                "from guesses. Do not infer dialogue from a still image.",
+            )
+            evidence.append(
+                {
+                    "content": f"Partial visual sample at {timestamp:.1f}s: "
+                    f"{observation}",
+                    "source": f"{url or video_path}#t={timestamp:.1f}s",
+                    "source_type": "video_frame_vlm",
+                }
+            )
+    if not evidence:
+        raise ValueError("The required modalities produced no usable evidence")
+    update = {"evidence": evidence}
+    if modalities["vision"]:
+        update["video_path"] = video_path
+    return update

@@ -3,7 +3,9 @@
 import re
 from typing import TypedDict
 
+from huggingface_agents_langgraph.answer_contract import AnswerContract
 from huggingface_agents_langgraph.config import LLM_FINAL_ANSWER_MAX_TOKENS
+from huggingface_agents_langgraph.experiments import improvement_enabled
 from huggingface_agents_langgraph.llm import chat_completion
 from huggingface_agents_langgraph.state import AgentState
 
@@ -72,6 +74,8 @@ def answer_production(state: AgentState) -> AnswerUpdate:
         answer = chat_completion(
             messages, max_tokens=LLM_FINAL_ANSWER_MAX_TOKENS, model=model
         ).strip()
+        if improvement_enabled(state.get("experiment", {}), "answer_contract"):
+            answer = AnswerContract.from_question(state["question"]).present(answer)
         issues = validate_answer(state["question"], answer)
         if not issues:
             return {"submitted_answer": answer, "answer_warnings": []}

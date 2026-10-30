@@ -55,6 +55,26 @@
         <label class="experiment-name-label">Nombre del experimento
           <input id="experiment-name" value="Completo" maxlength="80" />
         </label>
+        <label class="experiment-model-label">Versión del pipeline
+          <select id="pipeline-version">
+            <option value="2" selected>V2 · comportamiento de referencia</option>
+            <option value="3">V3 · experimental · mejoras seleccionables</option>
+          </select>
+        </label>
+        <fieldset id="pipeline-improvements" class="capability-list">
+          <legend>Mejoras V3 · activa una sola para medir su aportación</legend>
+          <label><input type="checkbox" data-improvement="reasoning_control" checked disabled /> Control del razonamiento</label>
+          <label><input type="checkbox" data-improvement="answer_contract" checked disabled /> Presentación determinista</label>
+          <label><input type="checkbox" data-improvement="web_sources" checked disabled /> Fuentes consultables</label>
+          <label><input type="checkbox" data-improvement="spreadsheet_tools" checked disabled /> Cálculo Excel ampliado</label>
+          <label><input type="checkbox" data-improvement="multimedia_tools" checked disabled /> Adquisición multimedia</label>
+          <label><input type="checkbox" data-improvement="calculation_tools" checked disabled /> Operaciones de texto y listas</label>
+        </fieldset>
+        <label>Razonamiento V3
+          <select id="reasoning-mode"><option value="bounded">Pensamiento limitado</option><option value="off">Sin pensamiento</option></select>
+        </label>
+        <label>Presupuesto de pensamiento <input id="thinking-tokens" type="number" min="0" max="8192" value="512" /></label>
+        <label>Presupuesto de solución <input id="solution-tokens" type="number" min="128" max="8192" value="1024" /></label>
         <label class="experiment-model-label">Modelo razonador
           <select id="experiment-model" aria-describedby="experiment-model-help">
             <option value="null">Consultando modelos locales…</option>

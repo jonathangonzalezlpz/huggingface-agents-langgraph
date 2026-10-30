@@ -16,6 +16,7 @@ dependencies = [
     "langgraph>=1.2.12",
     "openpyxl>=3.1,<4",
     "pypdf>=5,<7",
+    "trafilatura>=2,<3",
 ]
 
 [project.optional-dependencies]

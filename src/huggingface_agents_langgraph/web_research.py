@@ -72,6 +72,30 @@ class _WikipediaHTMLTextParser(HTMLParser):
         self._ignored_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        from huggingface_agents_langgraph.experiments import improvement_enabled
+
+        if (
+            improvement_enabled(None, "web_sources")
+            and self._ignored_depth
+            and tag
+            in {
+                "area",
+                "base",
+                "br",
+                "col",
+                "embed",
+                "hr",
+                "img",
+                "input",
+                "link",
+                "meta",
+                "param",
+                "source",
+                "track",
+                "wbr",
+            }
+        ):
+            return
         if self._ignored_depth:
             self._ignored_depth += 1
             return
@@ -193,6 +217,22 @@ def fetch_source(url: str) -> list[Evidence]:
     parser = _LinkedTextParser(final_url)
     parser.feed(data.decode(encoding, errors="replace"))
     text = parser.get_text()
+    from huggingface_agents_langgraph.experiments import improvement_enabled
+
+    if improvement_enabled(None, "web_sources"):
+        from trafilatura import extract
+
+        text = (
+            extract(
+                data.decode(encoding, errors="replace"),
+                url=final_url,
+                output_format="markdown",
+                include_tables=True,
+                include_links=True,
+                include_comments=False,
+            )
+            or text
+        )
     links = sorted(
         parser.links,
         key=lambda link: (
@@ -217,6 +257,10 @@ def fetch_source(url: str) -> list[Evidence]:
 
 def _search_web(question: str) -> list[Evidence]:
     """Search for pages and extract their readable text."""
+    from huggingface_agents_langgraph.experiments import improvement_enabled
+
+    if improvement_enabled(None, "web_sources"):
+        return _search_readable_sources(question)
     try:
         search_results = DDGS(timeout=WEB_SEARCH_TIMEOUT_SECONDS).text(
             question,
@@ -252,6 +296,38 @@ def _search_web(question: str) -> list[Evidence]:
 
     if not evidence and not search_results:
         raise RuntimeError("Web and scholarly searches failed")
+    return evidence
+
+
+def _search_readable_sources(query: str) -> list[Evidence]:
+    """Read search hits as sources and mark snippets explicitly on fetch failures."""
+    try:
+        results = DDGS(timeout=WEB_SEARCH_TIMEOUT_SECONDS).text(
+            query,
+            max_results=WEB_SEARCH_RESULT_LIMIT,
+        )
+    except DDGSException as error:
+        raise RuntimeError("Web search failed") from error
+    evidence = []
+    for result in results[:WEB_PAGE_LIMIT]:
+        url = result.get("href", "")
+        if not url.startswith(("https://", "http://")):
+            continue
+        try:
+            evidence.extend(fetch_source(url))
+        except (OSError, ValueError, RuntimeError) as error:
+            snippet = result.get("body", "").strip()
+            if snippet:
+                evidence.append(
+                    {
+                        "content": "Search snippet; source page not read "
+                        f"({type(error).__name__}).\n" + snippet,
+                        "source": url,
+                        "source_type": "search_snippet",
+                    }
+                )
+    if not evidence:
+        raise RuntimeError("No usable source pages or snippets were found")
     return evidence
 
 
@@ -377,12 +453,33 @@ def _search_wikipedia(question: str) -> list[Evidence]:
         if match.group(0).strip().lower() not in WIKIPEDIA_GENERIC_TITLES
     )
     search_queries = list(dict.fromkeys(subjects)) or [search_text]
+    from huggingface_agents_langgraph.experiments import improvement_enabled
+
+    version = re.search(r"\b(?:latest\s+)?(\d{4})\s+version\b", question, re.I)
+    as_of = (
+        f"{version[1]}-12-31T23:59:59Z"
+        if (version and improvement_enabled(None, "web_sources"))
+        else None
+    )
 
     for search_query in search_queries:
-        evidence = _get_wikipedia_page(search_query)
+        evidence = (
+            _get_wikipedia_page(search_query, as_of=as_of)
+            if as_of
+            else _get_wikipedia_page(search_query)
+        )
         if evidence:
             return evidence
         evidence = _search_wikipedia_subject(search_query)
+        if as_of and evidence:
+            evidence = [
+                revision
+                for item in evidence
+                for revision in _get_wikipedia_page(
+                    item["content"].split("\n", 1)[0],
+                    as_of=as_of,
+                )
+            ]
         if evidence:
             if search_query in subjects:
                 exact_title = [
@@ -397,7 +494,7 @@ def _search_wikipedia(question: str) -> list[Evidence]:
     return []
 
 
-def _get_wikipedia_page(title: str) -> list[Evidence]:
+def _get_wikipedia_page(title: str, *, as_of: str | None = None) -> list[Evidence]:
     """Fetch a rendered article, including tables, for an exact page title."""
     parameters = {
         "action": "parse",
@@ -405,6 +502,40 @@ def _get_wikipedia_page(title: str) -> list[Evidence]:
         "prop": "text",
         "format": "json",
     }
+    revision_id = None
+    if as_of:
+        query = {
+            "action": "query",
+            "titles": title,
+            "prop": "revisions",
+            "rvprop": "ids|timestamp",
+            "rvstart": as_of,
+            "rvlimit": "1",
+            "rvdir": "older",
+            "format": "json",
+            "redirects": "1",
+        }
+        try:
+            with urlopen(
+                Request(
+                    f"{WIKIPEDIA_API_URL}?{urlencode(query)}",
+                    headers={"User-Agent": "GAIA-LangGraph/0.1 (course portfolio)"},
+                ),
+                timeout=WEB_SEARCH_TIMEOUT_SECONDS,
+            ) as response:
+                pages = json.loads(response.read()).get("query", {}).get("pages", {})
+            revisions = [
+                revision
+                for page in pages.values()
+                for revision in page.get("revisions", [])
+            ]
+            if not revisions:
+                return []
+            revision_id = revisions[0]["revid"]
+            parameters.pop("page")
+            parameters["oldid"] = str(revision_id)
+        except (OSError, ValueError, KeyError):
+            return []
     request = Request(
         f"{WIKIPEDIA_API_URL}?{urlencode(parameters)}",
         headers={
@@ -435,7 +566,9 @@ def _get_wikipedia_page(title: str) -> list[Evidence]:
     return [
         {
             "content": f"{page_title}\n{content}",
-            "source": f"https://en.wikipedia.org/?curid={page_id}",
+            "source": f"https://en.wikipedia.org/?oldid={revision_id}"
+            if revision_id
+            else f"https://en.wikipedia.org/?curid={page_id}",
             "source_type": "wikipedia",
         }
     ]

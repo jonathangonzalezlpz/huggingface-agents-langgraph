@@ -75,6 +75,9 @@ def _choose_code_action(
 def _execute_python(path: Path, source: str) -> CodeProcessingUpdate:
     """Run the attachment and return its standard output as evidence."""
     try:
+        from huggingface_agents_langgraph.calculation import execution_environment
+        from huggingface_agents_langgraph.experiments import improvement_enabled
+
         result = subprocess.run(
             [sys.executable, "-I", "-S", "-c", source],
             capture_output=True,
@@ -82,6 +85,11 @@ def _execute_python(path: Path, source: str) -> CodeProcessingUpdate:
             cwd=path.parent,
             text=True,
             timeout=CODE_EXECUTION_TIMEOUT_SECONDS,
+            **(
+                {"env": execution_environment()}
+                if improvement_enabled(None, "calculation_tools")
+                else {}
+            ),
         )
     except subprocess.TimeoutExpired as error:
         raise TimeoutError(

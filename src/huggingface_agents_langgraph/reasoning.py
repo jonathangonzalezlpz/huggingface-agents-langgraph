@@ -7,6 +7,7 @@ from huggingface_agents_langgraph.config import (
     LLM_REASONING_MAX_TOKENS,
     LLM_REASONING_TEMPERATURE,
 )
+from huggingface_agents_langgraph.experiments import improvement_enabled
 from huggingface_agents_langgraph.llm import (
     ChatMessage,
     CompletionTruncatedError,
@@ -47,6 +48,43 @@ def reasoning(state: AgentState) -> ReasoningUpdate:
             ),
         },
     ]
+    experiment = state.get("experiment", {})
+    if improvement_enabled(experiment, "reasoning_control"):
+        thinking = experiment.get("reasoning_mode", "bounded") == "bounded"
+        budget = experiment.get("thinking_tokens", 512) if thinking else 0
+        tokens = experiment.get("solution_tokens", 1024)
+        try:
+            draft = chat_completion(
+                messages,
+                max_tokens=tokens + budget,
+                temperature=LLM_REASONING_TEMPERATURE if thinking else 0,
+                model=experiment.get("model"),
+                thinking=thinking,
+                thinking_budget=budget,
+            ).strip()
+            return {"draft_answer": draft}
+        except CompletionTruncatedError as error:
+            if error.partial_content:
+                messages.append({"role": "assistant", "content": error.partial_content})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": "Conclude from the available work. "
+                    "Return a concise candidate answer, preserving uncertainty. "
+                    "Do not restart the analysis. /no_think",
+                }
+            )
+            return {
+                "draft_answer": chat_completion(
+                    messages,
+                    max_tokens=tokens,
+                    model=experiment.get("model"),
+                    thinking=False,
+                ).strip(),
+                "reasoning_warnings": [
+                    "Used one bounded continuation after truncation."
+                ],
+            }
     try:
         draft = chat_completion(
             messages,

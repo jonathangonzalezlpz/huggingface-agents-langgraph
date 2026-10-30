@@ -8,7 +8,11 @@ from typing import Any, TypedDict
 from openpyxl import load_workbook
 
 from huggingface_agents_langgraph.evidence_selection import select_relevant_evidence
-from huggingface_agents_langgraph.experiments import DEFAULT_EXPERIMENT, ModelSelection
+from huggingface_agents_langgraph.experiments import (
+    DEFAULT_EXPERIMENT,
+    ModelSelection,
+    improvement_enabled,
+)
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
@@ -56,6 +60,35 @@ def spreadsheet_processing(state: AgentState) -> SpreadsheetProcessingUpdate:
             }
         ],
     )
+    if improvement_enabled(state.get("experiment", {}), "spreadsheet_tools"):
+        from huggingface_agents_langgraph.spreadsheet_tools import plan_aggregation
+
+        model = state.get("experiment", {}).get("model")
+        try:
+            calculation = plan_aggregation(state["question"], sheets, model)
+            return {
+                "evidence": [
+                    {
+                        "content": json.dumps(calculation, ensure_ascii=False),
+                        "source": str(path),
+                        "source_type": "spreadsheet_calculation",
+                    },
+                    *workbook_evidence,
+                ]
+            }
+        except (ValueError, TypeError, KeyError) as error:
+            update = _analyze_workbook(state["question"], workbook_data, path, model)
+            return {
+                "evidence": [
+                    *update["evidence"],
+                    {
+                        "content": f"Deterministic plan rejected: {error}",
+                        "source": str(path),
+                        "source_type": "spreadsheet_diagnostic",
+                    },
+                    *workbook_evidence,
+                ]
+            }
     plan_messages: list[ChatMessage] = [
         {
             "role": "system",

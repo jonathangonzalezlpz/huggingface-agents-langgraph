@@ -2,11 +2,35 @@
 
 import ast
 import json
+import os
 import subprocess
 import sys
+from copy import deepcopy
 
 from huggingface_agents_langgraph.config import CODE_EXECUTION_TIMEOUT_SECONDS
+from huggingface_agents_langgraph.experiments import improvement_enabled
 from huggingface_agents_langgraph.run_tracking import remaining_seconds
+
+STRING_METHODS = {
+    "join",
+    "split",
+    "strip",
+    "lower",
+    "upper",
+    "replace",
+    "count",
+    "find",
+}
+
+
+def execution_environment() -> dict[str, str]:
+    """Pass operating-system essentials without application credentials."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH"}
+    }
+
 
 ALLOWED_FUNCTIONS = {
     "sum",
@@ -72,7 +96,7 @@ ALLOWED_NODES = (
 )
 
 
-def validate_expression(expression: str) -> None:
+def validate_expression(expression: str, *, enhanced: bool = False) -> None:
     """Reject imports, attribute access, arbitrary calls, and oversized syntax."""
     if (
         not isinstance(expression, str)
@@ -85,16 +109,26 @@ def validate_expression(expression: str) -> None:
     if len(nodes) > 2000:
         raise ValueError("Calculation expression is too complex")
     for node in nodes:
-        if not isinstance(node, ALLOWED_NODES):
+        if not isinstance(node, ALLOWED_NODES + ((ast.Attribute,) if enhanced else ())):
             raise ValueError(f"Unsupported calculation syntax: {type(node).__name__}")
+        if isinstance(node, ast.Attribute):
+            if node.attr not in STRING_METHODS or not any(
+                isinstance(parent, ast.Call) and parent.func is node for parent in nodes
+            ):
+                raise ValueError("Only whitelisted string method calls are allowed")
         if isinstance(node, ast.Name) and node.id.startswith("_"):
             raise ValueError("Private names are not allowed in calculations")
         if isinstance(node, ast.Call):
-            if (
-                not isinstance(node.func, ast.Name)
-                or node.func.id not in ALLOWED_FUNCTIONS
-                or node.keywords
-            ):
+            named = isinstance(node.func, ast.Name) and node.func.id in (
+                ALLOWED_FUNCTIONS
+                | ({"reversed", "bool", "dict"} if enhanced else set())
+            )
+            method = (
+                enhanced
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in STRING_METHODS
+            )
+            if not (named or method) or node.keywords:
                 raise ValueError("Calculation calls must use an allowed pure function")
         if isinstance(node, ast.comprehension) and node.is_async:
             raise ValueError("Async expressions are not allowed")
@@ -102,11 +136,42 @@ def validate_expression(expression: str) -> None:
 
 def calculate(expression: str) -> str:
     """Evaluate a validated expression in a timed, isolated Python process."""
-    validate_expression(expression)
+    enhanced = improvement_enabled(None, "calculation_tools")
+    validate_expression(expression, enhanced=enhanced)
+    functions = ALLOWED_FUNCTIONS | (
+        {"reversed", "bool", "dict"} if enhanced else set()
+    )
+    if enhanced:
+        tree = ast.parse(expression, mode="eval")
+
+        class StringCalls(ast.NodeTransformer):
+            def visit_Call(self, node):
+                node = self.generic_visit(node)
+                if isinstance(node.func, ast.Attribute):
+                    return ast.copy_location(
+                        ast.Call(
+                            func=ast.Name(id="string_method", ctx=ast.Load()),
+                            args=[
+                                node.func.value,
+                                ast.Constant(node.func.attr),
+                                *node.args,
+                            ],
+                            keywords=[],
+                        ),
+                        node,
+                    )
+                return node
+
+        expression = ast.unparse(
+            ast.fix_missing_locations(StringCalls().visit(deepcopy(tree)))
+        )
     program = (
         "import builtins,json,sys;"
-        f"allowed={sorted(ALLOWED_FUNCTIONS)!r};"
+        f"allowed={sorted(functions)!r};"
         "scope={name:getattr(builtins,name) for name in allowed};"
+        "scope['string_method']=lambda value,name,*args: "
+        "getattr(value,name)(*args) if isinstance(value,str) "
+        "else (_ for _ in ()).throw(ValueError('String receiver required'));"
         "scope['__builtins__']={};"
         "result=eval(compile(sys.argv[1],'<calculation>','eval'),scope);"
         "print(json.dumps(result,default=lambda value:"
@@ -119,6 +184,7 @@ def calculate(expression: str) -> str:
             text=True,
             timeout=min(CODE_EXECUTION_TIMEOUT_SECONDS, remaining_seconds()),
             check=False,
+            **({"env": execution_environment()} if enhanced else {}),
         )
     except subprocess.TimeoutExpired as error:
         raise TimeoutError("Calculation exceeded its time budget") from error
