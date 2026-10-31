@@ -14,11 +14,14 @@ const gpuStatus = document.querySelector("#gpu-status");
 const refreshModelsButton = document.querySelector("#refresh-models-button");
 const experimentName = document.querySelector("#experiment-name");
 const experimentModel = document.querySelector("#experiment-model");
+const experimentVisionModel = document.querySelector("#experiment-vision-model");
 const pipelineVersion = document.querySelector("#pipeline-version");
 const improvementInputs = [...document.querySelectorAll("[data-improvement]")];
 const reasoningMode = document.querySelector("#reasoning-mode");
 const thinkingTokens = document.querySelector("#thinking-tokens");
 const solutionTokens = document.querySelector("#solution-tokens");
+const samplingProfile = document.querySelector("#sampling-profile");
+const samplingSeed = document.querySelector("#sampling-seed");
 let sessionRecordId = null;
 let sessionCreatedAt = null;
 const capabilityInputs = [...document.querySelectorAll("[data-capability]")];
@@ -50,6 +53,8 @@ const MODEL_STATE_LABELS = {
   not_loaded: "Bajo demanda",
   unavailable: "Sin conexión",
   error: "Error",
+  downloading: "Descargando",
+  incomplete: "Descarga pendiente",
 };
 
 function showNotice(message) {
@@ -106,12 +111,15 @@ function getExperiment() {
       .filter((input) => input.checked)
       .map((input) => input.dataset.capability),
     model,
+    vision_model: JSON.parse(experimentVisionModel.value || "null"),
     pipeline_version: pipelineVersion.value,
-    improvements: pipelineVersion.value === "3"
+    improvements: pipelineVersion.value !== "2"
       ? improvementInputs.filter((input) => input.checked).map((input) => input.dataset.improvement) : [],
     reasoning_mode: reasoningMode.value,
     thinking_tokens: Number(thinkingTokens.value),
     solution_tokens: Number(solutionTokens.value),
+    sampling_profile: samplingProfile.value,
+    seed: pipelineVersion.value === "3.1" ? Number(samplingSeed.value) : null,
   };
 }
 
@@ -137,6 +145,28 @@ function retainExperimentHistory(records) {
 }
 
 function applyProfile(profile) {
+  if (profile === "v31-shared") {
+    const value = JSON.stringify({ provider: "configured", model_id: "unsloth/Qwen3.5-9B-GGUF:Q5_K_M" });
+    if (![...experimentModel.options].some((option) => option.value === value)
+        || ![...experimentVisionModel.options].some((option) => option.value === value)) {
+      showNotice("Qwen3.5-9B Q5 todavía no está disponible en el router local.");
+      return;
+    }
+    pipelineVersion.value = "3.1";
+    pipelineVersion.dispatchEvent(new Event("change"));
+    applyProfile("full");
+    experimentName.value = "V3.1 · Compartido · Q5";
+    experimentModel.value = value;
+    experimentVisionModel.value = value;
+    const enabled = new Set(["reasoning_control", "answer_contract", "multimedia_tools", "calculation_tools"]);
+    improvementInputs.forEach((input) => { input.checked = enabled.has(input.dataset.improvement); });
+    reasoningMode.value = "bounded";
+    thinkingTokens.value = "512";
+    solutionTokens.value = "1024";
+    samplingProfile.value = "controlled";
+    samplingSeed.value = "42";
+    return;
+  }
   const allEnabled = profile === "full" || profile === "direct";
   experimentName.dataset.forceDirect = profile === "direct" ? "true" : "false";
   capabilityInputs.forEach((input) => {
@@ -182,6 +212,8 @@ function saveExperimentRecord() {
       route: card._result.route || "error",
       duration_seconds: card._durationSeconds,
       llm_duration_seconds: card._result.llm_duration_seconds,
+      model_load_seconds: card._result.model_load_seconds,
+      resources: card._result.resources,
       run_id: card._result.run_id,
       experiment: card._experimentUsed,
     })),
@@ -245,6 +277,9 @@ function renderExperimentHistory() {
   const previousLocalScore = localScoreExperimentSelect.value;
   const history = JSON.parse(localStorage.getItem("gaia-experiments") || "[]");
   experimentHistory.hidden = history.length === 0;
+  if (history.some((record) => Array.isArray(record.answers) && record.answers.length === 20)) {
+    scorePanel.hidden = false;
+  }
   scoreExperimentSelect.replaceChildren();
   localScoreExperimentSelect.replaceChildren();
   experimentHistoryList.replaceChildren();
@@ -278,6 +313,7 @@ function renderExperimentHistory() {
       details.textContent += ` · Mediana: ${formatDuration(record.metrics.median_seconds)} · P95: ${formatDuration(record.metrics.p95_seconds)} · Errores técnicos: ${record.metrics.technical_errors}`;
     }
     details.textContent += ` · Mejoras: ${(record.config.improvements || []).join(", ") || "ninguna"}`;
+    if (record.config.vision_model) details.textContent += ` · Visión: ${record.config.vision_model.model_id}`;
     const score = document.createElement("span");
     score.className = "experiment-score";
     score.textContent = record.score
@@ -318,8 +354,8 @@ function renderExperimentHistory() {
         ? " · Acierto local"
         : answer.locally_correct === false ? " · Error local" : "";
       const modelTiming = Number.isFinite(answer.llm_duration_seconds)
-        ? ` · LLM: ${formatDuration(answer.llm_duration_seconds)}` : "";
-      metadata.textContent = `${answer.task_id} · Ruta inicial: ${answer.route || "sin dato"}${timing}${modelTiming}${correctness}`;
+        ? ` · Modelos: ${formatDuration(answer.llm_duration_seconds)}` : "";
+      metadata.textContent = `${answer.task_id} · Ruta inicial: ${answer.route || "sin dato"}${timing}${modelTiming}${resourceLabel(answer)}${correctness}`;
       item.append(question, response, metadata);
       if (answer.run_id) item.append(traceLink(answer.run_id));
       reviewList.append(item);
@@ -412,7 +448,8 @@ function renderExperimentComparison() {
         : answer?.locally_correct === false ? "Error local" : "Sin evaluar localmente";
       route.textContent = `Ruta: ${answer?.route || "sin dato"} · ${localStatus}`;
       if (Number.isFinite(answer?.duration_seconds)) route.textContent += ` · Total: ${formatDuration(answer.duration_seconds)}`;
-      if (Number.isFinite(answer?.llm_duration_seconds)) route.textContent += ` · LLM: ${formatDuration(answer.llm_duration_seconds)}`;
+      if (Number.isFinite(answer?.llm_duration_seconds)) route.textContent += ` · Modelos: ${formatDuration(answer.llm_duration_seconds)}`;
+      if (answer) route.textContent += resourceLabel(answer);
       cell.append(document.createElement("br"), route);
       row.append(cell);
     });
@@ -437,6 +474,14 @@ function averageDuration(cards) {
     : null;
 }
 
+function resourceLabel(answer) {
+  let label = Number.isFinite(answer.model_load_seconds)
+    ? ` · Carga de modelos: ${formatDuration(answer.model_load_seconds)}` : "";
+  const peak = answer.resources?.gpu_peak_used_mib;
+  if (Number.isFinite(peak) && peak > 0) label += ` · Pico VRAM observado: ${(peak / 1024).toFixed(1)} GiB`;
+  return label;
+}
+
 function formatDuration(seconds) {
   return `${seconds.toFixed(1)} s`;
 }
@@ -455,8 +500,9 @@ function updateTimingSummary() {
 function setExperimentControlsDisabled(disabled) {
   experimentName.disabled = disabled;
   experimentModel.disabled = disabled;
-  [pipelineVersion, reasoningMode, thinkingTokens, solutionTokens].forEach((input) => { input.disabled = disabled; });
-  improvementInputs.forEach((input) => { input.disabled = disabled || pipelineVersion.value !== "3"; });
+  experimentVisionModel.disabled = disabled;
+  [pipelineVersion, reasoningMode, thinkingTokens, solutionTokens, samplingProfile, samplingSeed].forEach((input) => { input.disabled = disabled; });
+  improvementInputs.forEach((input) => { input.disabled = disabled || pipelineVersion.value === "2"; });
   capabilityInputs.forEach((input) => { input.disabled = disabled; });
   document.querySelectorAll(".preset-button").forEach((button) => {
     button.disabled = disabled;
@@ -488,7 +534,9 @@ function renderModelStatus(model) {
   const detail = document.createElement("span");
   detail.className = "model-status-detail";
   if (model.state === "unloaded") {
-    detail.textContent = `Inactivo ${model.idle_for_seconds}s · descarga tras ${model.idle_timeout_seconds}s`;
+    detail.textContent = model.idle_timeout_seconds
+      ? `Inactivo ${model.idle_for_seconds}s · descarga tras ${model.idle_timeout_seconds}s`
+      : "Descargado · se carga bajo demanda";
   } else if (model.state === "not_loaded") {
     detail.textContent = "Se carga al necesitarlo";
   } else if (model.idle_timeout_seconds) {
@@ -508,9 +556,11 @@ async function refreshModelStatus() {
       : `GPU no disponible · multimedia en CPU (${status.gpu.backend})`;
     gpuStatus.classList.toggle("gpu-status-active", status.gpu.available);
     gpuStatus.classList.toggle("gpu-status-inactive", !status.gpu.available);
+    if (status.gpu_policy === "exclusive") gpuStatus.textContent += " · máximo un modelo nativo residente";
+    if (status.gpu_memory?.total_mib) gpuStatus.textContent += ` · ${status.gpu_memory.used_mib}/${status.gpu_memory.total_mib} MiB`;
+    if (status.host_memory?.total_mib) gpuStatus.textContent += ` · RAM libre: ${(status.host_memory.available_mib / 1024).toFixed(1)}/${(status.host_memory.total_mib / 1024).toFixed(1)} GiB`;
     modelStatusList.replaceChildren(
-      renderModelStatus(status.llm),
-      ...status.multimedia_models.map(renderModelStatus),
+      ...(status.model_cards || [status.llm, ...status.multimedia_models]).map(renderModelStatus),
     );
   } catch {
     gpuStatus.textContent = "No se pudo consultar el estado de la GPU";
@@ -526,9 +576,24 @@ async function refreshModelStatus() {
 
 async function refreshAvailableModels() {
   const previousValue = experimentModel.value;
+  const previousVision = experimentVisionModel.value;
   try {
     const payload = await requestJson("/api/models", { cache: "no-store" });
     const models = Array.isArray(payload.models) ? payload.models : [];
+    experimentVisionModel.replaceChildren();
+    const originalVision = document.createElement("option");
+    originalVision.value = "null";
+    originalVision.textContent = "VLM original · Transformers (CPU en modo exclusivo)";
+    experimentVisionModel.append(originalVision);
+    (payload.vision_models || []).forEach((model) => {
+      const option = document.createElement("option");
+      option.value = JSON.stringify(model);
+      option.textContent = model.model_id;
+      experimentVisionModel.append(option);
+    });
+    if ([...experimentVisionModel.options].some((option) => option.value === previousVision)) {
+      experimentVisionModel.value = previousVision;
+    }
     experimentModel.replaceChildren();
     models.forEach((model) => {
       if (!model || !model.model_id || !["configured", "ollama"].includes(model.provider)) {
@@ -725,7 +790,7 @@ async function processQuestion(card) {
       : (performance.now() - startedAt) / 1000;
     card._duration.textContent = `Tiempo: ${formatDuration(card._durationSeconds)}`;
     if (Number.isFinite(result.llm_duration_seconds)) {
-      card._duration.textContent += ` · LLM: ${formatDuration(result.llm_duration_seconds)}`;
+      card._duration.textContent += ` · Modelos: ${formatDuration(result.llm_duration_seconds)}`;
     }
     if (result.run_id) card._answer.parentElement.append(traceLink(result.run_id));
     card._result = result;
@@ -891,7 +956,8 @@ async function processAllQuestions() {
 
 randomButton.addEventListener("click", loadRandomQuestion);
 pipelineVersion.addEventListener("change", () => {
-  improvementInputs.forEach((input) => { input.disabled = pipelineVersion.value !== "3"; });
+  samplingProfile.value = pipelineVersion.value === "3.1" ? "controlled" : "legacy";
+  improvementInputs.forEach((input) => { input.disabled = pipelineVersion.value === "2"; });
   if (["Completo", "V2 · Completo", "V3 · Completo"].includes(experimentName.value)) {
     experimentName.value = `V${pipelineVersion.value} · Completo`;
   }

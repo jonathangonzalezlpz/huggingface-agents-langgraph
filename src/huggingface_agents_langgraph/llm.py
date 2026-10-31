@@ -8,7 +8,9 @@ from urllib.request import Request, urlopen
 
 from huggingface_agents_langgraph.config import (
     LLM_BASE_URL,
+    LLM_DEFAULT_MODEL,
     LLM_TIMEOUT_SECONDS,
+    MODEL_SERVER_MODE,
     OLLAMA_BASE_URL,
 )
 from huggingface_agents_langgraph.experiments import ModelSelection, improvement_enabled
@@ -23,7 +25,7 @@ class ChatMessage(TypedDict):
     """Message passed to the configured chat model."""
 
     role: str
-    content: str
+    content: str | list[dict]
 
 
 class CompletionTruncatedError(ValueError):
@@ -47,7 +49,12 @@ def chat_completion(
     thinking_budget: int | None = None,
 ) -> str:
     """Return the model's response text for a chat-completions request."""
-    request_body = {"messages": messages, "temperature": temperature}
+    request_body = {
+        "messages": messages,
+        "temperature": temperature,
+    }
+    if MODEL_SERVER_MODE == "exclusive":
+        request_body["model"] = LLM_DEFAULT_MODEL
     if max_tokens is not None:
         request_body["max_tokens"] = max_tokens
     if frequency_penalty is not None:
@@ -55,10 +62,20 @@ def chat_completion(
     if repeat_penalty is not None:
         request_body["repeat_penalty"] = repeat_penalty
     base_url = LLM_BASE_URL
+    if MODEL_SERVER_MODE == "exclusive" and model and model["provider"] != "configured":
+        raise ValueError(
+            "Exclusive mode requires models hosted by the llama.cpp router"
+        )
     if model is not None:
         base_url = OLLAMA_BASE_URL if model["provider"] == "ollama" else LLM_BASE_URL
         request_body["model"] = model["model_id"]
-    if improvement_enabled(None, "reasoning_control") or thinking is not None:
+    trace = current_trace.get()
+    experiment = trace.experiment if trace else {}
+    if (
+        improvement_enabled(None, "reasoning_control")
+        or thinking is not None
+        or experiment.get("pipeline_version") == "3.1"
+    ):
         enabled = bool(thinking)
         if model and model["provider"] == "ollama":
             request_body["reasoning_effort"] = "medium" if enabled else "none"
@@ -67,7 +84,29 @@ def chat_completion(
             request_body["reasoning_format"] = "deepseek"
             if enabled and thinking_budget is not None:
                 request_body["reasoning_budget_tokens"] = thinking_budget
-    trace = current_trace.get()
+    sampling = experiment.get("sampling_profile", "legacy")
+    if sampling != "legacy":
+        newer = "qwen3.5" in request_body.get("model", LLM_DEFAULT_MODEL).lower()
+        request_body.update(
+            temperature=1.0
+            if sampling == "author" and newer and thinking
+            else (0.6 if thinking else 0.7),
+            top_p=0.95 if thinking else 0.8,
+            top_k=20,
+            min_p=0,
+            presence_penalty=1.5,
+            repeat_penalty=1.0,
+        )
+        if experiment.get("seed") is not None:
+            request_body["seed"] = experiment["seed"]
+    if MODEL_SERVER_MODE == "exclusive" and (
+        model is None or model["provider"] == "configured"
+    ):
+        from huggingface_agents_langgraph.model_server import ensure_model
+
+        load_seconds = ensure_model(request_body["model"])
+        if trace is not None:
+            trace.calls[-1]["model_load_seconds"] = round(load_seconds, 4)
     if trace is not None:
         trace.calls[-1]["request"] = deepcopy(request_body)
     request = Request(

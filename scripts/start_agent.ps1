@@ -3,6 +3,8 @@ param(
     [ValidateSet("frontend", "terminal")]
     [string]$Mode,
     [string]$Model = "Qwen/Qwen3-8B-GGUF:Q5_K_M",
+    [ValidateSet("single", "exclusive")]
+    [string]$ModelMode = "single",
     [string]$HostAddress = "127.0.0.1",
     [ValidateRange(1, 65535)]
     [int]$Port = 8080,
@@ -15,6 +17,11 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $llmScript = Join-Path $PSScriptRoot "start_local_llm.ps1"
+if ($ModelMode -eq "exclusive") {
+    $llmScript = Join-Path $PSScriptRoot "start_model_router.ps1"
+}
+$env:MODEL_SERVER_MODE = $ModelMode
+$env:LLM_DEFAULT_MODEL = $Model
 $uvCommand = Get-Command uv -ErrorAction SilentlyContinue
 
 if ($null -eq $uvCommand) {
@@ -60,8 +67,6 @@ try {
         "Bypass",
         "-File",
         "`"$llmScript`"",
-        "-Model",
-        "`"$Model`"",
         "-HostAddress",
         "`"$HostAddress`"",
         "-Port",
@@ -69,6 +74,9 @@ try {
         "-SleepIdleSeconds",
         "$SleepIdleSeconds"
     )
+    if ($ModelMode -eq "single") {
+        $llmArguments += @("-Model", "`"$Model`"")
+    }
     $llmProcess = Start-Process `
         -FilePath $currentPowerShell `
         -ArgumentList $llmArguments `
@@ -109,6 +117,16 @@ try {
     Write-Host "Qwen is ready at $healthUrl"
 }
 
+$inventory = Invoke-RestMethod -Uri "http://${healthHost}:${Port}/models" -TimeoutSec 5
+$isRouter = @($inventory.data | Where-Object { $null -ne $_.status }).Count -gt 0
+if ($ModelMode -eq "exclusive" -and -not $isRouter -and @($inventory.data).Count -gt 0) {
+    throw "The existing server is in single-model mode. Stop it before requesting exclusive mode."
+}
+if ($ModelMode -eq "single" -and $isRouter) {
+    throw "The existing server is an exclusive router. Restart with -ModelMode exclusive or stop that server."
+}
+
+$env:LLM_BASE_URL = "http://${healthHost}:${Port}/v1"
 $uvArguments = @("run", "--extra", "multimedia")
 if (Test-Path -LiteralPath (Join-Path $repositoryRoot ".env")) {
     $uvArguments += @("--env-file", ".env")

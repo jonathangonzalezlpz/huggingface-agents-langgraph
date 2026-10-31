@@ -59,10 +59,11 @@
           <select id="pipeline-version">
             <option value="2" selected>V2 · comportamiento de referencia</option>
             <option value="3">V3 · experimental · mejoras seleccionables</option>
+            <option value="3.1">V3.1 · comparación de modelos</option>
           </select>
         </label>
         <fieldset id="pipeline-improvements" class="capability-list">
-          <legend>Mejoras V3 · activa una sola para medir su aportación</legend>
+          <legend>Mejoras opcionales · combina o aísla su aportación</legend>
           <label><input type="checkbox" data-improvement="reasoning_control" checked disabled /> Control del razonamiento</label>
           <label><input type="checkbox" data-improvement="answer_contract" checked disabled /> Presentación determinista</label>
           <label><input type="checkbox" data-improvement="web_sources" checked disabled /> Fuentes consultables</label>
@@ -75,6 +76,10 @@
         </label>
         <label>Presupuesto de pensamiento <input id="thinking-tokens" type="number" min="0" max="8192" value="512" /></label>
         <label>Presupuesto de solución <input id="solution-tokens" type="number" min="128" max="8192" value="1024" /></label>
+        <label>Receta de muestreo
+          <select id="sampling-profile"><option value="legacy">Histórica V2/V3</option><option value="controlled">Controlada · común entre modelos</option><option value="author">Recomendada por el autor</option></select>
+        </label>
+        <label>Semilla V3.1 <input id="sampling-seed" type="number" min="0" max="4294967295" value="42" /></label>
         <label class="experiment-model-label">Modelo razonador
           <select id="experiment-model" aria-describedby="experiment-model-help">
             <option value="null">Consultando modelos locales…</option>
@@ -83,7 +88,14 @@
         <p id="experiment-model-help" class="experiment-model-help">
           Modelos disponibles en el endpoint configurado y en Ollama.
         </p>
+        <label class="experiment-model-label">Modelo visual
+          <select id="experiment-vision-model">
+            <option value="null">VLM original · Transformers</option>
+          </select>
+        </label>
+        <p class="experiment-model-help">Con GPU exclusiva se carga un único modelo. El mismo modelo multimodal puede cubrir ambos roles.</p>
         <div class="experiment-presets">
+          <button class="button button-secondary preset-button" data-profile="v31-shared" type="button">V3.1 · Compartido Q5</button>
           <button class="button button-secondary preset-button" data-profile="full" type="button">Completo</button>
           <button class="button button-secondary preset-button" data-profile="direct" type="button">Solo directo</button>
           <button class="button button-secondary preset-button" data-profile="no-web" type="button">Sin web</button>

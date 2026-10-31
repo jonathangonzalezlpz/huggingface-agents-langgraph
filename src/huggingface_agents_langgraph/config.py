@@ -3,6 +3,10 @@
 import os
 
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://127.0.0.1:8080/v1")
+LLM_DEFAULT_MODEL = os.environ.get("LLM_DEFAULT_MODEL", "Qwen/Qwen3-8B-GGUF:Q5_K_M")
+MODEL_SERVER_MODE = os.environ.get("MODEL_SERVER_MODE", "single")
+MODEL_LOAD_TIMEOUT_SECONDS = int(os.environ.get("MODEL_LOAD_TIMEOUT_SECONDS", "180"))
+MODEL_CACHE_RAM_MIB = int(os.environ.get("MODEL_CACHE_RAM_MIB", "512"))
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434/v1")
 LLM_TIMEOUT_SECONDS = int(os.environ.get("LLM_TIMEOUT_SECONDS", "120"))
 LLM_REASONING_MAX_TOKENS = int(os.environ.get("LLM_REASONING_MAX_TOKENS", "2048"))

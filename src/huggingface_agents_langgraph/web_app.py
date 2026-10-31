@@ -10,14 +10,16 @@ from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 from huggingface_agents_langgraph.attachments import get_attachment_path
-from huggingface_agents_langgraph.config import LLM_BASE_URL
+from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
+from huggingface_agents_langgraph.model_server import gpu_memory, model_inventory
 from huggingface_agents_langgraph.multimedia_processing import (
     get_gpu_status,
     get_multimedia_model_status,
 )
 from huggingface_agents_langgraph.pipeline_versions import experiment_presentation
+from huggingface_agents_langgraph.resource_tracking import host_memory
 from huggingface_agents_langgraph.run_tracking import (
     delete_record,
     list_records,
@@ -46,16 +48,71 @@ class WebAppHandler(BaseHTTPRequestHandler):
         elif request_path in {"/api/questions", "/api/random-question"}:
             self._get_questions(request_path)
         elif request_path == "/api/status":
+            inventory = model_inventory() if MODEL_SERVER_MODE == "exclusive" else []
+            model_cards = [
+                {
+                    "name": "LLM / VLM" if model["vision"] else "LLM razonador",
+                    "model": model["model_id"],
+                    "state": model["state"],
+                }
+                for model in inventory
+            ]
+            if not model_cards and MODEL_SERVER_MODE == "exclusive":
+                model_cards = [{"name": "Router LLM / VLM", "state": "unavailable"}]
             self._send_json(
                 200,
                 {
-                    "llm": _get_llm_status(),
+                    "llm": _get_llm_status()
+                    if MODEL_SERVER_MODE != "exclusive"
+                    else {
+                        "state": "ready" if inventory else "unavailable",
+                        "name": "Router · GPU exclusiva",
+                    },
                     "gpu": get_gpu_status(),
+                    "host_memory": host_memory(),
                     "multimedia_models": get_multimedia_model_status(),
+                    **(
+                        {
+                            "model_cards": [
+                                *model_cards,
+                                *[
+                                    item | {"name": item["name"] + " · CPU"}
+                                    for item in get_multimedia_model_status()
+                                ],
+                            ],
+                            "gpu_memory": gpu_memory(),
+                            "gpu_policy": "exclusive",
+                        }
+                        if MODEL_SERVER_MODE == "exclusive"
+                        else {}
+                    ),
                 },
             )
         elif request_path == "/api/models":
-            self._send_json(200, {"models": get_available_models()})
+            inventory = model_inventory() if MODEL_SERVER_MODE == "exclusive" else []
+            ready = {
+                item["model_id"]
+                for item in inventory
+                if item["state"] not in {"downloading", "incomplete"}
+            }
+            models = get_available_models()
+            if MODEL_SERVER_MODE == "exclusive":
+                models = [
+                    model
+                    for model in models
+                    if model["provider"] == "configured" and model["model_id"] in ready
+                ]
+            self._send_json(
+                200,
+                {
+                    "models": models,
+                    "vision_models": [
+                        {"provider": "configured", "model_id": item["model_id"]}
+                        for item in inventory
+                        if item["vision"] and item["model_id"] in ready
+                    ],
+                },
+            )
         elif request_path == "/api/experiments":
             self._send_json(
                 200,

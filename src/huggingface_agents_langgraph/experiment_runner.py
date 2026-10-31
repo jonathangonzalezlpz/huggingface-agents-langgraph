@@ -163,6 +163,10 @@ def run_experiment(
         if answer["run_id"]:
             trace = read_record("runs", answer["run_id"])
             answer["llm_calls"] = len(trace["calls"])
+            answer["resources"] = trace.get("resources", {})
+            answer["model_load_seconds"] = sum(
+                call.get("model_load_seconds", 0) for call in trace["calls"]
+            )
             answer["truncated_calls"] = sum(
                 call.get("response", {}).get("choices", [{}])[0].get("finish_reason")
                 == "length"

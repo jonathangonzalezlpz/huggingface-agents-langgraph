@@ -29,11 +29,14 @@ class ExperimentConfig(TypedDict):
     force_direct: bool
     enabled_capabilities: list[str]
     model: ModelSelection | None
+    vision_model: NotRequired[ModelSelection | None]
     pipeline_version: NotRequired[str]
     improvements: NotRequired[list[str]]
     reasoning_mode: NotRequired[str]
     thinking_tokens: NotRequired[int]
     solution_tokens: NotRequired[int]
+    sampling_profile: NotRequired[str]
+    seed: NotRequired[int | None]
 
 
 DEFAULT_EXPERIMENT: ExperimentConfig = {
@@ -41,11 +44,14 @@ DEFAULT_EXPERIMENT: ExperimentConfig = {
     "force_direct": False,
     "enabled_capabilities": list(CAPABILITIES),
     "model": None,
+    "vision_model": None,
     "pipeline_version": "2",
     "improvements": [],
     "reasoning_mode": "bounded",
     "thinking_tokens": 512,
     "solution_tokens": 1024,
+    "sampling_profile": "legacy",
+    "seed": None,
 }
 
 
@@ -60,12 +66,21 @@ def normalize_experiment(value: object) -> ExperimentConfig:
     force_direct = value.get("force_direct", False)
     enabled = value.get("enabled_capabilities", list(CAPABILITIES))
     model = value.get("model")
+    vision_model = value.get("vision_model")
     version = value.get("pipeline_version", "2")
     improvements = value.get("improvements", [])
     mode = value.get("reasoning_mode", "bounded")
     thinking = value.get("thinking_tokens", 512)
     solution = value.get("solution_tokens", 1024)
-    if version not in {"2", "3"}:
+    sampling = value.get(
+        "sampling_profile", "controlled" if version == "3.1" else "legacy"
+    )
+    seed = value.get("seed", 42 if version == "3.1" else None)
+    if sampling not in {"legacy", "controlled", "author"}:
+        raise ValueError("Unsupported sampling profile")
+    if seed is not None and (type(seed) is not int or not 0 <= seed < 2**32):
+        raise ValueError("seed must be an unsigned 32-bit integer")
+    if version not in {"2", "3", "3.1"}:
         raise ValueError("Unsupported pipeline version")
     if (
         not isinstance(improvements, list)
@@ -104,16 +119,32 @@ def normalize_experiment(value: object) -> ExperimentConfig:
         if not isinstance(model_id, str) or not model_id.strip() or len(model_id) > 200:
             raise ValueError("experiment.model.model_id must be a non-empty string")
         model = {"provider": provider, "model_id": model_id.strip()}
+    if vision_model is not None:
+        if (
+            not isinstance(vision_model, dict)
+            or vision_model.get("provider") not in {"configured", "ollama"}
+            or not isinstance(vision_model.get("model_id"), str)
+            or not vision_model["model_id"].strip()
+            or len(vision_model["model_id"]) > 200
+        ):
+            raise ValueError("experiment.vision_model is invalid")
+        vision_model = {
+            "provider": vision_model["provider"],
+            "model_id": vision_model["model_id"].strip(),
+        }
     return {
         "name": name.strip()[:80],
         "force_direct": force_direct,
         "enabled_capabilities": list(dict.fromkeys(enabled)),
         "model": model,
+        "vision_model": vision_model,
         "pipeline_version": version,
         "improvements": list(dict.fromkeys(improvements)),
         "reasoning_mode": mode,
         "thinking_tokens": thinking,
         "solution_tokens": solution,
+        "sampling_profile": sampling,
+        "seed": seed,
     }
 
 
@@ -124,9 +155,10 @@ def improvement_enabled(experiment: dict | None, improvement: str) -> bool:
 
         trace = current_trace.get()
         experiment = trace.experiment if trace else {}
-    return experiment.get("pipeline_version") == "3" and improvement in experiment.get(
-        "improvements", []
-    )
+    return experiment.get("pipeline_version") in {
+        "3",
+        "3.1",
+    } and improvement in experiment.get("improvements", [])
 
 
 def is_capability_enabled(experiment: ExperimentConfig, capability: str) -> bool:

@@ -16,6 +16,7 @@ from huggingface_agents_langgraph.config import (
     LLM_REASONING_MAX_TOKENS,
     MEDIA_ASR_MODEL,
     MEDIA_VLM_MODEL,
+    MODEL_SERVER_MODE,
     PIPELINE_MAX_ACTIONS,
     PIPELINE_MAX_LLM_CALLS,
     PIPELINE_TIMEOUT_SECONDS,
@@ -155,6 +156,12 @@ def run_pipeline(task: dict) -> dict:
     version = task["experiment"]["pipeline_version"]
     trace = RunTrace(experiment=task["experiment"])
     token = current_trace.set(trace)
+    monitor = None
+    if MODEL_SERVER_MODE == "exclusive":
+        from huggingface_agents_langgraph.resource_tracking import ResourceMonitor
+
+        monitor = ResourceMonitor()
+        monitor.start()
     record = {
         "id": str(uuid4()),
         "pipeline_version": version,
@@ -170,7 +177,12 @@ def run_pipeline(task: dict) -> dict:
             "reasoning_tokens": LLM_REASONING_MAX_TOKENS,
             "answer_tokens": LLM_FINAL_ANSWER_MAX_TOKENS,
         },
-        "models": {"vision": MEDIA_VLM_MODEL, "transcription": MEDIA_ASR_MODEL},
+        "models": {
+            "vision": task["experiment"].get("vision_model") or MEDIA_VLM_MODEL,
+            "reasoner": task["experiment"].get("model"),
+            "transcription": MEDIA_ASR_MODEL,
+            "server_mode": MODEL_SERVER_MODE,
+        },
     }
     try:
         result = build_state_graph().invoke(task, config={"recursion_limit": 40})
@@ -183,6 +195,10 @@ def run_pipeline(task: dict) -> dict:
             "llm_duration_seconds": round(
                 sum(call["duration_seconds"] for call in trace.calls), 3
             ),
+            "model_load_seconds": round(
+                sum(call.get("model_load_seconds", 0) for call in trace.calls), 3
+            ),
+            "resources": dict(monitor.metrics) if monitor else {},
         }
     except Exception as error:
         record["error"] = str(error)
@@ -199,6 +215,7 @@ def run_pipeline(task: dict) -> dict:
             calls=trace.calls,
             sources=trace.sources,
             duration_seconds=round(perf_counter() - trace.started, 3),
+            resources=monitor.finish() if monitor else {},
         )
         current_trace.reset(token)
         write_record("runs", record)

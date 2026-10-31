@@ -1,10 +1,12 @@
 """Extract question-focused evidence from local audio, images, and video."""
 
+import base64
 import gc
 import json
 import math
 import re
 import sys
+from io import BytesIO
 from pathlib import Path
 from threading import Condition, Timer
 from time import monotonic
@@ -18,10 +20,11 @@ from huggingface_agents_langgraph.config import (
     MEDIA_MODELS_IDLE_SECONDS,
     MEDIA_VIDEO_FRAME_INTERVAL_SECONDS,
     MEDIA_VLM_MODEL,
+    MODEL_SERVER_MODE,
     RUNTIME_DIRECTORY,
 )
 from huggingface_agents_langgraph.experiments import improvement_enabled
-from huggingface_agents_langgraph.run_tracking import remaining_seconds
+from huggingface_agents_langgraph.run_tracking import current_trace, remaining_seconds
 from huggingface_agents_langgraph.state import AgentState, Evidence
 
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".webp"}
@@ -208,7 +211,9 @@ def _load_audio_classifier():
     return pipeline(
         "audio-classification",
         model=MEDIA_AUDIO_CLASSIFIER_MODEL,
-        device=0 if torch.cuda.is_available() else "cpu",
+        device=0
+        if torch.cuda.is_available() and MODEL_SERVER_MODE != "exclusive"
+        else "cpu",
     )
 
 
@@ -229,6 +234,38 @@ def _run_vision_model(image, question: str) -> str:
         image = Image.fromarray(image).convert("RGB")
 
     image.thumbnail((1280, 1280))
+    trace = current_trace.get()
+    selected = trace.experiment.get("vision_model") if trace else None
+    if selected:
+        from huggingface_agents_langgraph.llm import chat_completion
+
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", quality=90)
+        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        return chat_completion(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "data:image/jpeg;base64," + encoded},
+                        },
+                        {
+                            "type": "text",
+                            "text": "Describe the visible facts needed to answer "
+                            "the question. Preserve spatial relations, labels, counts "
+                            "and relevant text. Mark uncertainty; do not invent "
+                            "hidden details or give a guessed "
+                            f"final answer. Question: {question}",
+                        },
+                    ],
+                },
+            ],
+            max_tokens=384,
+            model=selected,
+            thinking=False,
+        )
     messages = [
         {
             "role": "user",
@@ -269,7 +306,9 @@ def _get_vision_pipeline():
     import torch
     from transformers import pipeline
 
-    device = 0 if torch.cuda.is_available() else "cpu"
+    device = (
+        0 if torch.cuda.is_available() and MODEL_SERVER_MODE != "exclusive" else "cpu"
+    )
     return pipeline("image-text-to-text", model=MEDIA_VLM_MODEL, device=device)
 
 
@@ -414,6 +453,15 @@ def get_multimedia_model_status() -> list[dict[str, str | int | float | None]]:
 
 def get_gpu_status() -> dict[str, str | bool | None]:
     """Report whether CUDA is available to multimedia models."""
+    if MODEL_SERVER_MODE == "exclusive":
+        from huggingface_agents_langgraph.model_server import gpu_memory
+
+        memory = gpu_memory()
+        return {
+            "available": bool(memory),
+            "name": memory.get("name"),
+            "backend": "llama.cpp / CUDA" if memory else "CPU",
+        }
     try:
         import torch
     except ImportError:

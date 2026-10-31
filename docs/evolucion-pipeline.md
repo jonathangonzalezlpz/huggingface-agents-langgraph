@@ -316,3 +316,55 @@ el llama.cpp instalado ofrece `--models-max 1`, pero no la opción más reciente
 descargas, posteriormente pausadas para reservar esta línea a la siguiente versión.
 No se ha ejecutado inferencia ni batería con esos modelos y no se les atribuyen
 resultados V3. El servidor vuelve al Qwen3-8B de la comparación.
+
+## V3.1: comparación de modelos y gestión de memoria
+
+La V3 se identifica con el tag local `pipeline-v3.0.0`, sobre `5dcd257`.
+La siguiente iteración mantiene sus ramas y conserva la referencia V2. Separa
+selección de razonador y VLM, registra muestreo y semilla y utiliza el router de
+llama.cpp con una sola instancia nativa residente. Un modelo multimodal puede
+compartir ambos roles para evitar cambios de pesos.
+
+La selección se fundamenta en literatura y benchmarks de los autores, tamaños
+de GGUF y mediciones de una RTX 4060 Ti de 16 GB con 15,8 GiB de RAM. Se ensayan
+Qwen3.5-9B Q5, Qwen3-14B Q5 y Qwen3-VL-8B-Instruct Q4. La justificación detallada
+está en [seleccion-modelos-v3.1.md](seleccion-modelos-v3.1.md); el funcionamiento
+y la reproducción están en [pipeline-v3.1.md](pipeline-v3.1.md).
+
+Las pruebas breves verifican compatibilidad de texto e imagen y carga exclusiva.
+El piloto con el VLM original en CPU detectó presión de RAM y se interrumpió;
+no se mezcla con baterías completas. Las comparaciones principales usan modelos
+nativos y procesos separados por variante. Los resultados medidos y su estado
+se recogen en [resultados-v3.1.md](resultados-v3.1.md), con trazas completas en el
+historial local del panel.
+
+### Cierre de las mediciones V3.1
+
+Se completaron seis baterías de veinte preguntas, 120 ejecuciones, con un solo
+conjunto de entrada y una copia de código por fase. Son puntuaciones locales;
+no se realizaron nuevos envíos oficiales. Los pilotos interrumpidos se conservan
+identificados y no se incluyen como baterías completas.
+
+El control con razonador 8B y visión Qwen3.5 obtiene 6/20; el modelo Qwen3.5-9B
+Q5 compartido, 8/20; el razonador 14B con la misma visión, 5/20. La pareja con
+razonador Qwen3.5-9B y VLM Qwen3-VL-8B alcanza 10/20, pero sus dos ganancias
+frente al modelo compartido corresponden a preguntas web. No mejora las dos
+tareas visuales y no se atribuyen esos aciertos al cambio de VLM.
+
+La ayuda y los logs del motor revelan una caché RAM de prefijos de hasta 8192 MiB.
+Se añade un límite centralizado, `MODEL_CACHE_RAM_MIB=512`, y se repite el modelo
+compartido. Q5 obtiene 9/20 y 45,9 s de media, con un mínimo de 1733 MiB de RAM
+disponible, frente a 219 MiB en la primera pasada del mismo modelo. La media
+anterior era 46,6 s: mejora el margen de memoria, sin una aceleración material.
+
+La alternativa Q8 obtiene 8/20 y 58,6 s de media, cuatro errores y un mínimo de
+206 MiB de RAM disponible. Su mayor precisión no compensa en esta configuración.
+La recomendación provisional es Qwen3.5-9B Q5 compartido, contexto 16K, una
+secuencia y caché RAM de 512 MiB. El panel incluye un botón para preparar ese
+perfil sin eliminar los otros modelos ni las mejoras opcionales.
+
+Quedan visibles truncamientos del revisor y fallos de formato o suficiencia de
+evidencia visual. No se corrigen con respuestas específicas ni se presentan como
+fallos de GPU. Una sola pasada, con fuentes externas variables, no demuestra
+superioridad estadística ni permite atribuir todos los cambios a un componente.
+La referencia V2 se conserva con sus 6/20 históricos.

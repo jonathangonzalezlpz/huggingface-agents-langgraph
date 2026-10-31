@@ -36,6 +36,16 @@ para comparar sus resultados. La implementación y sus límites están descritos
 [docs/resultados-v3.md](docs/resultados-v3.md). Las respuestas y trazas completas
 permanecen en el historial local y no forman parte de la publicación del portfolio.
 
+V3 se conserva en el tag local `pipeline-v3.0.0`. V3.1 incorpora selección separada
+de razonador y VLM, muestreo registrado y carga exclusiva de modelos nativos en GPU.
+La selección está sustentada en fuentes primarias, benchmarks y el hardware medido
+en [docs/seleccion-modelos-v3.1.md](docs/seleccion-modelos-v3.1.md).
+La guía de uso está en [docs/pipeline-v3.1.md](docs/pipeline-v3.1.md), con seis
+baterías completas en [resultados de modelos](docs/resultados-v3.1.md) y
+[resultados de memoria y precisión](docs/resultados-v3.1-memoria.md).
+El perfil recomendado provisionalmente es Qwen3.5-9B Q5 compartido, contexto 16K,
+caché RAM de 512 MiB y un solo modelo nativo residente.
+
 Están implementados los tipos `Evidence` y `AgentState`, el preprocesamiento, la resolución local de adjuntos y las ramas `.py`, `.xlsx`, `.pdf`, web, Wikipedia, multimedia y directa. La rama `.py` consulta al LLM para decidir si debe inspeccionar o ejecutar el archivo; `.xlsx` usa planes de cálculo deterministas con análisis general del LLM como respaldo; `.pdf` extrae texto con número de página y usa el selector común. Las tareas sin adjunto se clasifican con el LLM. El revisor puede continuar investigando, abrir enlaces, calcular sin adjuntos o examinar otros instantes de un vídeo. El perfil Solo directo deshabilita las herramientas. `answer_production` presenta la solución y comprueba restricciones mecánicas del formato.
 
 El selector común divide y prioriza evidencias de cualquier fuente textual, mantiene referencias a páginas o URLs y limita el contexto con `DOCUMENT_MAX_EVIDENCE_CHARACTERS`. La búsqueda usa coincidencias léxicas, por lo que puede no encontrar pasajes relacionados expresados con términos distintos. La ruta web usa DDGS y, cuando la pregunta menciona papers o artículos, añade Europe PMC para buscar publicaciones biomédicas y recuperar texto completo cuando está disponible en acceso abierto. No todos los artículos ni disciplinas están cubiertos por Europe PMC; DDGS sigue como búsqueda general. La ruta Wikipedia consulta la Wikipedia inglesa actual, no una revisión histórica concreta. La extracción PDF requiere una capa de texto; los PDF escaneados todavía necesitan OCR. El frontal permite lanzar experimentos sobre la batería de 20 preguntas y comparar sus resultados.
