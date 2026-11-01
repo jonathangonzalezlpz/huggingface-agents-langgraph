@@ -48,6 +48,16 @@ AUTHORIZED_CALLABLES: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
+# Builders of the configurable LLM roles, which are not part of the V3.1 pipeline.
+AUTHORIZED_ROLE_BUILDERS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("huggingface_agents_langgraph.llm_roles", "build_planner"),
+        ("huggingface_agents_langgraph.llm_roles", "build_verifier"),
+        ("huggingface_agents_langgraph.llm_roles", "build_reflect"),
+        ("huggingface_agents_langgraph.llm_roles", "build_self_consistency"),
+    }
+)
+
 
 @dataclass(frozen=True)
 class NodeRegistration:
@@ -425,6 +435,87 @@ def create_gaia_v3_registry() -> NodeRegistry:
     return registry
 
 
+def create_studio_registry() -> NodeRegistry:
+    """The V3.1 components plus the configurable ones a Studio architecture may use."""
+    registry = create_gaia_v3_registry()
+    _register_llm_roles(registry)
+    return registry
+
+
+def _register_llm_roles(registry: NodeRegistry) -> None:
+    """Configurable roles that call the model; none of them is part of V3.1."""
+
+    def builder(name: str):
+        return lambda params: _resolve_module_attr(
+            "huggingface_agents_langgraph.llm_roles", name
+        )(params)
+
+    registry.register(
+        "llm_planner",
+        metadata={"category": "planning"},
+        contract=NodeContract(
+            required_inputs=frozenset({"question"}),
+            optional_inputs=frozenset({"research_notes"}),
+            guaranteed_outputs=frozenset({"plan", "research_notes"}),
+        ),
+        builder=builder("build_planner"),
+        params=(
+            ParamSpec("max_steps", "integer", default=4, minimum=1, maximum=8),
+            ParamSpec("max_tokens", "integer", default=400, minimum=64, maximum=2048),
+        ),
+        description="Breaks the question into a short plan the next nodes can follow.",
+    )
+    registry.register(
+        "llm_verifier",
+        metadata={"category": "verification"},
+        contract=NodeContract(
+            required_inputs=frozenset({"question", "draft_answer"}),
+            optional_inputs=frozenset({"evidence", "revision_count"}),
+            guaranteed_outputs=frozenset({"verdict"}),
+        ),
+        builder=builder("build_verifier"),
+        params=(
+            ParamSpec("max_revisions", "integer", default=1, minimum=0, maximum=5),
+            ParamSpec(
+                "strictness", "enum", default="strict", choices=("strict", "lenient")
+            ),
+            ParamSpec("max_tokens", "integer", default=300, minimum=64, maximum=1024),
+        ),
+        description="Judges the draft answer and decides whether it needs revising.",
+    )
+    registry.register(
+        "llm_reflect",
+        metadata={"category": "verification"},
+        contract=NodeContract(
+            required_inputs=frozenset({"question", "draft_answer", "verdict"}),
+            optional_inputs=frozenset({"evidence", "revision_count"}),
+            guaranteed_outputs=frozenset({"draft_answer", "revision_count"}),
+        ),
+        builder=builder("build_reflect"),
+        params=(
+            ParamSpec("max_tokens", "integer", default=1024, minimum=128, maximum=4096),
+            ParamSpec("thinking", "boolean", default=False),
+        ),
+        description="Revises the draft answer using the verifier's critique.",
+    )
+    registry.register(
+        "self_consistency",
+        metadata={"category": "reasoning"},
+        contract=NodeContract(
+            required_inputs=frozenset({"question"}),
+            optional_inputs=frozenset({"evidence", "research_notes"}),
+            guaranteed_outputs=frozenset({"draft_answer", "candidates"}),
+        ),
+        builder=builder("build_self_consistency"),
+        params=(
+            ParamSpec("n", "integer", default=3, minimum=1, maximum=7),
+            ParamSpec("temperature", "number", default=0.7, minimum=0.0, maximum=1.5),
+            ParamSpec("max_tokens", "integer", default=600, minimum=128, maximum=4096),
+        ),
+        description="Samples several answers in turn and keeps the majority vote.",
+    )
+
+
 def _resolve_module_attr(module_name: str, attr_name: str) -> Callable[..., Any]:
     """Safe internal resolver for pre-approved internal node functions only.
 
@@ -434,7 +525,7 @@ def _resolve_module_attr(module_name: str, attr_name: str) -> Callable[..., Any]
     """
     import importlib
 
-    if (module_name, attr_name) not in AUTHORIZED_CALLABLES:
+    if (module_name, attr_name) not in AUTHORIZED_CALLABLES | AUTHORIZED_ROLE_BUILDERS:
         raise PermissionError(
             "Unauthorized module attribute resolution attempt: "
             f"'{module_name}.{attr_name}'"

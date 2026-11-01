@@ -18,10 +18,18 @@ AUTHORIZED_ROUTING_CALLABLES: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
+# Decisions of the configurable roles, which are not part of the V3.1 pipeline.
+AUTHORIZED_ROLE_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {("huggingface_agents_langgraph.llm_roles", "route_on_verdict")}
+)
+
 
 def resolve_routing_attr(module_name: str, attr_name: str) -> Callable[..., Any]:
     """Resolve a pre-approved routing function; reject anything else."""
-    if (module_name, attr_name) not in AUTHORIZED_ROUTING_CALLABLES:
+    if (
+        module_name,
+        attr_name,
+    ) not in AUTHORIZED_ROUTING_CALLABLES | AUTHORIZED_ROLE_ROUTES:
         raise PermissionError(
             "Unauthorized routing attribute resolution attempt: "
             f"'{module_name}.{attr_name}'"
@@ -99,15 +107,20 @@ class RoutingRegistry:
         return sorted(self._strategies)
 
 
-def _strategy(identifier: str, outputs: Iterable[str], description: str):
-    function_name = "_" + identifier
+def _strategy(
+    identifier: str,
+    outputs: Iterable[str],
+    description: str,
+    *,
+    module: str = "huggingface_agents_langgraph.graph",
+    function_name: str | None = None,
+):
+    name = function_name or "_" + identifier
     return RoutingStrategy(
         identifier,
         frozenset(outputs),
         description,
-        resolver=lambda: resolve_routing_attr(
-            "huggingface_agents_langgraph.graph", function_name
-        ),
+        resolver=lambda: resolve_routing_attr(module, name),
     )
 
 
@@ -141,6 +154,21 @@ def create_gaia_v31_routing_registry() -> RoutingRegistry:
             "route_after_review",
             ("act", "solve"),
             "Continues researching or moves on to reasoning.",
+        )
+    )
+    return registry
+
+
+def create_studio_routing_registry() -> RoutingRegistry:
+    """The V3.1 decisions plus the ones the configurable roles add."""
+    registry = create_gaia_v31_routing_registry()
+    registry.register(
+        _strategy(
+            "route_on_verdict",
+            ("accept", "revise"),
+            "Revises the draft while the verifier rejects it and revisions remain.",
+            module="huggingface_agents_langgraph.llm_roles",
+            function_name="route_on_verdict",
         )
     )
     return registry

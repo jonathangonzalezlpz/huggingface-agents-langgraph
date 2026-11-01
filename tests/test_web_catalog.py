@@ -34,11 +34,12 @@ def _call(method: str, path: str, payload=None):
 def test_catalog_lists_components_strategies_and_state():
     status, body = _call("GET", "/api/catalog")
     assert status == 200
-    assert len(body["nodes"]) == 12
+    assert len(body["nodes"]) == 16
     assert {s["identifier"] for s in body["routing_strategies"]} == {
         "route_after_preprocessing",
         "route_after_review",
         "route_after_router",
+        "route_on_verdict",
     }
     assert "question" in body["state"]["fields"]
     assert body["categories"][0] == "input"

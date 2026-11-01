@@ -320,7 +320,7 @@ class TestRunRecord:
 
         monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
         monkeypatch.setattr(
-            graph_selection, "create_gaia_v3_registry", lambda: _registry([])
+            graph_selection, "create_studio_registry", lambda: _registry([])
         )
         saved = save_architecture(_definition(n=6, label="rec"))
         _graph, info = graph_selection.select_graph({"architecture": saved["id"]})

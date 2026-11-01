@@ -24,10 +24,10 @@ from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
 )
 from huggingface_agents_langgraph.graph_definition.registry import (
-    create_gaia_v3_registry,
+    create_studio_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
-    create_gaia_v31_routing_registry,
+    create_studio_routing_registry,
 )
 from huggingface_agents_langgraph.run_tracking import (
     list_records,
@@ -146,7 +146,7 @@ def list_architectures() -> list[dict]:
 
 
 def _validator() -> GraphValidator:
-    return GraphValidator(create_gaia_v3_registry(), create_gaia_v31_routing_registry())
+    return GraphValidator(create_studio_registry(), create_studio_routing_registry())
 
 
 def validate_definition(payload: Any) -> dict:
@@ -171,8 +171,8 @@ def architecture_detail(identifier: str) -> dict:
 def get_catalog() -> dict:
     """Components, routing strategies and state schema available for graphs."""
     return build_catalog(
-        create_gaia_v3_registry(),
-        create_gaia_v31_routing_registry(),
+        create_studio_registry(),
+        create_studio_routing_registry(),
         state_types=[AgentState.__name__],
         state_fields=AgentState.__annotations__,
         initial_fields=AgentState.__required_keys__,

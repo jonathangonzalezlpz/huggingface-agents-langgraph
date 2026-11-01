@@ -7,7 +7,15 @@ from huggingface_agents_langgraph.graph_definition.routing_registry import (
     RoutingRegistry,
 )
 
-CATEGORIES = ("input", "acquisition", "research", "reasoning", "output")
+CATEGORIES = (
+    "input",
+    "acquisition",
+    "research",
+    "planning",
+    "reasoning",
+    "verification",
+    "output",
+)
 UNCATEGORIZED = "other"
 
 

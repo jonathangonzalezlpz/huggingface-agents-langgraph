@@ -34,7 +34,22 @@ def _catalog():
 def test_every_v31_component_has_a_known_category():
     nodes = _catalog()["nodes"]
     assert len(nodes) == 12
+    v31_categories = {"input", "acquisition", "research", "reasoning", "output"}
+    assert {node["category"] for node in nodes} == v31_categories
+    assert v31_categories < set(CATEGORIES)
+
+
+def test_the_studio_catalog_adds_configurable_roles_to_the_v31_components():
+    nodes = get_catalog()["nodes"]
+    assert len(nodes) == 16
     assert {node["category"] for node in nodes} == set(CATEGORIES)
+    configurable = {n["implementation_id"] for n in nodes if n["params"]}
+    assert configurable == {
+        "llm_planner",
+        "llm_verifier",
+        "llm_reflect",
+        "self_consistency",
+    }
 
 
 def test_categories_follow_the_pipeline_roles():

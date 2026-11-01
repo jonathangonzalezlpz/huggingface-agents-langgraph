@@ -17,10 +17,10 @@ from huggingface_agents_langgraph.graph_definition import (
     GraphCompiler,
 )
 from huggingface_agents_langgraph.graph_definition.registry import (
-    create_gaia_v3_registry,
+    create_studio_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
-    create_gaia_v31_routing_registry,
+    create_studio_routing_registry,
 )
 
 
@@ -34,9 +34,7 @@ def select_graph(experiment: dict) -> tuple[CompiledStateGraph, dict]:
     except ArchitectureNotFoundError as error:
         raise ValueError(f"Unknown architecture '{reference}'") from error
     definition = AgentDefinition.from_dict(record["definition"])
-    compiler = GraphCompiler(
-        create_gaia_v3_registry(), create_gaia_v31_routing_registry()
-    )
+    compiler = GraphCompiler(create_studio_registry(), create_studio_routing_registry())
     graph = compiler.compile(definition)
     info = {
         "engine": "compiled",
