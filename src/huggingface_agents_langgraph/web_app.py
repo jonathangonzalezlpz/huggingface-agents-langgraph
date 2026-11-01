@@ -18,6 +18,7 @@ from huggingface_agents_langgraph.architecture_store import (
 )
 from huggingface_agents_langgraph.attachments import get_attachment_path
 from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
+from huggingface_agents_langgraph.experiment_comparison import compare_experiments
 from huggingface_agents_langgraph.graph_definition import AgentDefinition
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
@@ -39,6 +40,7 @@ from huggingface_agents_langgraph.run_tracking import (
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
 FRONTEND_DIRECTORY = Path(__file__).parent / "frontend"
 MAX_REQUEST_BYTES = 1_000_000
+MAX_COMPARED_EXPERIMENTS = 20
 
 
 class WebAppHandler(BaseHTTPRequestHandler):
@@ -156,6 +158,9 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if request_path == "/api/experiments":
             self._save_experiment()
             return
+        if request_path == "/api/experiments/compare":
+            self._compare_experiments()
+            return
         if request_path == "/api/architectures/validate":
             self._validate_architecture()
             return
@@ -233,6 +238,36 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             raise ValueError("Request body must be a JSON object")
         return payload
+
+    def _compare_experiments(self) -> None:
+        try:
+            payload = self._read_json_object()
+            ids = payload.get("ids")
+            base = payload.get("base")
+            if (
+                not isinstance(ids, list)
+                or not 2 <= len(ids) <= MAX_COMPARED_EXPERIMENTS
+                or not all(isinstance(item, str) for item in ids)
+                or len(set(ids)) != len(ids)
+            ):
+                raise ValueError("ids must list 2 to 20 distinct experiment ids")
+            if base is not None and not isinstance(base, str):
+                raise ValueError("base must be an experiment id")
+            records = []
+            for experiment_id in ids:
+                try:
+                    record = read_record("experiments", experiment_id)
+                except FileNotFoundError:
+                    self._send_json(
+                        404, {"error": f"Experiment not found: {experiment_id}"}
+                    )
+                    return
+                records.append(experiment_presentation(record))
+            comparison = compare_experiments(records, base_id=base)
+        except (ValueError, TypeError, KeyError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(200, comparison)
 
     def _validate_architecture(self) -> None:
         try:
