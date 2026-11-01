@@ -7,6 +7,7 @@ import {
   Search,
   Shapes,
   ShieldCheck,
+  Wrench,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -51,6 +52,12 @@ export const CATEGORY_STYLE: Record<Category, CategoryStyle> = {
     text: 'text-cat-verification',
     border: 'border-l-cat-verification',
     cssColor: 'var(--cat-verification)',
+  },
+  tools: {
+    Icon: Wrench,
+    text: 'text-cat-tools',
+    border: 'border-l-cat-tools',
+    cssColor: 'var(--cat-tools)',
   },
   reasoning: {
     Icon: BrainCircuit,

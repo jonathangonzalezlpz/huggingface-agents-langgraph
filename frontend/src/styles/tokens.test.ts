@@ -60,6 +60,7 @@ const COMPONENT_PAIRS: [string, string][] = [
   ['cat-research', 'surface'],
   ['cat-planning', 'surface'],
   ['cat-verification', 'surface'],
+  ['cat-tools', 'surface'],
   ['cat-reasoning', 'surface'],
   ['cat-output', 'surface'],
   ['cat-other', 'surface'],

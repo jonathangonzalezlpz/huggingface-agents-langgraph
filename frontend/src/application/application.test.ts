@@ -17,13 +17,14 @@ describe('groupComponents', () => {
       'planning',
       'reasoning',
       'verification',
+      'tools',
       'output',
     ]);
     const acquisition = groups.find((g) => g.category === 'acquisition');
     const ids = acquisition?.components.map((c) => c.implementationId) ?? [];
     expect(ids).toEqual([...ids].sort());
-    expect(ids).toHaveLength(5);
-    expect(groups.reduce((total, g) => total + g.components.length, 0)).toBe(16);
+    expect(ids).toHaveLength(7);
+    expect(groups.reduce((total, g) => total + g.components.length, 0)).toBe(22);
   });
 
   it('omits categories without components', () => {

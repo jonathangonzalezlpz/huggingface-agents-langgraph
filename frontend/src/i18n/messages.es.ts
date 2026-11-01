@@ -585,6 +585,21 @@ export const es = {
   'param.self_consistency.temperature': 'Temperatura',
   'param.self_consistency.max_tokens': 'Tokens máximos por muestra',
 
+  'category.tools': 'Herramientas',
+  'component.tool_node':
+    'Ejecuta una herramienta de la lista y añade lo que encuentra a la evidencia.',
+  'component.web_search': 'Busca en la web con la pregunta o con una consulta fija.',
+  'component.wikipedia_search': 'Busca en Wikipedia con la pregunta o con una consulta fija.',
+  'component.calculator': 'Pide al modelo una expresión y la evalúa de forma segura.',
+  'component.transcribe_audio': 'Transcribe el archivo de audio adjunto.',
+  'component.describe_image': 'Describe la imagen adjunta con el modelo de visión.',
+  'param.tool_node.tool': 'Herramienta',
+  'param.tool_node.input_from': 'Entrada de la herramienta',
+  'param.tool_node.text': 'Texto fijo',
+  'param.web_search.query': 'Consulta fija (vacío: la pregunta)',
+  'param.wikipedia_search.query': 'Consulta fija (vacío: la pregunta)',
+  'param.calculator.max_tokens': 'Tokens máximos',
+
   'notfound.title': 'Página no encontrada',
   'notfound.body': 'Esa dirección no existe en Studio.',
   'notfound.back': 'Volver al Constructor',

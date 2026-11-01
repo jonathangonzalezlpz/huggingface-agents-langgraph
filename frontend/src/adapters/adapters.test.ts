@@ -28,7 +28,7 @@ describe('http adapter', () => {
   it('maps the catalog to the domain model', async () => {
     const services = createHttpServices(serving({ '/api/catalog': () => respond(demo.catalog) }));
     const catalog = await services.catalog.getCatalog();
-    expect(catalog.components).toHaveLength(16);
+    expect(catalog.components).toHaveLength(22);
     const web = catalog.components.find((c) => c.implementationId === 'web_research');
     expect(web).toMatchObject({ category: 'acquisition', recoverErrors: true });
     expect(web?.contract.requiredInputs).toEqual(['question']);
@@ -186,7 +186,7 @@ describe('memory adapter', () => {
 
   it('serves the same catalog the backend exposes', async () => {
     const catalog = await createMemoryServices().catalog.getCatalog();
-    expect(catalog.components).toHaveLength(16);
+    expect(catalog.components).toHaveLength(22);
     expect(catalog.state.initialFields).toEqual(['file_name', 'question', 'task_id']);
   });
 

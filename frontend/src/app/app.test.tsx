@@ -102,8 +102,8 @@ describe('builder page', () => {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, 'es');
     renderApp();
     const acquisition = await screen.findByRole('region', { name: 'Adquisición' });
-    expect(within(acquisition).getAllByRole('listitem')).toHaveLength(5);
-    expect(within(acquisition).getAllByText('Recupera errores')).toHaveLength(5);
+    expect(within(acquisition).getAllByRole('listitem')).toHaveLength(7);
+    expect(within(acquisition).getAllByText('Recupera errores')).toHaveLength(7);
     expect(screen.getByRole('region', { name: 'Entrada' })).toBeVisible();
   });
 

@@ -7,6 +7,7 @@
       "planning",
       "reasoning",
       "verification",
+      "tools",
       "output"
     ],
     "nodes": [
@@ -49,6 +50,39 @@
         }
       },
       {
+        "implementation_id": "calculator",
+        "description": "Has the model write one expression and evaluates it safely.",
+        "category": "tools",
+        "recover_errors": true,
+        "params": [
+          {
+            "name": "max_tokens",
+            "kind": "integer",
+            "default": 160,
+            "required": false,
+            "minimum": 32,
+            "maximum": 512
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "draft_answer",
+            "evidence",
+            "research_notes",
+            "source_links"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
+          ]
+        }
+      },
+      {
         "implementation_id": "code_processing",
         "description": "Static inspection or sandboxed execution of Python code.",
         "category": "acquisition",
@@ -64,6 +98,30 @@
           "optional_outputs": [
             "evidence",
             "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "describe_image",
+        "description": "Describes the attached image with the vision model.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "params": [],
+        "contract": {
+          "required_inputs": [
+            "file_path",
+            "question"
+          ],
+          "optional_inputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
           ]
         }
       },
@@ -404,6 +462,85 @@
         }
       },
       {
+        "implementation_id": "tool_node",
+        "description": "Runs one vetted tool and adds what it finds to the evidence.",
+        "category": "tools",
+        "recover_errors": true,
+        "params": [
+          {
+            "name": "tool",
+            "kind": "enum",
+            "default": "web_search",
+            "required": false,
+            "choices": [
+              "web_search",
+              "wikipedia",
+              "fetch_url",
+              "calculate"
+            ]
+          },
+          {
+            "name": "input_from",
+            "kind": "enum",
+            "default": "question",
+            "required": false,
+            "choices": [
+              "question",
+              "draft_answer",
+              "text"
+            ]
+          },
+          {
+            "name": "text",
+            "kind": "string",
+            "default": "",
+            "required": false,
+            "max_length": 200
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "draft_answer",
+            "evidence",
+            "research_notes",
+            "source_links"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
+          ]
+        }
+      },
+      {
+        "implementation_id": "transcribe_audio",
+        "description": "Transcribes the attached audio file.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "params": [],
+        "contract": {
+          "required_inputs": [
+            "file_path",
+            "question"
+          ],
+          "optional_inputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
+          ]
+        }
+      },
+      {
         "implementation_id": "web_research",
         "description": "Search engine and encyclopedia retrieval.",
         "category": "acquisition",
@@ -420,6 +557,70 @@
           "optional_outputs": [
             "evidence",
             "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "web_search",
+        "description": "Searches the web with the question (or a fixed query).",
+        "category": "tools",
+        "recover_errors": true,
+        "params": [
+          {
+            "name": "query",
+            "kind": "string",
+            "default": "",
+            "required": false,
+            "max_length": 200
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "draft_answer",
+            "evidence",
+            "research_notes",
+            "source_links"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
+          ]
+        }
+      },
+      {
+        "implementation_id": "wikipedia_search",
+        "description": "Searches Wikipedia with the question (or a fixed query).",
+        "category": "tools",
+        "recover_errors": true,
+        "params": [
+          {
+            "name": "query",
+            "kind": "string",
+            "default": "",
+            "required": false,
+            "max_length": 200
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "draft_answer",
+            "evidence",
+            "research_notes",
+            "source_links"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes",
+            "source_links"
           ]
         }
       }

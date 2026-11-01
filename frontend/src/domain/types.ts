@@ -31,6 +31,7 @@ export type Category =
   | 'planning'
   | 'reasoning'
   | 'verification'
+  | 'tools'
   | 'output'
   | 'other';
 

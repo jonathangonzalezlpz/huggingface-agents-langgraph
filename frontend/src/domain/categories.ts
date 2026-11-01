@@ -8,6 +8,7 @@ export const CATEGORY_ORDER: readonly Category[] = [
   'planning',
   'reasoning',
   'verification',
+  'tools',
   'output',
   'other',
 ];
