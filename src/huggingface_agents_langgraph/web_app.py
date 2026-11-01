@@ -20,6 +20,11 @@ from huggingface_agents_langgraph.architecture_store import (
     validate_definition,
 )
 from huggingface_agents_langgraph.attachments import get_attachment_path
+from huggingface_agents_langgraph.batteries import (
+    BatteryBusyError,
+    BatteryManager,
+    BatteryUnavailableError,
+)
 from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
 from huggingface_agents_langgraph.experiment_comparison import compare_experiments
 from huggingface_agents_langgraph.graph_definition import AgentDefinition
@@ -65,6 +70,9 @@ BUNDLE_NOT_BUILT = (
 )
 MAX_REQUEST_BYTES = 1_000_000
 MAX_COMPARED_EXPERIMENTS = 20
+
+
+BATTERIES = BatteryManager()
 
 
 class WebAppHandler(BaseHTTPRequestHandler):
@@ -159,6 +167,8 @@ class WebAppHandler(BaseHTTPRequestHandler):
                     ]
                 },
             )
+        elif request_path == "/api/batteries/current":
+            self._send_json(200, BATTERIES.status())
         elif request_path == "/api/architectures":
             self._send_json(200, {"architectures": list_architectures()})
         elif request_path == "/api/catalog":
@@ -191,6 +201,12 @@ class WebAppHandler(BaseHTTPRequestHandler):
             return
         if request_path == "/api/experiments/compare":
             self._compare_experiments()
+            return
+        if request_path == "/api/batteries":
+            self._start_battery()
+            return
+        if request_path == "/api/batteries/stop":
+            self._send_json(200, BATTERIES.stop())
             return
         if request_path == "/api/architectures/validate":
             self._validate_architecture()
@@ -284,6 +300,32 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             raise ValueError("Request body must be a JSON object")
         return payload
+
+    def _start_battery(self) -> None:
+        try:
+            payload = self._read_json_object()
+            limit = payload.get("limit", 20)
+            if type(limit) is not int:
+                raise ValueError("limit must be an integer")
+            resume_id = payload.get("resume_id")
+            if resume_id is not None and not isinstance(resume_id, str):
+                raise ValueError("resume_id must be an experiment id")
+            status = BATTERIES.start(
+                payload.get("experiment"), limit=limit, resume_id=resume_id
+            )
+        except BatteryBusyError as error:
+            self._send_json(409, {"error": str(error)})
+            return
+        except BatteryUnavailableError as error:
+            self._send_json(503, {"error": str(error)})
+            return
+        except FileNotFoundError:
+            self._send_json(404, {"error": "Experiment not found"})
+            return
+        except (ValueError, TypeError, KeyError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(202, status)
 
     def _compare_experiments(self) -> None:
         try:

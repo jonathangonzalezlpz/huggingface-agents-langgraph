@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import subprocess
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import mean, median
@@ -99,8 +100,15 @@ def run_experiment(
     group_id: str,
     score: bool = True,
     record: dict | None = None,
+    should_stop: Callable[[], bool] | None = None,
+    on_progress: Callable[[dict], None] | None = None,
 ) -> dict:
-    """Persist each completed task and evaluate labels only after agent execution."""
+    """Persist each completed task and evaluate labels only after agent execution.
+
+    ``should_stop`` is checked before every task, never during one: a stopped
+    experiment is stored as ``cancelled`` and can be resumed with ``record``.
+    ``on_progress`` sees the record after each write.
+    """
     tasks = [
         {key: task.get(key, "") for key in ("task_id", "question", "file_name")}
         for task in tasks
@@ -134,10 +142,18 @@ def run_experiment(
     }
     record["status"] = "running"
     write_record("experiments", record)
+    if on_progress:
+        on_progress(record)
     completed = {answer["task_id"] for answer in record["answers"]}
     for task in tasks:
         if task["task_id"] in completed:
             continue
+        if should_stop and should_stop():
+            record["status"] = "cancelled"
+            write_record("experiments", record)
+            if on_progress:
+                on_progress(record)
+            return record
         started = perf_counter()
         try:
             result = run_pipeline(task | {"experiment": config})
@@ -188,6 +204,8 @@ def run_experiment(
         record["metrics"] = timing_summary(record["answers"])
         record["average_duration_seconds"] = record["metrics"]["mean_seconds"]
         write_record("experiments", record)
+        if on_progress:
+            on_progress(record)
         print(
             f"{config['name']}: {len(record['answers'])}/{len(tasks)} "
             f"{answer['duration_seconds']:.1f}s "
@@ -209,6 +227,8 @@ def run_experiment(
         except (RuntimeError, ValueError) as error:
             record["evaluation_error"] = str(error)
     write_record("experiments", record)
+    if on_progress:
+        on_progress(record)
     return record
 
 
