@@ -1,0 +1,64 @@
+/*
+ * Design tokens: the single source of truth for colour.
+ * Contrast of every text and component pair is verified by src/styles/tokens.test.ts.
+ */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --surface-muted: #eceff4;
+  --border: #d3d9e2;
+  --border-strong: #6b7587;
+  --text: #141a24;
+  --text-muted: #475264;
+  --accent: #2557d6;
+  --accent-contrast: #ffffff;
+  --accent-soft: #e6edfc;
+  --accent-text: #1c47b3;
+  --focus: #1c47b3;
+  --success: #14663a;
+  --success-soft: #e3f4ea;
+  --warning: #8a4b05;
+  --warning-soft: #fdf0dc;
+  --error: #b3261e;
+  --error-soft: #fbe5e3;
+  --info: #1d4ed8;
+  --info-soft: #e5edfd;
+  --cat-input: #3f5fa8;
+  --cat-acquisition: #0f766e;
+  --cat-research: #6d3fc4;
+  --cat-reasoning: #a15c07;
+  --cat-output: #166534;
+  --cat-other: #5b6577;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e131a;
+  --surface: #151c26;
+  --surface-muted: #1c2531;
+  --border: #2a3545;
+  --border-strong: #8b97ab;
+  --text: #e8ecf2;
+  --text-muted: #a8b2c3;
+  --accent: #7aa2ff;
+  --accent-contrast: #0b1220;
+  --accent-soft: #1c2a4a;
+  --accent-text: #9db9ff;
+  --focus: #9db9ff;
+  --success: #5ad28a;
+  --success-soft: #12301f;
+  --warning: #f0b95a;
+  --warning-soft: #35270e;
+  --error: #ff8a80;
+  --error-soft: #3a1a18;
+  --info: #8fb0ff;
+  --info-soft: #1b2a4d;
+  --cat-input: #8aa6ff;
+  --cat-acquisition: #4fd1c5;
+  --cat-research: #b79bff;
+  --cat-reasoning: #f0b95a;
+  --cat-output: #6fdc9a;
+  --cat-other: #a8b2c3;
+}

@@ -1,0 +1,105 @@
+import type { MessageKey } from './messages.es';
+
+export const en: Record<MessageKey, string> = {
+  'app.name': 'GAIA Agent Studio',
+  'app.tagline': 'Visual builder and evaluation lab for GAIA agents',
+  'skip.toContent': 'Skip to content',
+
+  'nav.label': 'Main navigation',
+  'nav.builder': 'Builder',
+  'nav.runs': 'Runs',
+  'nav.experiments': 'Experiments',
+  'nav.system': 'System',
+
+  'status.title': 'Status',
+  'status.backend': 'Backend',
+  'status.backend.online': 'Connected',
+  'status.backend.offline': 'Offline',
+  'status.model': 'Model',
+  'status.model.ready': 'Ready',
+  'status.model.sleeping': 'Idle',
+  'status.model.loading': 'Loading',
+  'status.model.unavailable': 'Unavailable',
+  'status.model.unknown': 'No data',
+
+  'controls.theme': 'Theme',
+  'controls.theme.system': 'System',
+  'controls.theme.light': 'Light',
+  'controls.theme.dark': 'Dark',
+  'controls.language': 'Language',
+
+  'demo.banner': 'Demo mode: sample data; runs are not real.',
+
+  'common.loading': 'Loading…',
+  'common.retry': 'Retry',
+  'common.legacy': 'Open the previous interface',
+
+  'error.title': 'Something went wrong',
+  'error.network': 'Cannot connect to the backend.',
+  'error.http': 'The backend responded with an error ({status}).',
+  'error.contract': 'The backend returned unexpected data.',
+
+  'diagnostics.errors.one': '{count} error',
+  'diagnostics.errors.other': '{count} errors',
+  'diagnostics.warnings.one': '{count} warning',
+  'diagnostics.warnings.other': '{count} warnings',
+  'diagnostics.infos.one': '{count} note',
+  'diagnostics.infos.other': '{count} notes',
+
+  'category.input': 'Input',
+  'category.acquisition': 'Acquisition',
+  'category.research': 'Research',
+  'category.reasoning': 'Reasoning',
+  'category.output': 'Output',
+  'category.other': 'Other',
+
+  'builder.title': 'Builder',
+  'builder.description': 'Design, validate and save agent architectures.',
+  'builder.library': 'Architecture library',
+  'builder.library.empty': 'There are no architectures yet.',
+  'builder.builtin': 'Built-in',
+  'builder.readOnly': 'Read-only',
+  'builder.version': 'Version {version}',
+  'builder.components.one': '{count} component',
+  'builder.components.other': '{count} components',
+  'builder.validation.valid': 'Valid',
+  'builder.validation.invalid': 'Has errors',
+  'builder.catalog': 'Component catalog',
+  'builder.catalog.hint': 'The components you will be able to place on the canvas, by category.',
+  'builder.coming': 'The editing canvas arrives in the next phase.',
+  'builder.recoversErrors': 'Recovers errors',
+
+  'component.preprocessing': 'Normalizes whitespace and prepares the question text.',
+  'component.attachment_resolver': 'Locates and verifies the task attachment.',
+  'component.router': 'Picks the route by attachment extension, falling back to the model.',
+  'component.code_processing':
+    'Inspects or runs the attached Python code in a restricted environment.',
+  'component.spreadsheet_processing': 'Extracts and analyzes spreadsheet data.',
+  'component.document_processing': 'Extracts PDF text and selects the relevant parts.',
+  'component.multimedia_processing':
+    'Transcribes audio, classifies sounds and inspects images and video.',
+  'component.web_research': 'Searches the web and encyclopedias.',
+  'component.review': 'Reviews the evidence and decides whether to research more or solve.',
+  'component.research_action': 'Runs the research action chosen by the review.',
+  'component.reasoning': 'Reasons over the evidence and drafts an answer.',
+  'component.answer_production': 'Formats the final answer following GAIA conventions.',
+
+  'runs.title': 'Runs',
+  'runs.description': 'Run a question with an architecture and review its path.',
+  'experiments.title': 'Experiments',
+  'experiments.description': 'Batteries, history and result comparison.',
+  'placeholder.title': 'Available in a later phase',
+  'placeholder.body':
+    'This section will be built following the V4 roadmap. In the meantime the previous interface remains available.',
+
+  'system.title': 'System',
+  'system.description': 'Service status and operating mode.',
+  'system.mode': 'Operating mode',
+  'system.mode.live': 'Connected to the backend',
+  'system.mode.demo': 'Demo with sample data',
+  'system.model': 'Reasoning model',
+
+  'notfound.title': 'Page not found',
+  'notfound.body': 'That address does not exist in Studio.',
+  'notfound.back': 'Back to the Builder',
+};
