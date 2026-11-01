@@ -87,7 +87,22 @@ def test_missing_bundle_explains_how_to_build_it(monkeypatch, tmp_path):
     assert b"build_frontend" in body
 
 
-def test_legacy_interface_is_still_served_at_the_root():
-    status, body, _type, _headers = _get("/")
-    assert status == 200
-    assert b"<html" in body.lower()
+def _get_with_redirect(path: str):
+    handler = WebAppHandler.__new__(WebAppHandler)
+    handler.path = path
+    sent = []
+    handler._redirect = lambda location: sent.append(("redirect", location))
+    handler._send_json = lambda status, payload: sent.append((status, payload))
+    handler._send_bytes = lambda *args, **kwargs: sent.append(("bytes", args))
+    handler.do_GET()
+    return sent[-1]
+
+
+def test_the_root_leads_to_the_studio():
+    assert _get_with_redirect("/") == ("redirect", "/app/")
+
+
+@pytest.mark.parametrize("path", ["/assets/app.js", "/assets/styles.css"])
+def test_the_previous_interface_assets_are_gone(path):
+    status, _payload = _get_with_redirect(path)
+    assert status == 404

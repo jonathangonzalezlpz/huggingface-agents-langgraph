@@ -23,13 +23,16 @@ from huggingface_agents_langgraph.run_tracking import (
 
 
 def source_identity() -> dict:
-    """Identify executable source and lockfile, including uncommitted changes."""
+    """Identify executable source and lockfile, including uncommitted changes.
+
+    Only Python sources count: the built interface is output, and rebuilding it must not
+    make otherwise identical experiments look like they ran different code.
+    """
     root = Path(__file__).resolve().parents[2]
-    files = (
-        sorted((root / "src").rglob("*.py"))
-        + sorted((root / "src").rglob("*.js"))
-        + [root / "pyproject.toml", root / "uv.lock"]
-    )
+    files = sorted((root / "src").rglob("*.py")) + [
+        root / "pyproject.toml",
+        root / "uv.lock",
+    ]
     digest = hashlib.sha256()
     for path in files:
         digest.update(path.relative_to(root).as_posix().encode())

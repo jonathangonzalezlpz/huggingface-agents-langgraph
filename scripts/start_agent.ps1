@@ -137,7 +137,11 @@ $uvArguments += @("python", "-m")
 
 if ($Mode -eq "frontend") {
     $uvArguments += "huggingface_agents_langgraph.web_app"
-    Write-Host "Starting frontend at http://127.0.0.1:7860"
+    $studioIndex = Join-Path $repositoryRoot "src/huggingface_agents_langgraph/static/app/index.html"
+    if (-not (Test-Path $studioIndex)) {
+        Write-Warning "The Studio interface is not built yet, so the page will only explain how to build it. Run scripts/build_frontend.ps1 (needs Node; see docs/frontend-seguridad.md) and reload."
+    }
+    Write-Host "Starting frontend at http://127.0.0.1:7860 (opens the Studio at /app/)"
 } else {
     $uvArguments += "huggingface_agents_langgraph.cli"
     Write-Host "Starting terminal runner."

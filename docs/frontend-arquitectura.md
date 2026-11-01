@@ -1,8 +1,8 @@
 # Arquitectura del frontend (GAIA Agent Studio)
 
-Aplicación en `frontend/` (React, TypeScript estricto, Vite). Convive con la interfaz
-anterior, que sigue en `src/huggingface_agents_langgraph/frontend/` y se sirve en `/`, hasta
-alcanzar paridad (M3.4). **No confundir ambas carpetas.** La nueva se sirve en `/app`.
+Aplicación en `frontend/` (React, TypeScript estricto, Vite), servida en `/app` (`/` redirige
+a ella). Sustituyó a la interfaz anterior (`src/huggingface_agents_langgraph/frontend/`, ya
+retirada; sigue en el historial de Git y en la etiqueta `pipeline-v3.1.0`).
 
 El diseño de experiencia está en [DISENO_UX_V4.md](DISENO_UX_V4.md) y las fases en
 [ROADMAP_V4.md](ROADMAP_V4.md). La seguridad de las dependencias, en

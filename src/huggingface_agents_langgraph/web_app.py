@@ -51,7 +51,6 @@ from huggingface_agents_langgraph.run_tracking import (
 )
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
-FRONTEND_DIRECTORY = Path(__file__).parent / "frontend"
 APP_DIRECTORY = Path(__file__).parent / "static" / "app"
 APP_PREFIX = "/app"
 WEB_CONTENT_TYPES = {
@@ -89,11 +88,7 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if request_path == APP_PREFIX or request_path.startswith(APP_PREFIX + "/"):
             self._serve_app(request_path.removeprefix(APP_PREFIX))
         elif request_path == "/":
-            self._serve_asset("index.html")
-        elif request_path == "/assets/app.js":
-            self._serve_asset("app.js")
-        elif request_path == "/assets/styles.css":
-            self._serve_asset("styles.css")
+            self._redirect(APP_PREFIX + "/")
         elif request_path in {"/api/questions", "/api/random-question"}:
             self._get_questions(request_path)
         elif request_path == "/api/status":
@@ -594,18 +589,11 @@ class WebAppHandler(BaseHTTPRequestHandler):
             {"Cache-Control": cache},
         )
 
-    def _serve_asset(self, file_name: str) -> None:
-        asset_path = FRONTEND_DIRECTORY / file_name
-        if not asset_path.is_file():
-            self._send_json(404, {"error": "Frontend asset not found"})
-            return
-
-        content_type = mimetypes.guess_type(file_name)[0]
-        self._send_bytes(
-            200,
-            asset_path.read_bytes(),
-            content_type or "application/octet-stream",
-        )
+    def _redirect(self, location: str) -> None:
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _send_json(self, status: int, payload: object) -> None:
         body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
