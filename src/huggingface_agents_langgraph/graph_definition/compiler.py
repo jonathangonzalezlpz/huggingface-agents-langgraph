@@ -54,6 +54,17 @@ def _recover_errors(function: Callable[..., Any]) -> Callable[..., Any]:
     return wrapped
 
 
+def _named(handler: Callable[..., Any], name: str) -> Callable[..., Any]:
+    """Run ``handler`` under the node id, so traces name the node, not its component."""
+
+    @wraps(handler)
+    def named(state):
+        return handler(state)
+
+    named.__name__ = name
+    return named
+
+
 def _target(name: str) -> str:
     return END if name in END_TERMINALS else name
 
@@ -94,7 +105,9 @@ class GraphCompiler:
 
         graph = StateGraph(self._state_types[definition.state_type])
         for node in definition.nodes:
-            graph.add_node(node.id, self._wrapped_handler(node.implementation_id))
+            graph.add_node(
+                node.id, self._wrapped_handler(node.id, node.implementation_id)
+            )
 
         graph.add_edge(START, definition.initial_node)
         for edge in definition.edges:
@@ -113,7 +126,9 @@ class GraphCompiler:
                 )
         return graph.compile()
 
-    def _wrapped_handler(self, implementation_id: str) -> Callable[..., Any]:
+    def _wrapped_handler(
+        self, node_id: str, implementation_id: str
+    ) -> Callable[..., Any]:
         registration = self._nodes.get_registration(implementation_id)
-        handler = traced_node(registration.resolve_handler())
+        handler = traced_node(_named(registration.resolve_handler(), node_id))
         return _recover_errors(handler) if registration.recover_errors else handler

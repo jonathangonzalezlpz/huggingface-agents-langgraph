@@ -265,3 +265,45 @@ class TestWrappers:
         with pytest.raises(ValueError, match="boom"):
             graph.invoke(TASK)
         assert trace.steps[0]["error"] == "boom"
+
+
+class TestNodeIdentityInTraces:
+    """A step must name the node that ran, not the component it uses."""
+
+    @staticmethod
+    def _graph(handler, recover=False):
+        registry = NodeRegistry()
+        registry.register(
+            "step",
+            NodeContract(optional_outputs={"research_notes"})
+            if recover
+            else NodeContract(),
+            handler=handler,
+            recover_errors=recover,
+        )
+        definition = AgentDefinition(
+            schema_version="4.0",
+            architecture_id="t",
+            state_type="AgentState",
+            initial_node="first",
+            nodes=(
+                NodeDefinition(id="first", implementation_id="step"),
+                NodeDefinition(id="second", implementation_id="step"),
+            ),
+            edges=(
+                EdgeDefinition(source="first", target="second"),
+                EdgeDefinition(source="second", target="__end__"),
+            ),
+        )
+        return GraphCompiler(registry, _routing()).compile(definition)
+
+    def test_steps_use_node_ids_when_a_component_is_used_twice(self, trace):
+        self._graph(lambda state: {}).invoke(TASK)
+        assert [step["node"] for step in trace.steps] == ["first", "second"]
+
+    def test_recovery_notes_name_the_node_that_failed(self):
+        def boom(state):
+            raise ValueError("no luck")
+
+        result = self._graph(boom, recover=True).invoke(TASK)
+        assert result["research_notes"] == ["first: no luck", "second: no luck"]
