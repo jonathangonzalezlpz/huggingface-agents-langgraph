@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { IDLE_BATTERY } from '../../domain/battery';
 import { StudioError } from '../../domain/errors';
 import type { Point } from '../../domain/editor/model';
 import type { StudioServices } from '../../ports';
@@ -63,6 +64,12 @@ export function createMemoryServices(): StudioServices {
       run: () => Promise.reject(new StudioError('unavailable', 'Running needs the backend')),
       get: (id) => Promise.reject(new StudioError('http', `Run ${id} not found`, 404)),
     },
+    batteries: {
+      start: () => Promise.reject(new StudioError('unavailable', 'Batteries need the backend')),
+      current: () => Promise.resolve(IDLE_BATTERY),
+      stop: () => Promise.resolve(IDLE_BATTERY),
+    },
+    experiments: { list: () => Promise.resolve([]) },
     models: { list: () => Promise.resolve([]) },
     questions: {
       list: () => Promise.reject(new StudioError('unavailable', 'Questions need the backend')),

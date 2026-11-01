@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { defaultSettings } from '../domain/experiment';
 import type { RunRequest } from '../domain/run';
 import { createHttpServices, type FetchLike } from './http/httpServices';
 import { createMemoryServices } from './memory/memoryServices';
@@ -16,7 +17,7 @@ const request: RunRequest = {
   question: 'What is 2+2?',
   taskId: 'studio-1',
   fileName: '',
-  model: null,
+  settings: defaultSettings(),
 };
 
 const record = {
@@ -105,7 +106,7 @@ describe('running an architecture', () => {
     await createHttpServices(fetchImpl).runs.run({
       ...request,
       fileName: 'data.xlsx',
-      model: { provider: 'ollama', modelId: 'qwen2' },
+      settings: { ...defaultSettings(), model: { provider: 'ollama', modelId: 'qwen2' } },
     });
     expect(sent[0]?.body).toMatchObject({
       file_name: 'data.xlsx',

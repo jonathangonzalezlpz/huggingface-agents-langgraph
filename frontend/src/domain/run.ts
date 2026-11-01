@@ -43,6 +43,8 @@ export interface GaiaQuestion {
   level: string;
 }
 
+import type { ExperimentSettings } from './experiment';
+
 export interface RunRequest {
   /** A saved version (or the built-in pipeline). */
   architectureId: string;
@@ -50,6 +52,5 @@ export interface RunRequest {
   taskId: string;
   /** Empty when the question has no attachment. */
   fileName: string;
-  /** Null to use the server's default model. */
-  model: ModelOption | null;
+  settings: ExperimentSettings;
 }

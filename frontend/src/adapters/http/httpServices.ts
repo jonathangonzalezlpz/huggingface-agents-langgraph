@@ -1,11 +1,14 @@
 import type { z } from 'zod';
 
+import { toWireExperiment } from '../../domain/experiment';
 import { StudioError } from '../../domain/errors';
 import type { SystemStatus } from '../../domain/types';
 import type { StudioServices } from '../../ports';
 import { createLocalStorageDrafts } from '../drafts/localStorageDrafts';
 import {
   architectureListSchema,
+  batterySchema,
+  experimentListSchema,
   architectureSchema,
   catalogSchema,
   definitionToWire,
@@ -16,7 +19,9 @@ import {
   savedRecordSchema,
   statusSchema,
   toArchitecture,
+  toBatteryStatus,
   toCatalog,
+  toExperimentSummaries,
   toModels,
   toQuestions,
   toRunRecord,
@@ -61,20 +66,6 @@ async function requestJson<S extends z.ZodType>(
   }
   return parsed.data;
 }
-
-/** The settings every Studio run uses: the V3.1 pipeline with all its improvements. */
-const RUN_PRESET = {
-  name: 'Studio',
-  pipeline_version: '3.1',
-  improvements: [
-    'reasoning_control',
-    'answer_contract',
-    'web_sources',
-    'spreadsheet_tools',
-    'multimedia_tools',
-    'calculation_tools',
-  ],
-} as const;
 
 const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
 
@@ -162,13 +153,7 @@ export function createHttpServices(
           task_id: request.taskId,
           question: request.question,
           file_name: request.fileName,
-          experiment: {
-            ...RUN_PRESET,
-            architecture: request.architectureId,
-            ...(request.model
-              ? { model: { provider: request.model.provider, model_id: request.model.modelId } }
-              : {}),
-          },
+          experiment: toWireExperiment(request.settings, request.architectureId),
         };
         let response: Response;
         try {
@@ -206,6 +191,36 @@ export function createHttpServices(
       get: async (id) =>
         toRunRecord(
           await requestJson(fetchImpl, `/api/runs/${encodeURIComponent(id)}`, runRecordSchema),
+        ),
+    },
+    batteries: {
+      start: async (request) =>
+        toBatteryStatus(
+          await requestJson(fetchImpl, '/api/batteries', batterySchema, {
+            method: 'POST',
+            body:
+              request.kind === 'resume'
+                ? { resume_id: request.experimentId }
+                : {
+                    experiment: toWireExperiment(request.settings, request.architectureId),
+                    limit: request.limit,
+                  },
+          }),
+        ),
+      current: async () =>
+        toBatteryStatus(await requestJson(fetchImpl, '/api/batteries/current', batterySchema)),
+      stop: async () =>
+        toBatteryStatus(
+          await requestJson(fetchImpl, '/api/batteries/stop', batterySchema, {
+            method: 'POST',
+            body: {},
+          }),
+        ),
+    },
+    experiments: {
+      list: async () =>
+        toExperimentSummaries(
+          await requestJson(fetchImpl, '/api/experiments', experimentListSchema),
         ),
     },
     models: {

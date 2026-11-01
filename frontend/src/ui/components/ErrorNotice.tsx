@@ -3,7 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { StudioError } from '../../domain/errors';
 import { useI18n } from '../../i18n/I18nProvider';
 
-export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const { t } = useI18n();
   let message = t('error.contract');
   if (error instanceof StudioError) {
@@ -21,13 +21,15 @@ export function ErrorNotice({ error, onRetry }: { error: unknown; onRetry: () =>
           <p className="font-semibold">{t('error.title')}</p>
           <p className="text-sm">{message}</p>
         </div>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="min-h-8 rounded-lg border border-current px-3 text-sm font-medium hover:bg-surface/40"
-        >
-          {t('common.retry')}
-        </button>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="min-h-8 rounded-lg border border-current px-3 text-sm font-medium hover:bg-surface/40"
+          >
+            {t('common.retry')}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -4,7 +4,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { loadLibrary } from '../../application/loadLibrary';
 import type { Architecture } from '../../domain/types';
-import type { GaiaQuestion, ModelOption } from '../../domain/run';
+import { defaultSettings, settingsIssues } from '../../domain/experiment';
+import type { GaiaQuestion } from '../../domain/run';
 import { useI18n } from '../../i18n/I18nProvider';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { PageHeader } from '../components/PageHeader';
@@ -13,10 +14,10 @@ import { useServices } from '../services';
 import { useSystemStatus } from '../shell/SystemStatusProvider';
 import { GaiaPicker } from './GaiaPicker';
 import { RunResult } from './RunResult';
+import { SettingsPanel } from './SettingsPanel';
 import { useRunner } from './useRunner';
 
 const FIELD = 'min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm';
-const DEFAULT_MODEL = '__default__';
 
 function versionLabel(t: ReturnType<typeof useI18n>['t'], architecture: Architecture): string {
   const name = architecture.architectureId;
@@ -25,10 +26,6 @@ function versionLabel(t: ReturnType<typeof useI18n>['t'], architecture: Architec
   return architecture.validation.isValid
     ? t('runs.architecture.version', { name, version })
     : t('runs.architecture.invalid', { name, version });
-}
-
-function modelKey(option: ModelOption): string {
-  return `${option.provider}:${option.modelId}`;
 }
 
 export function RunsPage() {
@@ -45,7 +42,7 @@ export function RunsPage() {
   const [question, setQuestion] = useState('');
   const [gaia, setGaia] = useState<GaiaQuestion | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [modelChoice, setModelChoice] = useState(DEFAULT_MODEL);
+  const [settings, setSettings] = useState(defaultSettings);
 
   const live = mode === 'live';
   const available = useMemo(() => (library.status === 'success' ? library.data : []), [library]);
@@ -54,7 +51,13 @@ export function RunsPage() {
   const options = modelList.status === 'success' ? modelList.data : [];
   const examples = [t('runs.example.1'), t('runs.example.2'), t('runs.example.3')];
   const running = runner.state.status === 'running';
-  const canRun = live && selected !== null && !blocked && question.trim() !== '' && !running;
+  const canRun =
+    live &&
+    selected !== null &&
+    !blocked &&
+    question.trim() !== '' &&
+    !running &&
+    settingsIssues(settings).length === 0;
 
   const grouped = useMemo(
     () => [...available].sort((a, b) => a.architectureId.localeCompare(b.architectureId)),
@@ -63,13 +66,12 @@ export function RunsPage() {
 
   const run = () => {
     if (!selected) return;
-    const model = options.find((option) => modelKey(option) === modelChoice) ?? null;
     void runner.start({
       architectureId: selected.id,
       question: question.trim(),
       taskId: gaia?.taskId ?? `studio-${crypto.randomUUID()}`,
       fileName: gaia?.fileName ?? '',
-      model,
+      settings,
     });
   };
 
@@ -128,24 +130,12 @@ export function RunsPage() {
           )}
         </div>
 
-        <div>
-          <label htmlFor="run-model" className="mb-1 block text-sm font-medium">
-            {t('runs.model')}
-          </label>
-          <select
-            id="run-model"
-            className={FIELD}
-            value={modelChoice}
-            onChange={(event) => setModelChoice(event.target.value)}
-          >
-            <option value={DEFAULT_MODEL}>{t('runs.model.default')}</option>
-            {options.map((option) => (
-              <option key={modelKey(option)} value={modelKey(option)}>
-                {option.modelId}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SettingsPanel
+          settings={settings}
+          models={options}
+          disabled={running}
+          onChange={setSettings}
+        />
 
         <div>
           <label htmlFor="run-question" className="mb-1 block text-sm font-medium">

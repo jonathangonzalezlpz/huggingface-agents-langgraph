@@ -1,4 +1,5 @@
 /** Outbound ports: what the Studio needs from the outside world. */
+import type { BatteryRequest, BatteryStatus, ExperimentSummary } from '../domain/battery';
 import type { EditorDocument, Point } from '../domain/editor/model';
 import type { GaiaQuestion, ModelOption, RunRecord, RunRequest } from '../domain/run';
 import type {
@@ -77,6 +78,18 @@ export interface RunPort {
   get(id: string): Promise<RunRecord>;
 }
 
+export interface BatteryPort {
+  /** Start a battery or resume an experiment. Rejects with status 409 if one is running. */
+  start(request: BatteryRequest): Promise<BatteryStatus>;
+  current(): Promise<BatteryStatus>;
+  /** Finish after the question in progress; the server cannot interrupt a question. */
+  stop(): Promise<BatteryStatus>;
+}
+
+export interface ExperimentPort {
+  list(): Promise<ExperimentSummary[]>;
+}
+
 export interface ModelPort {
   list(): Promise<ModelOption[]>;
 }
@@ -99,4 +112,6 @@ export interface StudioServices {
   runs: RunPort;
   models: ModelPort;
   questions: QuestionPort;
+  batteries: BatteryPort;
+  experiments: ExperimentPort;
 }

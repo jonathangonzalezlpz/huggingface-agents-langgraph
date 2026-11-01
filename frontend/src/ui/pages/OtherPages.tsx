@@ -1,32 +1,11 @@
 import { Link } from 'react-router-dom';
 
-import type { MessageKey } from '../../i18n';
 import { useI18n } from '../../i18n/I18nProvider';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { modelLabel } from '../shell/StatusPanel';
 import { useServices } from '../services';
 import { useSystemStatus } from '../shell/SystemStatusProvider';
-
-function Placeholder({ title, description }: { title: MessageKey; description: MessageKey }) {
-  const { t } = useI18n();
-  return (
-    <>
-      <PageHeader title={t(title)} description={t(description)} />
-      <section className="rounded-xl border border-dashed border-line-strong p-6">
-        <h2 className="font-semibold">{t('placeholder.title')}</h2>
-        <p className="mt-1 max-w-prose text-fg-muted">{t('placeholder.body')}</p>
-        <a href="/" className="mt-4 inline-block text-accent-fg underline underline-offset-2">
-          {t('common.legacy')}
-        </a>
-      </section>
-    </>
-  );
-}
-
-export const ExperimentsPage = () => (
-  <Placeholder title="experiments.title" description="experiments.description" />
-);
 
 export function SystemPage() {
   const { t } = useI18n();

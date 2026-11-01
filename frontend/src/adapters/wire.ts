@@ -5,6 +5,8 @@
 import { z } from 'zod';
 
 import { isCategory } from '../domain/categories';
+import type { BatteryStatus, ExperimentSummary } from '../domain/battery';
+import { PIPELINE_VERSIONS, type PipelineVersion } from '../domain/experiment';
 import type { GaiaQuestion, ModelOption, RunRecord } from '../domain/run';
 import type {
   AgentDefinition,
@@ -336,4 +338,79 @@ export function toQuestions(wire: z.output<typeof questionsSchema>): GaiaQuestio
     fileName: item.file_name ?? '',
     level: String(item.Level ?? ''),
   }));
+}
+
+const BATTERY_STATES = ['idle', 'running', 'stopping', 'completed', 'cancelled', 'failed'] as const;
+
+export const batterySchema = z.object({
+  state: z.string(),
+  experiment_id: z.string().nullish(),
+  name: z.string().nullish(),
+  completed: z.number().default(0),
+  total: z.number().default(0),
+  error: z.string().nullish(),
+  started_at: z.string().nullish(),
+});
+
+export function toBatteryStatus(wire: z.output<typeof batterySchema>): BatteryStatus {
+  const state = BATTERY_STATES.find((candidate) => candidate === wire.state);
+  return {
+    state: state ?? 'failed',
+    experimentId: wire.experiment_id ?? null,
+    name: wire.name ?? null,
+    completed: wire.completed,
+    total: wire.total,
+    error: state ? (wire.error ?? null) : `Unknown battery state: ${wire.state}`,
+    startedAt: wire.started_at ?? null,
+  };
+}
+
+/** Only the fields the lists use: the answers themselves are not needed here. */
+export const experimentListSchema = z.object({
+  experiments: z.array(
+    z.object({
+      id: z.string(),
+      status: z.string().nullish(),
+      created_at: z.string().nullish(),
+      total_questions: z.number().nullish(),
+      average_duration_seconds: z.number().nullish(),
+      answers: z.array(z.unknown()).default([]),
+      config: z
+        .object({
+          name: z.string().nullish(),
+          pipeline_version: z.string().nullish(),
+          architecture: z.string().nullish(),
+        })
+        .nullish(),
+      local_score: z.object({ correct_count: z.number(), total_attempted: z.number() }).nullish(),
+    }),
+  ),
+});
+
+const isPipelineVersion = (value: string): value is PipelineVersion =>
+  (PIPELINE_VERSIONS as readonly string[]).includes(value);
+
+export function toExperimentSummaries(
+  wire: z.output<typeof experimentListSchema>,
+): ExperimentSummary[] {
+  return wire.experiments.map((record) => {
+    const version = record.config?.pipeline_version ?? '';
+    return {
+      id: record.id,
+      status: record.status ?? 'completed',
+      name: record.config?.name ?? record.id,
+      pipelineVersion: isPipelineVersion(version) ? version : null,
+      architecture: record.config?.architecture ?? null,
+      completed: record.answers.length,
+      total: record.total_questions ?? record.answers.length,
+      createdAt: record.created_at ?? null,
+      averageSeconds: record.average_duration_seconds ?? null,
+      score: record.local_score
+        ? {
+            correct: record.local_score.correct_count,
+            attempted: record.local_score.total_attempted,
+          }
+        : null,
+    };
+  });
 }

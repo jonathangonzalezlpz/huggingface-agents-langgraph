@@ -92,6 +92,9 @@ proyecto solo se ha probado en Windows.
   grafo (`ui/run/overlay.ts`), página con puertos simulados (bloqueo de versiones inválidas,
   ejecución, fallo en el nodo, dejar de esperar, preguntas de GAIA, demostración) y el botón
   del editor. El camino de éxito con un modelo real no se ha comprobado.
+- **Experimentos:** dominio de ajustes y baterías, adaptadores (`/api/batteries`, lista de
+  experimentos), la página con un servidor simulado y con estado (progreso, detener, 409,
+  reanudar) y el panel de ajustes. El progreso es por sondeo; el servidor ejecuta la batería.
 - **i18n:** mismas claves y marcadores en ambos idiomas, plurales y detección.
 - **Tokens:** todos los pares de color cumplen WCAG (4,5:1 texto, 3:1 componentes) en ambos
   temas. Se comprueba contra `tokens.css`, que es la única fuente de los colores.

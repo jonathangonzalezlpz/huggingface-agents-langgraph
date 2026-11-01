@@ -171,7 +171,7 @@ describe('running', () => {
       architectureId: 'alpha-v2',
       question: '17 x 23',
       fileName: '',
-      model: { provider: 'ollama', modelId: 'llama3' },
+      settings: { pipelineVersion: '3.1', model: { provider: 'ollama', modelId: 'llama3' } },
     });
     expect(request?.taskId).toMatch(/^studio-/);
     const timeline = within(await screen.findByRole('region', { name: 'Pasos' }));
