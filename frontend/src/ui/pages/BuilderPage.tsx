@@ -1,29 +1,19 @@
-import { BrainCircuit, Download, Flag, LogIn, Search, ShieldCheck, Shapes } from 'lucide-react';
-import { useCallback } from 'react';
-import type { ComponentType } from 'react';
+import { Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { loadLibrary } from '../../application/loadLibrary';
 import { groupComponents, shortHash } from '../../domain/catalog';
-import type { Architecture, Category, ComponentInfo } from '../../domain/types';
-import { isMessageKey } from '../../i18n';
+import type { Architecture } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
+import { CATEGORY_STYLE } from '../components/categoryStyle';
+import { useComponentDescription } from '../components/componentText';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { buildDraft, saveNewDraft, type DraftKind } from '../editor/drafts';
 import { useServices } from '../services';
-
-const CATEGORY_STYLE: Record<
-  Category,
-  { Icon: ComponentType<{ className?: string }>; text: string }
-> = {
-  input: { Icon: LogIn, text: 'text-cat-input' },
-  acquisition: { Icon: Download, text: 'text-cat-acquisition' },
-  research: { Icon: Search, text: 'text-cat-research' },
-  reasoning: { Icon: BrainCircuit, text: 'text-cat-reasoning' },
-  output: { Icon: Flag, text: 'text-cat-output' },
-  other: { Icon: Shapes, text: 'text-cat-other' },
-};
 
 function ArchitectureCard({ architecture }: { architecture: Architecture }) {
   const { t, tp } = useI18n();
@@ -52,13 +42,22 @@ function ArchitectureCard({ architecture }: { architecture: Architecture }) {
           </StatusBadge>
         </div>
       </div>
-      <p className="mt-3 text-sm text-fg-muted">
-        {tp('diagnostics.errors', validation.counts.error)}
-        {' · '}
-        {tp('diagnostics.warnings', validation.counts.warning)}
-        {' · '}
-        {tp('diagnostics.infos', validation.counts.info)}
-      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-fg-muted">
+          {tp('diagnostics.errors', validation.counts.error)}
+          {' · '}
+          {tp('diagnostics.warnings', validation.counts.warning)}
+          {' · '}
+          {tp('diagnostics.infos', validation.counts.info)}
+        </p>
+        <Link
+          to={`/builder/architecture/${encodeURIComponent(architecture.id)}`}
+          aria-label={`${t('builder.open')} ${architecture.architectureId}`}
+          className="inline-flex min-h-9 items-center rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium hover:bg-muted"
+        >
+          {t('builder.open')}
+        </Link>
+      </div>
     </li>
   );
 }
@@ -90,14 +89,119 @@ function Library() {
   );
 }
 
+const NEW_DRAFT_KINDS: {
+  kind: DraftKind;
+  label: 'builder.new.blank' | 'builder.new.linear' | 'builder.new.copy';
+}[] = [
+  { kind: 'blank', label: 'builder.new.blank' },
+  { kind: 'linear', label: 'builder.new.linear' },
+  { kind: 'copy', label: 'builder.new.copy' },
+];
+
+function Drafts() {
+  const services = useServices();
+  const { t, tp } = useI18n();
+  const navigate = useNavigate();
+  const [revision, setRevision] = useState(0);
+  const [failure, setFailure] = useState<unknown>(null);
+  // `revision` only exists to re-read the drafts after one is deleted.
+  const drafts = revision >= 0 ? services.drafts.list() : [];
+
+  const create = async (kind: DraftKind) => {
+    try {
+      const [catalog, library] = await Promise.all([
+        services.catalog.getCatalog(),
+        services.architectures.list(),
+      ]);
+      const builtin = library.find((item) => item.readOnly);
+      const source =
+        kind === 'copy' && builtin ? await services.architectures.get(builtin.id) : undefined;
+      const taken = services.drafts.list().map((draft) => draft.architectureId);
+      const doc = buildDraft(kind, catalog, taken, source);
+      navigate(`/builder/draft/${saveNewDraft(services, doc)}`);
+    } catch (error) {
+      setFailure(error);
+    }
+  };
+
+  return (
+    <section aria-labelledby="drafts-heading" className="mb-12">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h2 id="drafts-heading" className="text-lg font-semibold">
+          {t('builder.drafts')}
+        </h2>
+        <div
+          role="group"
+          aria-label={t('builder.new')}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <span className="inline-flex items-center gap-1 text-sm font-medium">
+            <Plus aria-hidden="true" className="size-4" />
+            {t('builder.new')}
+          </span>
+          {NEW_DRAFT_KINDS.map(({ kind, label }) => (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => void create(kind)}
+              className="min-h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium hover:bg-muted"
+            >
+              {t(label)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="mb-4 text-sm text-fg-muted">{t('builder.drafts.hint')}</p>
+      {failure !== null && <ErrorNotice error={failure} onRetry={() => setFailure(null)} />}
+      {drafts.length === 0 ? (
+        <p className="text-fg-muted">{t('builder.drafts.empty')}</p>
+      ) : (
+        <ul className="space-y-3">
+          {drafts.map((draft) => (
+            <li
+              key={draft.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4"
+            >
+              <div>
+                <p className="font-mono text-base font-semibold">{draft.architectureId}</p>
+                <p className="text-sm text-fg-muted">
+                  {tp('builder.drafts.nodes', draft.nodeCount)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Link
+                  to={`/builder/draft/${encodeURIComponent(draft.id)}`}
+                  aria-label={`${t('builder.open')} ${draft.architectureId}`}
+                  className="inline-flex min-h-9 items-center rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium hover:bg-muted"
+                >
+                  {t('builder.open')}
+                </Link>
+                <button
+                  type="button"
+                  aria-label={`${t('builder.drafts.delete')} ${draft.architectureId}`}
+                  title={t('builder.drafts.delete')}
+                  onClick={() => {
+                    services.drafts.remove(draft.id);
+                    setRevision((current) => current + 1);
+                  }}
+                  className="inline-flex size-9 items-center justify-center rounded-lg border border-line-strong text-error hover:bg-error-soft"
+                >
+                  <Trash2 aria-hidden="true" className="size-4" />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function CatalogOverview() {
   const { catalog } = useServices();
   const { t } = useI18n();
   const load = useCallback(() => catalog.getCatalog(), [catalog]);
-  const describeComponent = (component: ComponentInfo) => {
-    const key = `component.${component.implementationId}`;
-    return isMessageKey(key) ? t(key) : component.description;
-  };
+  const describeComponent = useComponentDescription();
   const state = useAsyncData(load);
 
   return (
@@ -158,10 +262,8 @@ export function BuilderPage() {
     <>
       <PageHeader title={t('builder.title')} description={t('builder.description')} />
       <Library />
+      <Drafts />
       <CatalogOverview />
-      <p className="mt-10 rounded-xl border border-dashed border-line-strong p-4 text-sm text-fg-muted">
-        {t('builder.coming')}
-      </p>
     </>
   );
 }

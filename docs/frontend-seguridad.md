@@ -13,8 +13,9 @@ la aplicación.
 | Sin scripts de instalación | `ignore-scripts=true` | Una dependencia comprometida no ejecuta código al instalarse. Solo `fsevents` (módulo nativo opcional de macOS) tenía uno. |
 | Versiones exactas | `save-exact=true` y 28 dependencias directas fijadas | Una instalación sin lockfile no recoge una versión nueva y maliciosa. |
 | Instalación reproducible | `npm ci` (nunca `npm install` para instalar) | Usa el lockfile y comprueba el hash `sha512` de cada paquete. |
+| Antigüedad mínima | `npm run check:age` (14 días) | Ninguna versión publicada hace menos de 14 días, tampoco las transitivas. |
 | Auditoría | `npm audit --audit-level=high` y `npm audit signatures` | Avisos conocidos y firmas del registro. |
-| Dependencias mínimas | 6 de ejecución | Menos superficie: el i18n es propio y mínimo en lugar de una librería. |
+| Dependencias mínimas | 9 de ejecución | Menos superficie: el i18n es propio y mínimo en lugar de una librería. |
 | Servidor de desarrollo local | `host: 127.0.0.1` | No se expone a la red. |
 
 ## Incidentes revisados (noviembre de 2026)
@@ -36,6 +37,30 @@ Comprobaciones realizadas: ninguna versión afectada en el lockfile, 434 entrada
 y desde `registry.npmjs.org`, 388 paquetes instalados con firma de registro verificada
 (`npm audit signatures`) y sin artefactos de persistencia de la campaña en el repositorio.
 Estas comprobaciones no detectan un compromiso publicado hace pocas horas.
+
+## Regla de antigüedad (14 días)
+
+Los ataques de 2026 se detectaron en horas o días, así que una versión recién publicada es la
+ventana de riesgo. `scripts/check-dependency-age.mjs` revisa el lockfile contra el registro y
+falla si alguna versión es más joven que el mínimo.
+
+Al adoptarla se vio que el árbol ya instalado **no la cumplía**: 59 versiones tenían menos de
+14 días, porque se instaló «la última» el mismo día. Se resolvió de nuevo desde cero con
+`npm install --before=<hoy menos 14 días>` (`npm` conserva las versiones ya fijadas en el
+lockfile, por eso hubo que partir sin él) y se fijaron las versiones exactas. Revisión de
+las dependencias añadidas para el editor:
+
+| Paquete | Veredicto |
+|---|---|
+| `@xyflow/react` 12.12.0 | MIT; 3 dependencias (`@xyflow/system` exacta, `zustand` 4.x, `classcat`). |
+| `@dagrejs/dagre` 3.1.1 | MIT; fija `graphlib` 4.0.5. Las 3.1.2 y 3.1.3 eran de hacía 8 días y no se adoptaron. |
+| `@radix-ui/react-dialog` 1.3.1 | MIT. |
+| `elkjs` | **Descartado**: licencia EPL/GPL, 8 MB y versiones recién publicadas. |
+
+Resultado: 468 versiones con más de 14 días, 425 paquetes con firma de registro verificada,
+sin entradas fuera de `registry.npmjs.org` y solo `fsevents` con script de instalación
+(ignorado). Para actualizar una dependencia: `npm install --before=<fecha> --save-exact`
+y repetir estas comprobaciones.
 
 ## Riesgo aceptado
 

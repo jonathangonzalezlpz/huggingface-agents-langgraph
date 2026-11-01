@@ -4,23 +4,24 @@ import { cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
 /** jsdom has no matchMedia; tests that care about it install their own stub. */
-export function stubMatchMedia(prefersDark = false) {
+export function stubMatchMedia(prefersDark = false, reducedMotion = false) {
   const listeners = new Set<(event: { matches: boolean }) => void>();
-  const state = { matches: prefersDark };
-  const mediaQuery = {
+  const state = { dark: prefersDark };
+  vi.stubGlobal('matchMedia', (query: string) => ({
     get matches() {
-      return state.matches;
+      if (query.includes('prefers-reduced-motion')) return reducedMotion;
+      if (query.includes('prefers-color-scheme')) return state.dark;
+      return false;
     },
-    media: '(prefers-color-scheme: dark)',
+    media: query,
     addEventListener: (_type: string, listener: (event: { matches: boolean }) => void) =>
       listeners.add(listener),
     removeEventListener: (_type: string, listener: (event: { matches: boolean }) => void) =>
       listeners.delete(listener),
-  };
-  vi.stubGlobal('matchMedia', () => mediaQuery);
+  }));
   return {
     setDark(next: boolean) {
-      state.matches = next;
+      state.dark = next;
       listeners.forEach((listener) => listener({ matches: next }));
     },
   };

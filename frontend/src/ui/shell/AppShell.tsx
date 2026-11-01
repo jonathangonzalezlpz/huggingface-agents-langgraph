@@ -1,6 +1,6 @@
 import { FlaskConical, Play, Settings2, Workflow } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { useI18n } from '../../i18n/I18nProvider';
 import type { MessageKey } from '../../i18n';
@@ -77,6 +77,7 @@ function Sidebar() {
 export function AppShell() {
   const { t } = useI18n();
   const { mode } = useServices();
+  const fullBleed = useLocation().pathname.startsWith('/builder/');
   return (
     <SystemStatusProvider>
       <a
@@ -96,7 +97,11 @@ export function AppShell() {
               {t('demo.banner')}
             </p>
           )}
-          <main id="main" tabIndex={-1} className="mx-auto max-w-5xl p-6 md:p-10">
+          <main
+            id="main"
+            tabIndex={-1}
+            className={fullBleed ? '' : 'mx-auto max-w-5xl p-6 md:p-10'}
+          >
             <Outlet />
           </main>
         </div>

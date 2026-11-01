@@ -13,14 +13,18 @@ El diseño de experiencia está en [DISENO_UX_V4.md](DISENO_UX_V4.md) y las fase
 ```
 frontend/src/
 ├── domain/        Modelo (Architecture, Catalog, Diagnostic…) y reglas puras. Sin React ni red.
+│   └── editor/    Grafo editable, comandos, historial, conversión y plantillas.
 ├── application/   Casos de uso que reciben puertos (hoy: loadLibrary).
-├── ports/         Interfaces de salida: CatalogPort, ArchitecturePort, SystemPort.
+├── ports/         Interfaces de salida: Catalog, Architecture, System, Validation,
+│                  Layout y Draft.
 ├── adapters/
 │   ├── wire.ts    Contrato JSON del backend (zod) y traducción al dominio. Único sitio que
 │   │              conoce el snake_case del backend.
 │   ├── http/      Adaptador contra el backend Python.
+│   ├── drafts/    Borradores en localStorage (validados al leer; lo corrupto se descarta).
 │   └── memory/    Adaptador con datos de ejemplo (demo y tests). demo-data.json se genera.
 ├── ui/            Componentes React: shell, páginas y piezas reutilizables.
+│   └── editor/    Lienzo (React Flow), paleta, inspector, diálogos y espacio de trabajo.
 ├── app/           Raíz de composición: elige adaptadores y monta rutas y proveedores.
 ├── i18n/          Catálogos es/en tipados y proveedor de idioma.
 ├── theme/         Proveedor de tema (sistema, claro, oscuro).
@@ -33,7 +37,26 @@ reales (HTTP y memoria), que es lo que permite probar sin backend y publicar una
 Space. La capa `application` crece con cada caso de uso (edición del grafo en M3.1) en lugar
 de definirse por adelantado.
 
-## Comandos
+## El editor
+
+El estado del grafo en edición es **código de dominio puro**, no estado de React Flow. La
+biblioteca solo dibuja una proyección (`ui/editor/projection.ts`) y emite eventos que se
+traducen en comandos; así las reglas de prevención de errores se prueban sin navegador.
+
+- **Modelo.** Cada nodo tiene una `salida`: ninguna, directa o una decisión (estrategia y una
+  rama por etiqueta, conectada o pendiente). Las reglas del backend que no se pueden
+  representar quedan fuera por construcción.
+- **Comandos.** Funciones `(documento, ...) → aceptado | rechazado con motivo`. Un comando que
+  no cambia nada devuelve el mismo documento y el historial no registra nada.
+- **Historial.** Pila de estados inmutables; arrastrar varios nodos es un único paso.
+- **Disposición.** Las posiciones viajan aparte de la estructura (`EditorDocument.layout`) y no
+  alteran la identidad de la versión. En versiones guardadas solo se persiste la disposición.
+- **Conversión.** `fromDefinition`/`toDefinition`; lo que el editor no puede representar se
+  informa, nunca se oculta. Las ramas sin conectar no se exportan, de modo que el validador
+  las señala.
+- **Borradores.** Locales al navegador (`DraftPort`); guardar versiones es M3.2.
+- **Carga bajo demanda.** El editor está en un fragmento aparte para no penalizar el resto.
+
 
 ```powershell
 cd frontend
@@ -55,6 +78,10 @@ proyecto solo se ha probado en Windows.
 - **Adaptadores:** contrato con el backend, errores de red, HTTP y de forma de los datos.
 - **Aplicación completa** (Testing Library con el adaptador en memoria): navegación,
   idioma, tema, estados de carga y error, y accesibilidad con axe en ambos idiomas.
+- **Editor:** comandos, historial, conversión y una prueba aleatoria de invariantes en el
+  dominio; proyección, autodisposición y búsqueda; y el espacio de trabajo completo con React
+  Flow en jsdom (`src/test/reactFlow.ts` simula `ResizeObserver` y la geometría). jsdom no
+  puede probar el arrastre ni el aspecto: eso se comprobó en un Edge real.
 - **i18n:** mismas claves y marcadores en ambos idiomas, plurales y detección.
 - **Tokens:** todos los pares de color cumplen WCAG (4,5:1 texto, 3:1 componentes) en ambos
   temas. Se comprueba contra `tokens.css`, que es la única fuente de los colores.
