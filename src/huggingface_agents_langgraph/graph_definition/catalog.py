@@ -30,6 +30,7 @@ def build_catalog(
                 "description": registration.description,
                 "category": registration.metadata.get("category", UNCATEGORIZED),
                 "recover_errors": registration.recover_errors,
+                "params": [spec.to_dict() for spec in registration.params],
                 "contract": {
                     "required_inputs": sorted(contract.required_inputs),
                     "optional_inputs": sorted(contract.optional_inputs),

@@ -9,6 +9,7 @@ from huggingface_agents_langgraph.graph_definition.diagnostics import (
     Diagnostic,
     ValidationReport,
 )
+from huggingface_agents_langgraph.graph_definition.params import ParamError, ParamSpec
 from huggingface_agents_langgraph.graph_definition.registry import (
     NodeRegistration,
     NodeRegistry,
@@ -35,6 +36,8 @@ __all__ = [
     "NodeDefinition",
     "NodeRegistration",
     "NodeRegistry",
+    "ParamError",
+    "ParamSpec",
     "RoutingRegistry",
     "RoutingStrategy",
     "ValidationReport",

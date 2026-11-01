@@ -13,6 +13,7 @@
         "description": "Formats concise final answer adhering to GAIA conventions.",
         "category": "output",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "draft_answer",
@@ -31,6 +32,7 @@
         "description": "Resolves and verifies physical existence of attachment.",
         "category": "input",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "file_name"
@@ -49,6 +51,7 @@
         "description": "Static inspection or sandboxed execution of Python code.",
         "category": "acquisition",
         "recover_errors": true,
+        "params": [],
         "contract": {
           "required_inputs": [
             "file_path",
@@ -67,6 +70,7 @@
         "description": "PDF text extraction with relevance filtering.",
         "category": "acquisition",
         "recover_errors": true,
+        "params": [],
         "contract": {
           "required_inputs": [
             "file_path",
@@ -85,6 +89,7 @@
         "description": "Audio transcription, sound classification, and VLM inspection.",
         "category": "acquisition",
         "recover_errors": true,
+        "params": [],
         "contract": {
           "required_inputs": [
             "file_path",
@@ -103,6 +108,7 @@
         "description": "Normalizes whitespace and prepares question string.",
         "category": "input",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "question"
@@ -119,6 +125,7 @@
         "description": "Synthesizes evidence to produce a reasoning draft answer.",
         "category": "reasoning",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "question"
@@ -140,6 +147,7 @@
         "description": "Dispatches and executes the action chosen by the review node.",
         "category": "research",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "question",
@@ -166,6 +174,7 @@
         "description": "Iterative review loop deciding the next research action.",
         "category": "research",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "question"
@@ -189,6 +198,7 @@
         "description": "Deterministic extension-based router with LLM fallback.",
         "category": "input",
         "recover_errors": false,
+        "params": [],
         "contract": {
           "required_inputs": [
             "file_name",
@@ -208,6 +218,7 @@
         "description": "Tabular data extraction and structured analysis.",
         "category": "acquisition",
         "recover_errors": true,
+        "params": [],
         "contract": {
           "required_inputs": [
             "file_path",
@@ -226,6 +237,7 @@
         "description": "Search engine and encyclopedia retrieval.",
         "category": "acquisition",
         "recover_errors": true,
+        "params": [],
         "contract": {
           "required_inputs": [
             "question"

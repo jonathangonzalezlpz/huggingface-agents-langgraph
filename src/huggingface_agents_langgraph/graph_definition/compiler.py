@@ -18,6 +18,8 @@ from huggingface_agents_langgraph.graph_definition.schema import (
     SPECIAL_TERMINALS,
     START_TERMINALS,
     AgentDefinition,
+    NodeDefinition,
+    _unfreeze_metadata,
 )
 from huggingface_agents_langgraph.graph_definition.validator import GraphValidator
 from huggingface_agents_langgraph.run_tracking import traced_node
@@ -105,9 +107,7 @@ class GraphCompiler:
 
         graph = StateGraph(self._state_types[definition.state_type])
         for node in definition.nodes:
-            graph.add_node(
-                node.id, self._wrapped_handler(node.id, node.implementation_id)
-            )
+            graph.add_node(node.id, self._wrapped_handler(node))
 
         graph.add_edge(START, definition.initial_node)
         for edge in definition.edges:
@@ -126,9 +126,22 @@ class GraphCompiler:
                 )
         return graph.compile()
 
-    def _wrapped_handler(
-        self, node_id: str, implementation_id: str
-    ) -> Callable[..., Any]:
-        registration = self._nodes.get_registration(implementation_id)
-        handler = traced_node(_named(registration.resolve_handler(), node_id))
+    def resolved_params(self, definition: AgentDefinition) -> dict[str, dict[str, Any]]:
+        """The parameters each configurable node will run with, defaults included.
+
+        Recorded with a run so it stays reproducible even if a default changes later.
+        """
+        resolved: dict[str, dict[str, Any]] = {}
+        for node in definition.nodes:
+            registration = self._nodes.get_registration(node.implementation_id)
+            if registration.params:
+                resolved[node.id] = registration.resolve_params(
+                    _unfreeze_metadata(node.params)
+                )
+        return resolved
+
+    def _wrapped_handler(self, node: NodeDefinition) -> Callable[..., Any]:
+        registration = self._nodes.get_registration(node.implementation_id)
+        configured = registration.build_handler(_unfreeze_metadata(node.params))
+        handler = traced_node(_named(configured, node.id))
         return _recover_errors(handler) if registration.recover_errors else handler

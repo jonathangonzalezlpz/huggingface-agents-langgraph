@@ -34,13 +34,18 @@ def select_graph(experiment: dict) -> tuple[CompiledStateGraph, dict]:
     except ArchitectureNotFoundError as error:
         raise ValueError(f"Unknown architecture '{reference}'") from error
     definition = AgentDefinition.from_dict(record["definition"])
-    graph = GraphCompiler(
+    compiler = GraphCompiler(
         create_gaia_v3_registry(), create_gaia_v31_routing_registry()
-    ).compile(definition)
-    return graph, {
+    )
+    graph = compiler.compile(definition)
+    info = {
         "engine": "compiled",
         "id": record["id"],
         "architecture_id": record["architecture_id"],
         "version": record["version"],
         "content_sha256": record["content_sha256"],
     }
+    params = compiler.resolved_params(definition)
+    if params:
+        info["node_params"] = params
+    return graph, info

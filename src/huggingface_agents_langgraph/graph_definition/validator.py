@@ -25,6 +25,7 @@ from huggingface_agents_langgraph.graph_definition.schema import (
     SPECIAL_TERMINALS,
     START_TERMINALS,
     AgentDefinition,
+    _unfreeze_metadata,
 )
 from huggingface_agents_langgraph.state import AgentState
 
@@ -76,6 +77,7 @@ class GraphValidator:
                 )
             )
         contracts = self._known_contracts(definition, diagnostics)
+        diagnostics.extend(self._param_diagnostics(definition))
         successors = self._check_edges(definition, diagnostics)
 
         reachable = self._reachable(definition.initial_node, successors)
@@ -130,6 +132,25 @@ class GraphValidator:
                     )
                 )
         return contracts
+
+    def _param_diagnostics(self, definition: AgentDefinition) -> list[Diagnostic]:
+        findings: list[Diagnostic] = []
+        for node in definition.nodes:
+            if not self._nodes.has(node.implementation_id):
+                continue
+            registration = self._nodes.get_registration(node.implementation_id)
+            params = _unfreeze_metadata(node.params)
+            for problem in registration.check_params(params):
+                findings.append(
+                    Diagnostic(
+                        problem.code,
+                        "error",
+                        f"Node '{node.id}': {problem}",
+                        node_id=node.id,
+                        details={"param": problem.param},
+                    )
+                )
+        return findings
 
     def _check_edges(
         self, definition: AgentDefinition, diagnostics: list[Diagnostic]

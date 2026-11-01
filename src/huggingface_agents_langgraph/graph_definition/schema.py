@@ -136,6 +136,8 @@ class NodeDefinition:
     implementation_id: str
     description: str = ""
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    # Values for the parameters the component declares; plain JSON, never code.
+    params: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.id or not self.id.strip():
@@ -147,15 +149,23 @@ class NodeDefinition:
                 f"Node '{self.id}' must reference a non-empty implementation_id"
             )
         object.__setattr__(self, "metadata", _freeze_metadata(self.metadata))
+        object.__setattr__(self, "params", _freeze_metadata(self.params))
 
     def to_dict(self) -> dict[str, Any]:
-        """Serialize node definition to a plain dictionary."""
-        return {
+        """Serialize node definition to a plain dictionary.
+
+        ``params`` is written only when present, so definitions saved before
+        parameters existed keep exactly the same content and hash.
+        """
+        data: dict[str, Any] = {
             "id": self.id,
             "implementation_id": self.implementation_id,
             "description": self.description,
             "metadata": _unfreeze_metadata(self.metadata),
         }
+        if self.params:
+            data["params"] = _unfreeze_metadata(self.params)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "NodeDefinition":
@@ -165,6 +175,7 @@ class NodeDefinition:
             implementation_id=data["implementation_id"],
             description=data.get("description", ""),
             metadata=dict(data.get("metadata", {})),
+            params=dict(data.get("params", {})),
         )
 
 
