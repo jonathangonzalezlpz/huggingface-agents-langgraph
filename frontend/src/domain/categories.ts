@@ -5,7 +5,9 @@ export const CATEGORY_ORDER: readonly Category[] = [
   'input',
   'acquisition',
   'research',
+  'planning',
   'reasoning',
+  'verification',
   'output',
   'other',
 ];

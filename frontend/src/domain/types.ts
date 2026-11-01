@@ -24,7 +24,15 @@ export interface ValidationReport {
   availability: Record<string, NodeAvailability>;
 }
 
-export type Category = 'input' | 'acquisition' | 'research' | 'reasoning' | 'output' | 'other';
+export type Category =
+  | 'input'
+  | 'acquisition'
+  | 'research'
+  | 'planning'
+  | 'reasoning'
+  | 'verification'
+  | 'output'
+  | 'other';
 
 export interface NodeContract {
   requiredInputs: string[];

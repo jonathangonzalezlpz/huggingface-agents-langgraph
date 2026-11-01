@@ -4,7 +4,9 @@
       "input",
       "acquisition",
       "research",
+      "planning",
       "reasoning",
+      "verification",
       "output"
     ],
     "nodes": [
@@ -82,6 +84,129 @@
             "evidence",
             "research_notes"
           ]
+        }
+      },
+      {
+        "implementation_id": "llm_planner",
+        "description": "Breaks the question into a short plan the next nodes can follow.",
+        "category": "planning",
+        "recover_errors": false,
+        "params": [
+          {
+            "name": "max_steps",
+            "kind": "integer",
+            "default": 4,
+            "required": false,
+            "minimum": 1,
+            "maximum": 8
+          },
+          {
+            "name": "max_tokens",
+            "kind": "integer",
+            "default": 400,
+            "required": false,
+            "minimum": 64,
+            "maximum": 2048
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "research_notes"
+          ],
+          "guaranteed_outputs": [
+            "plan",
+            "research_notes"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
+        "implementation_id": "llm_reflect",
+        "description": "Revises the draft answer using the verifier's critique.",
+        "category": "verification",
+        "recover_errors": false,
+        "params": [
+          {
+            "name": "max_tokens",
+            "kind": "integer",
+            "default": 1024,
+            "required": false,
+            "minimum": 128,
+            "maximum": 4096
+          },
+          {
+            "name": "thinking",
+            "kind": "boolean",
+            "default": false,
+            "required": false
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "draft_answer",
+            "question",
+            "verdict"
+          ],
+          "optional_inputs": [
+            "evidence",
+            "revision_count"
+          ],
+          "guaranteed_outputs": [
+            "draft_answer",
+            "revision_count"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
+        "implementation_id": "llm_verifier",
+        "description": "Judges the draft answer and decides whether it needs revising.",
+        "category": "verification",
+        "recover_errors": false,
+        "params": [
+          {
+            "name": "max_revisions",
+            "kind": "integer",
+            "default": 1,
+            "required": false,
+            "minimum": 0,
+            "maximum": 5
+          },
+          {
+            "name": "strictness",
+            "kind": "enum",
+            "default": "strict",
+            "required": false,
+            "choices": [
+              "strict",
+              "lenient"
+            ]
+          },
+          {
+            "name": "max_tokens",
+            "kind": "integer",
+            "default": 300,
+            "required": false,
+            "minimum": 64,
+            "maximum": 1024
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "draft_answer",
+            "question"
+          ],
+          "optional_inputs": [
+            "evidence",
+            "revision_count"
+          ],
+          "guaranteed_outputs": [
+            "verdict"
+          ],
+          "optional_outputs": []
         }
       },
       {
@@ -214,6 +339,52 @@
         }
       },
       {
+        "implementation_id": "self_consistency",
+        "description": "Samples several answers in turn and keeps the majority vote.",
+        "category": "reasoning",
+        "recover_errors": false,
+        "params": [
+          {
+            "name": "n",
+            "kind": "integer",
+            "default": 3,
+            "required": false,
+            "minimum": 1,
+            "maximum": 7
+          },
+          {
+            "name": "temperature",
+            "kind": "number",
+            "default": 0.7,
+            "required": false,
+            "minimum": 0.0,
+            "maximum": 1.5
+          },
+          {
+            "name": "max_tokens",
+            "kind": "integer",
+            "default": 600,
+            "required": false,
+            "minimum": 128,
+            "maximum": 4096
+          }
+        ],
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "evidence",
+            "research_notes"
+          ],
+          "guaranteed_outputs": [
+            "candidates",
+            "draft_answer"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
         "implementation_id": "spreadsheet_processing",
         "description": "Tabular data extraction and structured analysis.",
         "category": "acquisition",
@@ -282,6 +453,14 @@
           "spreadsheet",
           "web"
         ]
+      },
+      {
+        "identifier": "route_on_verdict",
+        "description": "Revises the draft while the verifier rejects it and revisions remain.",
+        "outputs": [
+          "accept",
+          "revise"
+        ]
       }
     ],
     "state": {
@@ -291,21 +470,25 @@
       "fields": [
         "action_history",
         "answer_warnings",
+        "candidates",
         "draft_answer",
         "evidence",
         "experiment",
         "file_name",
         "file_path",
+        "plan",
         "question",
         "reasoning_warnings",
         "research_action",
         "research_notes",
         "research_steps",
+        "revision_count",
         "route",
         "run_id",
         "source_links",
         "submitted_answer",
         "task_id",
+        "verdict",
         "video_path"
       ],
       "initial_fields": [

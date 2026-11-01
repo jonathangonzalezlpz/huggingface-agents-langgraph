@@ -1,4 +1,13 @@
-import { BrainCircuit, Download, Flag, LogIn, Search, Shapes } from 'lucide-react';
+import {
+  BrainCircuit,
+  Download,
+  Flag,
+  ListChecks,
+  LogIn,
+  Search,
+  Shapes,
+  ShieldCheck,
+} from 'lucide-react';
 import type { ComponentType } from 'react';
 
 import type { Category } from '../../domain/types';
@@ -30,6 +39,18 @@ export const CATEGORY_STYLE: Record<Category, CategoryStyle> = {
     text: 'text-cat-research',
     border: 'border-l-cat-research',
     cssColor: 'var(--cat-research)',
+  },
+  planning: {
+    Icon: ListChecks,
+    text: 'text-cat-planning',
+    border: 'border-l-cat-planning',
+    cssColor: 'var(--cat-planning)',
+  },
+  verification: {
+    Icon: ShieldCheck,
+    text: 'text-cat-verification',
+    border: 'border-l-cat-verification',
+    cssColor: 'var(--cat-verification)',
   },
   reasoning: {
     Icon: BrainCircuit,

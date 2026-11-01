@@ -28,6 +28,8 @@
   --cat-input: #3f5fa8;
   --cat-acquisition: #0f766e;
   --cat-research: #6d3fc4;
+  --cat-planning: #0e7490;
+  --cat-verification: #b3263f;
   --cat-reasoning: #a15c07;
   --cat-output: #166534;
   --cat-other: #5b6577;
@@ -58,6 +60,8 @@
   --cat-input: #8aa6ff;
   --cat-acquisition: #4fd1c5;
   --cat-research: #b79bff;
+  --cat-planning: #67d4ee;
+  --cat-verification: #ff9aa8;
   --cat-reasoning: #f0b95a;
   --cat-output: #6fdc9a;
   --cat-other: #a8b2c3;
