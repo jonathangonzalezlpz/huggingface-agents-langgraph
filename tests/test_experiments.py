@@ -103,3 +103,28 @@ def test_router_sends_web_question_direct_when_web_disabled(monkeypatch) -> None
     }
 
     assert router(state) == {"route": "direct"}
+
+
+def test_architecture_is_omitted_unless_requested() -> None:
+    assert "architecture" not in normalize_experiment({"name": "plain"})
+    assert "architecture" not in normalize_experiment({"architecture": None})
+
+
+def test_architecture_reference_is_kept_and_trimmed() -> None:
+    experiment = normalize_experiment({"architecture": "  builtin:gaia_v31 "})
+    assert experiment["architecture"] == "builtin:gaia_v31"
+
+
+@pytest.mark.parametrize("value", ["", "   ", 7, ["x"], "x" * 101])
+def test_invalid_architecture_reference_is_rejected(value) -> None:
+    with pytest.raises(ValueError, match="architecture"):
+        normalize_experiment({"architecture": value})
+
+
+def test_variant_config_can_carry_an_architecture_reference() -> None:
+    from huggingface_agents_langgraph.experiment_runner import variant_config
+
+    reference = normalize_experiment(None)
+    assert "architecture" not in variant_config(reference, "combined")
+    configured = variant_config(reference, "combined", architecture="builtin:gaia_v31")
+    assert configured["architecture"] == "builtin:gaia_v31"

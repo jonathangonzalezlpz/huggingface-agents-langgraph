@@ -150,7 +150,7 @@ def delete_record(kind: str, record_id: str) -> None:
 
 def run_pipeline(task: dict) -> dict:
     """Execute the graph and retain its trace even when a node fails."""
-    from huggingface_agents_langgraph.graph import build_state_graph
+    from huggingface_agents_langgraph.graph_selection import select_graph
 
     task = task | {"experiment": normalize_experiment(task.get("experiment"))}
     version = task["experiment"]["pipeline_version"]
@@ -185,7 +185,8 @@ def run_pipeline(task: dict) -> dict:
         },
     }
     try:
-        result = build_state_graph().invoke(task, config={"recursion_limit": 40})
+        graph, record["architecture"] = select_graph(task["experiment"])
+        result = graph.invoke(task, config={"recursion_limit": 40})
         record["result"] = result
         record["status"] = "completed"
         return result | {

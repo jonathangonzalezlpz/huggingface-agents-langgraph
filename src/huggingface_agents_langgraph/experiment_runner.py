@@ -66,7 +66,9 @@ def timing_summary(answers: list[dict]) -> dict:
     }
 
 
-def variant_config(reference: dict, variant: str) -> dict:
+def variant_config(
+    reference: dict, variant: str, architecture: str | None = None
+) -> dict:
     """Keep the model and capabilities fixed while changing one feature or all."""
     if variant not in {"baseline", "combined", *IMPROVEMENTS}:
         raise ValueError("Unknown evaluation variant")
@@ -80,14 +82,14 @@ def variant_config(reference: dict, variant: str) -> dict:
         if variant == "baseline"
         else ("V3 · Completo" if variant == "combined" else f"V3 · Solo {variant}")
     )
-    return normalize_experiment(
-        reference
-        | {
-            "name": name,
-            "pipeline_version": "2" if variant == "baseline" else "3",
-            "improvements": improvements,
-        }
-    )
+    overrides = {
+        "name": name,
+        "pipeline_version": "2" if variant == "baseline" else "3",
+        "improvements": improvements,
+    }
+    if architecture is not None:
+        overrides["architecture"] = architecture
+    return normalize_experiment(reference | overrides)
 
 
 def run_experiment(
@@ -222,6 +224,10 @@ def main() -> None:
     parser.add_argument("--group-id", default=str(uuid4()))
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--resume", help="UUID of a partially completed experiment")
+    parser.add_argument(
+        "--architecture",
+        help="Stored architecture version (or builtin:gaia_v31) to compile and run",
+    )
     args = parser.parse_args()
     reference = read_record("experiments", V2_REFERENCE_ID)
     if not 1 <= args.limit <= 20:
@@ -238,7 +244,9 @@ def main() -> None:
         return
     for variant in args.variants:
         result = run_experiment(
-            tasks, variant_config(reference["config"], variant), group_id=args.group_id
+            tasks,
+            variant_config(reference["config"], variant, args.architecture),
+            group_id=args.group_id,
         )
         print(
             json.dumps(

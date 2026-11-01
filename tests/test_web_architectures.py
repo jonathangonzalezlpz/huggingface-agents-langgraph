@@ -126,3 +126,35 @@ class TestReadEndpoints:
         status, _body = _call("DELETE", f"/api/architectures/{saved['id']}")
         assert status == 404
         assert _call("GET", f"/api/architectures/{saved['id']}")[0] == 200
+
+
+class TestRunEndpointArchitecture:
+    def test_unknown_architecture_is_a_bad_request_with_a_run_id(self):
+        status, body = _post(
+            "/api/run",
+            {
+                "task_id": "t",
+                "question": "q",
+                "file_name": "",
+                "experiment": {"architecture": "nope"},
+            },
+        )
+        assert status == 400
+        assert "Unknown architecture" in body["error"]
+        assert run_tracking.read_record("runs", body["run_id"])["status"] == "error"
+
+    @pytest.mark.usefixtures("stubbed_nodes")
+    def test_builtin_architecture_runs_through_the_endpoint(self):
+        status, body = _post(
+            "/api/run",
+            {
+                "task_id": "t",
+                "question": "q",
+                "file_name": "",
+                "experiment": {"architecture": BUILTIN_V31_ID},
+            },
+        )
+        assert status == 200
+        assert body["submitted_answer"] == "answer"
+        record = run_tracking.read_record("runs", body["run_id"])
+        assert record["architecture"]["engine"] == "compiled"
