@@ -12,6 +12,20 @@ const OVERLAY = 'fixed inset-0 z-40 bg-black/50';
 const CONTENT =
   'fixed top-16 left-1/2 z-50 w-[min(40rem,94vw)] -translate-x-1/2 rounded-xl border border-line-strong bg-surface p-5 text-fg shadow-xl';
 
+/** Download the file a GAIA question comes with, served by the local backend. */
+export function AttachmentLink({ taskId }: { taskId: string }) {
+  const { t } = useI18n();
+  return (
+    <a
+      href={`/api/files/${encodeURIComponent(taskId)}`}
+      download
+      className="ml-3 text-xs text-accent-fg underline underline-offset-2"
+    >
+      {t('runs.gaia.download')}
+    </a>
+  );
+}
+
 function Questions({ onPick }: { onPick: (question: GaiaQuestion) => void }) {
   const { t } = useI18n();
   const { questions } = useServices();
@@ -38,7 +52,7 @@ function Questions({ onPick }: { onPick: (question: GaiaQuestion) => void }) {
       <ul className="mt-3 max-h-80 space-y-1.5 overflow-y-auto">
         {matches.length === 0 && <li className="text-sm text-fg-muted">{t('runs.gaia.empty')}</li>}
         {matches.map((item) => (
-          <li key={item.taskId}>
+          <li key={item.taskId} className="space-y-1">
             <button
               type="button"
               onClick={() => onPick(item)}
@@ -55,6 +69,7 @@ function Questions({ onPick }: { onPick: (question: GaiaQuestion) => void }) {
                 )}
               </span>
             </button>
+            {item.fileName && <AttachmentLink taskId={item.taskId} />}
           </li>
         ))}
       </ul>

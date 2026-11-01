@@ -22,10 +22,18 @@ export function modelLabel(status: SystemStatus | null): { tone: Tone; key: Mess
   return { tone: MODEL_TONES[status.llm.state], key: `status.model.${status.llm.state}` };
 }
 
+export function gpuLabel(status: SystemStatus | null): { tone: Tone; key: MessageKey } {
+  if (status?.gpu == null) return { tone: 'neutral', key: 'status.gpu.unknown' };
+  return status.gpu.available
+    ? { tone: 'success', key: 'status.gpu.available' }
+    : { tone: 'warning', key: 'status.gpu.unavailable' };
+}
+
 export function StatusPanel({ status }: { status: SystemStatus | null }) {
   const { t } = useI18n();
   const backend = backendLabel(status);
   const model = modelLabel(status);
+  const gpu = gpuLabel(status);
   return (
     <section aria-labelledby="status-heading">
       <h2
@@ -47,6 +55,15 @@ export function StatusPanel({ status }: { status: SystemStatus | null }) {
             <StatusBadge tone={model.tone}>{t(model.key)}</StatusBadge>
           </dd>
         </div>
+        <div className="flex items-center justify-between gap-2">
+          <dt className="text-fg-muted">{t('status.gpu')}</dt>
+          <dd>
+            <StatusBadge tone={gpu.tone}>{t(gpu.key)}</StatusBadge>
+          </dd>
+        </div>
+        {status?.gpu?.available && status.gpu.name && (
+          <p className="text-xs text-fg-muted">{status.gpu.name}</p>
+        )}
       </dl>
     </section>
   );

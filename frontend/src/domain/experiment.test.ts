@@ -99,3 +99,30 @@ describe('wire form', () => {
     expect(toWireExperiment(defaultSettings(), null)).not.toHaveProperty('architecture');
   });
 });
+
+describe('wire form keeps the chosen capabilities, models and improvements', () => {
+  // Replaces the Python check that read these values back out of the old interface.
+  it.each(['2', '3', '3.1'] as const)('for pipeline version %s', (version) => {
+    const settings = setPipelineVersion(
+      {
+        ...defaultSettings(),
+        name: 'Custom',
+        capabilities: ['web'],
+        improvements: ['reasoning_control'],
+        model: { provider: 'configured', modelId: 'reasoner' },
+        visionModel: { provider: 'configured', modelId: 'vision' },
+      },
+      version,
+    );
+    const wire = toWireExperiment(settings, null);
+    expect(wire.enabled_capabilities).toEqual(['web']);
+    expect(wire.model?.model_id).toBe('reasoner');
+    expect(wire.vision_model?.model_id).toBe('vision');
+    expect(wire.improvements).toEqual(version === '2' ? [] : ['reasoning_control']);
+    expect(wire.seed).toBe(version === '3.1' ? 42 : null);
+  });
+
+  it('leaves the vision model out when the original one is used', () => {
+    expect(toWireExperiment(defaultSettings(), null)).not.toHaveProperty('vision_model');
+  });
+});

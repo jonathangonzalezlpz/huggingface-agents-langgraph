@@ -12,7 +12,7 @@ import { PageHeader } from '../components/PageHeader';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { useServices } from '../services';
 import { useSystemStatus } from '../shell/SystemStatusProvider';
-import { GaiaPicker } from './GaiaPicker';
+import { AttachmentLink, GaiaPicker } from './GaiaPicker';
 import { RunResult } from './RunResult';
 import { SettingsPanel } from './SettingsPanel';
 import { useRunner } from './useRunner';
@@ -48,7 +48,8 @@ export function RunsPage() {
   const available = useMemo(() => (library.status === 'success' ? library.data : []), [library]);
   const selected = available.find((item) => item.id === selectedId) ?? null;
   const blocked = selected !== null && !selected.validation.isValid;
-  const options = modelList.status === 'success' ? modelList.data : [];
+  const options = modelList.status === 'success' ? modelList.data.models : [];
+  const visionOptions = modelList.status === 'success' ? modelList.data.visionModels : [];
   const examples = [t('runs.example.1'), t('runs.example.2'), t('runs.example.3')];
   const running = runner.state.status === 'running';
   const canRun =
@@ -133,6 +134,7 @@ export function RunsPage() {
         <SettingsPanel
           settings={settings}
           models={options}
+          visionModels={visionOptions}
           disabled={running}
           onChange={setSettings}
         />
@@ -146,6 +148,7 @@ export function RunsPage() {
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-fg-muted">{t('runs.gaia.selected')}</p>
                 <p>{gaia.question}</p>
+                {gaia.fileName && <AttachmentLink taskId={gaia.taskId} />}
               </div>
               <button
                 type="button"

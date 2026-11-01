@@ -39,6 +39,8 @@ export interface ExperimentSettings {
   seed: number | null;
   /** Null to use the server's default model. */
   model: ModelOption | null;
+  /** Null for the original in-process vision model. */
+  visionModel: ModelOption | null;
 }
 
 export type SettingsIssue =
@@ -62,6 +64,7 @@ export function defaultSettings(): ExperimentSettings {
     samplingProfile: 'controlled',
     seed: DEFAULT_SEED,
     model: null,
+    visionModel: null,
   };
 }
 
@@ -116,6 +119,7 @@ export interface WireExperiment {
   seed: number | null;
   architecture?: string;
   model?: { provider: ModelOption['provider']; model_id: string };
+  vision_model?: { provider: ModelOption['provider']; model_id: string };
 }
 
 /** The `experiment` object the backend expects, with the architecture to run. */
@@ -137,6 +141,14 @@ export function toWireExperiment(
     ...(architectureId ? { architecture: architectureId } : {}),
     ...(settings.model
       ? { model: { provider: settings.model.provider, model_id: settings.model.modelId } }
+      : {}),
+    ...(settings.visionModel
+      ? {
+          vision_model: {
+            provider: settings.visionModel.provider,
+            model_id: settings.visionModel.modelId,
+          },
+        }
       : {}),
   };
 }

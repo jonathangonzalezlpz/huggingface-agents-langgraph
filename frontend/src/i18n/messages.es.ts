@@ -31,7 +31,6 @@ export const es = {
 
   'common.loading': 'Cargando…',
   'common.retry': 'Reintentar',
-  'common.legacy': 'Abrir la interfaz anterior',
 
   'error.title': 'Algo ha fallado',
   'error.network': 'No se puede conectar con el backend.',
@@ -538,6 +537,24 @@ export const es = {
   'compare.change.lost': 'perdida',
   'runs.view.notFound': 'No existe esa ejecución.',
   'runs.view.back': 'Volver a Ejecuciones',
+
+  'settings.vision': 'Modelo de visión',
+  'settings.vision.default': 'VLM original · Transformers',
+  'runs.gaia.download': 'Descargar adjunto',
+
+  'status.gpu': 'GPU',
+  'status.gpu.available': 'Disponible',
+  'status.gpu.unavailable': 'No disponible',
+  'status.gpu.unknown': 'Desconocida',
+  'system.gpu': 'Tarjeta gráfica',
+  'system.memory': 'Memoria del equipo',
+  'system.memory.value': '{available} de {total} MiB libres',
+
+  'settings.model.hint': 'Se listan los modelos que el servidor y Ollama ofrecen ahora mismo.',
+  'settings.model.none':
+    'No hay modelos disponibles: arranca el servidor de modelos con start_agent.ps1 o usa el predeterminado.',
+  'settings.vision.none':
+    'Solo está el VLM original. Los modelos de visión adicionales aparecen con el modo de modelos exclusivo (start_agent.ps1 -ModelMode exclusive).',
 
   'notfound.title': 'Página no encontrada',
   'notfound.body': 'Esa dirección no existe en Studio.',

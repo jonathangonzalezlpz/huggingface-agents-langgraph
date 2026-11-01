@@ -14,7 +14,7 @@ import type {
   TaskChange,
 } from '../domain/history';
 import { PIPELINE_VERSIONS, type PipelineVersion } from '../domain/experiment';
-import type { GaiaQuestion, ModelOption, RunRecord } from '../domain/run';
+import type { GaiaQuestion, ModelCatalog, ModelOption, RunRecord } from '../domain/run';
 import type {
   AgentDefinition,
   Architecture,
@@ -124,6 +124,14 @@ export const architectureListSchema = z.object({ architectures: z.array(summaryS
 
 export const statusSchema = z.object({
   llm: z.object({ state: z.string(), name: z.string() }).optional(),
+  gpu: z
+    .object({
+      available: z.boolean(),
+      name: z.string().nullish(),
+      backend: z.string().nullish(),
+    })
+    .optional(),
+  host_memory: z.object({ available_mib: z.number(), total_mib: z.number() }).optional(),
 });
 
 const LLM_STATES: readonly LlmState[] = ['ready', 'sleeping', 'loading', 'unavailable'];
@@ -226,6 +234,16 @@ export function toStatus(wire: Wire<typeof statusSchema>): SystemStatus {
           name: wire.llm.name,
         }
       : null,
+    gpu: wire.gpu
+      ? {
+          available: wire.gpu.available,
+          name: wire.gpu.name ?? null,
+          backend: wire.gpu.backend ?? null,
+        }
+      : null,
+    hostMemory: wire.host_memory
+      ? { availableMib: wire.host_memory.available_mib, totalMib: wire.host_memory.total_mib }
+      : null,
   };
 }
 
@@ -288,8 +306,11 @@ export const runRecordSchema = z.object({
   error: z.string().nullish(),
 });
 
+const modelEntry = z.object({ provider: z.string(), model_id: z.string() });
+
 export const modelsSchema = z.object({
-  models: z.array(z.object({ provider: z.string(), model_id: z.string() })),
+  models: z.array(modelEntry),
+  vision_models: z.array(modelEntry).default([]),
 });
 
 export const questionsSchema = z.array(
@@ -331,11 +352,15 @@ export function toRunRecord(wire: z.output<typeof runRecordSchema>): RunRecord {
 
 const MODEL_PROVIDERS: readonly ModelOption['provider'][] = ['configured', 'ollama'];
 
-export function toModels(wire: z.output<typeof modelsSchema>): ModelOption[] {
-  return wire.models.flatMap((model) => {
+function toModelOptions(entries: z.output<typeof modelEntry>[]): ModelOption[] {
+  return entries.flatMap((model) => {
     const provider = MODEL_PROVIDERS.find((known) => known === model.provider);
     return provider ? [{ provider, modelId: model.model_id }] : [];
   });
+}
+
+export function toModels(wire: z.output<typeof modelsSchema>): ModelCatalog {
+  return { models: toModelOptions(wire.models), visionModels: toModelOptions(wire.vision_models) };
 }
 
 export function toQuestions(wire: z.output<typeof questionsSchema>): GaiaQuestion[] {

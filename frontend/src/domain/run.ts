@@ -31,6 +31,12 @@ export interface RunRecord {
   modelId: string | null;
 }
 
+/** What the server can run: reasoning models and the vision models it can serve. */
+export interface ModelCatalog {
+  models: ModelOption[];
+  visionModels: ModelOption[];
+}
+
 export interface ModelOption {
   provider: 'configured' | 'ollama';
   modelId: string;

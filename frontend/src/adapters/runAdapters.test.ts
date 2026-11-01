@@ -189,13 +189,19 @@ describe('models and questions', () => {
             { provider: 'configured', model_id: 'Qwen3-8B' },
             { provider: 'other', model_id: 'ignored' },
           ],
-          vision_models: [],
+          vision_models: [
+            { provider: 'configured', model_id: 'Qwen-VL' },
+            { provider: 'other', model_id: 'ignored' },
+          ],
         }),
     });
-    expect(await createHttpServices(fetchImpl).models.list()).toEqual([
-      { provider: 'ollama', modelId: 'qwen2:latest' },
-      { provider: 'configured', modelId: 'Qwen3-8B' },
-    ]);
+    expect(await createHttpServices(fetchImpl).models.list()).toEqual({
+      models: [
+        { provider: 'ollama', modelId: 'qwen2:latest' },
+        { provider: 'configured', modelId: 'Qwen3-8B' },
+      ],
+      visionModels: [{ provider: 'configured', modelId: 'Qwen-VL' }],
+    });
   });
 
   it('lists GAIA questions with their attachment and level', async () => {
@@ -232,7 +238,7 @@ describe('demo mode', () => {
   });
 
   it('has no models and no stored runs', async () => {
-    expect(await memory.models.list()).toEqual([]);
+    expect(await memory.models.list()).toEqual({ models: [], visionModels: [] });
     await expect(memory.runs.get('x')).rejects.toMatchObject({ kind: 'http', status: 404 });
   });
 });

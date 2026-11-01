@@ -43,7 +43,10 @@ export function createMemoryServices(): StudioServices {
           : Promise.reject(new StudioError('http', `Architecture ${id} not found`, 404)),
       save: () => Promise.reject(new StudioError('unavailable', 'Saving needs the backend')),
     },
-    system: { getStatus: () => Promise.resolve({ backend: 'online', llm: null }) },
+    system: {
+      getStatus: () =>
+        Promise.resolve({ backend: 'online', llm: null, gpu: null, hostMemory: null }),
+    },
     // The validator runs on the Python backend, so only the built-in report is known here.
     validation: {
       validate: (definition) =>
@@ -76,7 +79,7 @@ export function createMemoryServices(): StudioServices {
       submitOfficial: () => Promise.reject(new StudioError('unavailable', 'Needs the backend')),
       compare: () => Promise.reject(new StudioError('unavailable', 'Needs the backend')),
     },
-    models: { list: () => Promise.resolve([]) },
+    models: { list: () => Promise.resolve({ models: [], visionModels: [] }) },
     questions: {
       list: () => Promise.reject(new StudioError('unavailable', 'Questions need the backend')),
     },

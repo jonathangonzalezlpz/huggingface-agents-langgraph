@@ -101,6 +101,8 @@ describe('http adapter', () => {
       expect(await services.system.getStatus()).toEqual({
         backend: 'online',
         llm: { state: 'sleeping', name: 'LLM' },
+        gpu: null,
+        hostMemory: null,
       });
     });
 
@@ -111,14 +113,55 @@ describe('http adapter', () => {
       expect((await services.system.getStatus()).llm?.state).toBe('unavailable');
     });
 
+    it('reads the graphics card and the host memory when the backend reports them', async () => {
+      const services = createHttpServices(
+        serving({
+          '/api/status': () =>
+            respond({
+              llm: { state: 'ready', name: 'LLM' },
+              gpu: { available: true, name: 'NVIDIA GeForce RTX 4060 Ti', backend: 'CUDA' },
+              host_memory: { available_mib: 3796, total_mib: 16197 },
+            }),
+        }),
+      );
+      const status = await services.system.getStatus();
+      expect(status.gpu).toEqual({
+        available: true,
+        name: 'NVIDIA GeForce RTX 4060 Ti',
+        backend: 'CUDA',
+      });
+      expect(status.hostMemory).toEqual({ availableMib: 3796, totalMib: 16197 });
+    });
+
+    it('reports no graphics card as unavailable, not as unknown', async () => {
+      const services = createHttpServices(
+        serving({ '/api/status': () => respond({ gpu: { available: false } }) }),
+      );
+      expect((await services.system.getStatus()).gpu).toEqual({
+        available: false,
+        name: null,
+        backend: null,
+      });
+    });
+
     it('reports an unreachable backend as offline instead of failing', async () => {
       const services = createHttpServices(() => Promise.reject(new TypeError('down')));
-      expect(await services.system.getStatus()).toEqual({ backend: 'offline', llm: null });
+      expect(await services.system.getStatus()).toEqual({
+        backend: 'offline',
+        llm: null,
+        gpu: null,
+        hostMemory: null,
+      });
     });
 
     it('keeps the backend online when only the status call fails', async () => {
       const services = createHttpServices(serving({ '/api/status': () => respond({}, 500) }));
-      expect(await services.system.getStatus()).toEqual({ backend: 'online', llm: null });
+      expect(await services.system.getStatus()).toEqual({
+        backend: 'online',
+        llm: null,
+        gpu: null,
+        hostMemory: null,
+      });
     });
   });
 });

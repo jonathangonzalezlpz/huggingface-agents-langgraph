@@ -13,6 +13,7 @@ import type { MessageKey } from '../../i18n';
 import { useI18n } from '../../i18n/I18nProvider';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { AttachmentLink } from '../run/GaiaPicker';
 import { useServices } from '../services';
 import { formatDate, formatScore, formatSeconds } from './format';
 import { ArchitectureLabel, ExperimentStatus } from './HistoryPage';
@@ -204,6 +205,7 @@ export function ExperimentDetailPage() {
                   </td>
                   <td className={CELL}>
                     {answer.answer || <span className="text-fg-muted">{t('detail.noAnswer')}</span>}
+                    {answer.fileName && <AttachmentLink taskId={answer.taskId} />}
                     {answer.error && (
                       <p className="mt-1 text-xs text-error">
                         {t('detail.error', { message: answer.error })}

@@ -78,10 +78,11 @@ describe('navigation and structure', () => {
     );
   });
 
-  it('links to the previous interface while both coexist', () => {
+  it('no longer links to a previous interface', () => {
     renderApp();
-    const legacy = screen.getAllByRole('link', { name: /interfaz anterior|previous interface/i });
-    expect(legacy[0]).toHaveAttribute('href', '/');
+    expect(
+      screen.queryByRole('link', { name: /interfaz anterior|previous interface/i }),
+    ).toBeNull();
   });
 });
 
@@ -222,12 +223,61 @@ describe('system status and modes', () => {
       mode: 'live',
       system: {
         getStatus: () =>
-          Promise.resolve({ backend: 'online', llm: { state: 'sleeping', name: 'LLM' } }),
+          Promise.resolve({
+            backend: 'online',
+            llm: { state: 'sleeping', name: 'LLM' },
+            gpu: { available: true, name: 'RTX 4060 Ti', backend: 'CUDA' },
+            hostMemory: { availableMib: 3796, totalMib: 16197 },
+          }),
       },
     });
     const status = screen.getByRole('region', { name: 'Estado' });
     expect(await within(status).findByText('Conectado')).toBeVisible();
     expect(within(status).getByText('En reposo')).toBeVisible();
+    expect(within(status).getByText('GPU')).toBeVisible();
+    expect(within(status).getByText('Disponible')).toBeVisible();
+    expect(within(status).getByText('RTX 4060 Ti')).toBeVisible();
+  });
+
+  it('says when there is no graphics card, and when the backend does not say', async () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'es');
+    const base = createMemoryServices();
+    renderApp('/builder', {
+      ...base,
+      mode: 'live',
+      system: {
+        getStatus: () =>
+          Promise.resolve({
+            backend: 'online',
+            llm: null,
+            gpu: { available: false, name: null, backend: null },
+            hostMemory: null,
+          }),
+      },
+    });
+    const status = screen.getByRole('region', { name: 'Estado' });
+    expect(await within(status).findByText('No disponible')).toBeVisible();
+    expect(within(status).queryByText('Desconocida')).not.toBeInTheDocument();
+  });
+
+  it('shows the graphics card and memory on the system page', async () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'es');
+    const base = createMemoryServices();
+    renderApp('/system', {
+      ...base,
+      mode: 'live',
+      system: {
+        getStatus: () =>
+          Promise.resolve({
+            backend: 'online',
+            llm: { state: 'ready', name: 'LLM' },
+            gpu: { available: true, name: 'RTX 4060 Ti', backend: 'CUDA' },
+            hostMemory: { availableMib: 3796, totalMib: 16197 },
+          }),
+      },
+    });
+    expect(await screen.findByText('RTX 4060 Ti · CUDA')).toBeVisible();
+    expect(screen.getByText('3796 de 16197 MiB libres')).toBeVisible();
   });
 
   it('flags an unreachable backend', async () => {
@@ -235,7 +285,10 @@ describe('system status and modes', () => {
     const base = createMemoryServices();
     renderApp('/builder', {
       ...base,
-      system: { getStatus: () => Promise.resolve({ backend: 'offline', llm: null }) },
+      system: {
+        getStatus: () =>
+          Promise.resolve({ backend: 'offline', llm: null, gpu: null, hostMemory: null }),
+      },
     });
     expect(await screen.findByText('Sin conexión')).toBeVisible();
     expect(screen.getByText('Sin datos')).toBeVisible();

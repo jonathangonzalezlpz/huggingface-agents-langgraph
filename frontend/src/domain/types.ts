@@ -100,4 +100,8 @@ export interface SystemStatus {
   backend: 'online' | 'offline';
   /** Null when the backend could not report the model state. */
   llm: { state: LlmState; name: string } | null;
+  /** Null when the backend did not report the graphics card. */
+  gpu: { available: boolean; name: string | null; backend: string | null } | null;
+  /** Null when the backend did not report host memory. */
+  hostMemory: { availableMib: number; totalMib: number } | null;
 }

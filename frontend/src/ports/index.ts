@@ -2,7 +2,7 @@
 import type { BatteryRequest, BatteryStatus } from '../domain/battery';
 import type { Comparison, ExperimentRecord, OfficialSubmission, Score } from '../domain/history';
 import type { EditorDocument, Point } from '../domain/editor/model';
-import type { GaiaQuestion, ModelOption, RunRecord, RunRequest } from '../domain/run';
+import type { GaiaQuestion, ModelCatalog, RunRecord, RunRequest } from '../domain/run';
 import type {
   AgentDefinition,
   Architecture,
@@ -102,7 +102,7 @@ export interface ExperimentPort {
 }
 
 export interface ModelPort {
-  list(): Promise<ModelOption[]>;
+  list(): Promise<ModelCatalog>;
 }
 
 export interface QuestionPort {

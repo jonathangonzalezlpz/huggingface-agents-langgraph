@@ -66,9 +66,6 @@ function Sidebar() {
           <ThemeToggle />
           <LanguageToggle />
         </div>
-        <a href="/" className="block text-sm text-accent-fg underline underline-offset-2">
-          {t('common.legacy')}
-        </a>
       </div>
     </aside>
   );

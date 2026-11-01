@@ -104,7 +104,13 @@ function services(over: Partial<StudioServices> = {}): StudioServices {
       },
       save: base.architectures.save,
     },
-    models: { list: () => Promise.resolve([{ provider: 'ollama', modelId: 'llama3' }]) },
+    models: {
+      list: () =>
+        Promise.resolve({
+          models: [{ provider: 'ollama', modelId: 'llama3' }],
+          visionModels: [{ provider: 'configured', modelId: 'Qwen-VL' }],
+        }),
+    },
     questions: { list: () => Promise.resolve([gaiaQuestion]) },
     runs: { run: () => Promise.resolve(record()), get: () => Promise.resolve(record()) },
     ...over,
@@ -243,6 +249,50 @@ describe('GAIA questions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ejecutar' }));
     await waitFor(() => expect(run).toHaveBeenCalled());
     expect(run.mock.calls[0]?.[0]).toMatchObject({ taskId: 'task-9', fileName: 'sheet.xlsx' });
+  });
+
+  it('offers the attachment of a question for download, in the list and once chosen', async () => {
+    renderRuns(services());
+    await choose('alpha-v2');
+    await userEvent.click(screen.getByRole('button', { name: 'Elegir de GAIA' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Preguntas de GAIA' }));
+    expect(await dialog.findByRole('link', { name: 'Descargar adjunto' })).toHaveAttribute(
+      'href',
+      '/api/files/task-9',
+    );
+    await userEvent.click(dialog.getByRole('button', { name: /attached sheet/ }));
+    expect(screen.getByRole('link', { name: 'Descargar adjunto' })).toHaveAttribute(
+      'href',
+      '/api/files/task-9',
+    );
+  });
+
+  it('sends the chosen vision model with the run', async () => {
+    const run = vi.fn<RunPort['run']>(() => Promise.resolve(record()));
+    renderRuns(services({ runs: { run, get: () => Promise.resolve(record()) } }));
+    await choose('alpha-v2');
+    await userEvent.click(screen.getByText('Ajustes avanzados'));
+    await userEvent.selectOptions(screen.getByLabelText('Modelo de visión'), 'configured:Qwen-VL');
+    await userEvent.type(screen.getByLabelText('Pregunta'), 'x');
+    await userEvent.click(screen.getByRole('button', { name: 'Ejecutar' }));
+    await waitFor(() => expect(run).toHaveBeenCalled());
+    expect(run.mock.calls[0]?.[0]).toMatchObject({
+      settings: { visionModel: { provider: 'configured', modelId: 'Qwen-VL' } },
+    });
+  });
+
+  it('explains when no extra vision models are offered', async () => {
+    renderRuns(
+      services({
+        models: {
+          list: () => Promise.resolve({ models: [], visionModels: [] }),
+        },
+      }),
+    );
+    await screen.findByLabelText('Arquitectura');
+    await userEvent.click(screen.getByText('Ajustes avanzados'));
+    expect(await screen.findByText(/Solo está el VLM original/)).toBeVisible();
+    expect(screen.getByText(/No hay modelos disponibles/)).toBeVisible();
   });
 
   it('filters the list and can be cleared', async () => {

@@ -34,7 +34,7 @@ function Field({
   children,
 }: {
   label: string;
-  hint?: string;
+  hint?: string | undefined;
   children: (id: string) => React.ReactNode;
 }) {
   const id = useId();
@@ -87,11 +87,13 @@ function CheckGroup<T extends string>({
 export function SettingsPanel({
   settings,
   models,
+  visionModels,
   disabled = false,
   onChange,
 }: {
   settings: ExperimentSettings;
   models: readonly ModelOption[];
+  visionModels: readonly ModelOption[];
   disabled?: boolean;
   onChange: (next: ExperimentSettings) => void;
 }) {
@@ -126,7 +128,10 @@ export function SettingsPanel({
           )}
         </Field>
 
-        <Field label={t('runs.model')}>
+        <Field
+          label={t('runs.model')}
+          hint={models.length === 0 ? t('settings.model.none') : t('settings.model.hint')}
+        >
           {(id) => (
             <select
               id={id}
@@ -188,6 +193,33 @@ export function SettingsPanel({
                 value={settings.name}
                 onChange={(event) => patch({ name: event.target.value })}
               />
+            )}
+          </Field>
+
+          <Field
+            label={t('settings.vision')}
+            hint={visionModels.length === 0 ? t('settings.vision.none') : undefined}
+          >
+            {(id) => (
+              <select
+                id={id}
+                className={FIELD}
+                value={settings.visionModel ? modelKey(settings.visionModel) : DEFAULT_MODEL}
+                onChange={(event) =>
+                  patch({
+                    visionModel:
+                      visionModels.find((option) => modelKey(option) === event.target.value) ??
+                      null,
+                  })
+                }
+              >
+                <option value={DEFAULT_MODEL}>{t('settings.vision.default')}</option>
+                {visionModels.map((option) => (
+                  <option key={modelKey(option)} value={modelKey(option)}>
+                    {option.modelId}
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
 
@@ -278,7 +310,13 @@ export function SettingsPanel({
 
       <button
         type="button"
-        onClick={() => onChange({ ...defaultSettings(), model: settings.model })}
+        onClick={() =>
+          onChange({
+            ...defaultSettings(),
+            model: settings.model,
+            visionModel: settings.visionModel,
+          })
+        }
         className="text-sm underline underline-offset-2"
       >
         {t('settings.reset')}

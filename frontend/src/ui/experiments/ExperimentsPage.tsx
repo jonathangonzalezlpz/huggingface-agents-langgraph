@@ -63,7 +63,8 @@ export function ExperimentsPage({ pollMs }: { pollMs?: number } = {}) {
     () => (library.status === 'success' ? library.data.filter((a) => a.validation.isValid) : []),
     [library],
   );
-  const options = modelList.status === 'success' ? modelList.data : [];
+  const options = modelList.status === 'success' ? modelList.data.models : [];
+  const visionOptions = modelList.status === 'success' ? modelList.data.visionModels : [];
   const active = isBatteryActive(status);
   const limitValid = Number.isInteger(limit) && limit >= 1 && limit <= MAX_QUESTIONS;
   const canStart =
@@ -130,6 +131,7 @@ export function ExperimentsPage({ pollMs }: { pollMs?: number } = {}) {
           <SettingsPanel
             settings={settings}
             models={options}
+            visionModels={visionOptions}
             disabled={active}
             onChange={setSettings}
           />

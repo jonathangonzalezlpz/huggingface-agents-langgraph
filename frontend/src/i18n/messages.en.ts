@@ -32,7 +32,6 @@ export const en: Record<MessageKey, string> = {
 
   'common.loading': 'Loading…',
   'common.retry': 'Retry',
-  'common.legacy': 'Open the previous interface',
 
   'error.title': 'Something went wrong',
   'error.network': 'Cannot connect to the backend.',
@@ -532,6 +531,24 @@ export const en: Record<MessageKey, string> = {
   'compare.change.lost': 'lost',
   'runs.view.notFound': 'That run does not exist.',
   'runs.view.back': 'Back to Runs',
+
+  'settings.vision': 'Vision model',
+  'settings.vision.default': 'Original VLM · Transformers',
+  'runs.gaia.download': 'Download attachment',
+
+  'status.gpu': 'GPU',
+  'status.gpu.available': 'Available',
+  'status.gpu.unavailable': 'Not available',
+  'status.gpu.unknown': 'Unknown',
+  'system.gpu': 'Graphics card',
+  'system.memory': 'Host memory',
+  'system.memory.value': '{available} of {total} MiB free',
+
+  'settings.model.hint': 'These are the models the server and Ollama offer right now.',
+  'settings.model.none':
+    'No models are available: start the model server with start_agent.ps1 or use the default.',
+  'settings.vision.none':
+    'Only the original VLM is available. Extra vision models appear in exclusive model mode (start_agent.ps1 -ModelMode exclusive).',
 
   'notfound.title': 'Page not found',
   'notfound.body': 'That address does not exist in Studio.',

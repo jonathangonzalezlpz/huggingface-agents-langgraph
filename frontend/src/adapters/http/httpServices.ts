@@ -127,9 +127,9 @@ export function createHttpServices(
           return toStatus(await requestJson(fetchImpl, '/api/status', statusSchema));
         } catch (error) {
           if (error instanceof StudioError && error.kind === 'network') {
-            return { backend: 'offline', llm: null };
+            return { backend: 'offline', llm: null, gpu: null, hostMemory: null };
           }
-          return { backend: 'online', llm: null };
+          return { backend: 'online', llm: null, gpu: null, hostMemory: null };
         }
       },
     },

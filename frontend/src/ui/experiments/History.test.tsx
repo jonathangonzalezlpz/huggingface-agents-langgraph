@@ -343,6 +343,20 @@ describe('experiment detail', () => {
     expect(table.getByText('Sin traza')).toBeVisible();
   });
 
+  it('links the attachment of a question that has one', async () => {
+    const withFile = record('f', {
+      name: 'F',
+      answers: [answer(1, { fileName: 'data.xlsx' }), answer(2)],
+    });
+    renderAt('/experiments/f', services({ list: () => Promise.resolve([withFile]) }));
+    const table = within(await screen.findByRole('table'));
+    expect(table.getAllByRole('link', { name: 'Descargar adjunto' })).toHaveLength(1);
+    expect(table.getByRole('link', { name: 'Descargar adjunto' })).toHaveAttribute(
+      'href',
+      '/api/files/t1',
+    );
+  });
+
   it('says when the experiment does not exist', async () => {
     renderAt('/experiments/nope', services());
     expect(await screen.findByText('No existe ese experimento.')).toBeVisible();

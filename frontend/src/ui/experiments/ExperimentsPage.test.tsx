@@ -90,7 +90,13 @@ function services(over: Partial<StudioServices> = {}): StudioServices {
       get: (id) => Promise.resolve(all.find((item) => item.id === id) ?? builtin),
       save: base.architectures.save,
     },
-    models: { list: () => Promise.resolve([{ provider: 'ollama', modelId: 'llama3' }]) },
+    models: {
+      list: () =>
+        Promise.resolve({
+          models: [{ provider: 'ollama', modelId: 'llama3' }],
+          visionModels: [{ provider: 'configured', modelId: 'Qwen-VL' }],
+        }),
+    },
     experiments: experimentsPort(() => Promise.resolve([unfinished])),
     batteries: {
       start: () => Promise.resolve(status({ state: 'running', total: 20 })),
