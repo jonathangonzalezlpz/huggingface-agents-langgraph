@@ -550,6 +550,17 @@ export const en: Record<MessageKey, string> = {
   'settings.vision.none':
     'Only the original VLM is available. Extra vision models appear in exclusive model mode (start_agent.ps1 -ModelMode exclusive).',
 
+  'editor.reject.unknown-param': 'That parameter does not exist on this component.',
+  'editor.reject.invalid-param': "That value is outside the parameter's limits.",
+  'editor.params': 'Parameters',
+  'editor.params.reset': 'Reset',
+  'editor.params.default': 'Default: {value}',
+  'editor.params.required': 'required',
+  'editor.params.defaultOption': '{value} (default)',
+  'editor.params.none': 'no value',
+  'editor.announce.param': 'Parameter {name} of {id} updated.',
+  'editor.announce.paramReset': 'Parameter {name} of {id} reset.',
+
   'notfound.title': 'Page not found',
   'notfound.body': 'That address does not exist in Studio.',
   'notfound.back': 'Back to the Builder',

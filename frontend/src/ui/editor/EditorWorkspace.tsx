@@ -18,6 +18,7 @@ import {
   setDecision,
   setDescription,
   setInitial,
+  setParam,
   uniqueNodeId,
 } from '../../domain/editor/commands';
 import { toDefinition, unexportableDecisions } from '../../domain/editor/convert';
@@ -308,6 +309,14 @@ function Workspace({
         () => ({ key: 'editor.announce.decision', params: { id: nodeId, strategy } }),
       ),
     setDescription: (nodeId, text) => execute((current) => setDescription(current, nodeId, text)),
+    setParam: (nodeId, name, value) =>
+      execute(
+        (current) => setParam(current, catalog, nodeId, name, value),
+        () => ({
+          key: value === null ? 'editor.announce.paramReset' : 'editor.announce.param',
+          params: { id: nodeId, name },
+        }),
+      ),
     renameArchitecture: (name) => execute((current) => renameArchitecture(current, name)),
   };
 

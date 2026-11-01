@@ -58,6 +58,7 @@ export function fromDefinition(
     id: node.id,
     implementationId: node.implementationId,
     description: node.description,
+    ...(node.params && Object.keys(node.params).length > 0 ? { params: { ...node.params } } : {}),
     outgoing: outgoing.get(node.id) ?? { kind: 'none' },
   }));
   const entryExists = nodes.some((node) => node.id === definition.initialNode);
@@ -111,6 +112,7 @@ export function toDefinition(graph: EditorGraph): AgentDefinition {
       id: node.id,
       implementationId: node.implementationId,
       description: node.description,
+      ...(node.params && Object.keys(node.params).length > 0 ? { params: { ...node.params } } : {}),
     })),
     edges,
   };

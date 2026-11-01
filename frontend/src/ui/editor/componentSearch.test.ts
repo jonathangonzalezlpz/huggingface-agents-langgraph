@@ -14,6 +14,7 @@ const make = (implementationId: string, description: string): ComponentInfo => (
   description,
   category: 'other',
   recoverErrors: false,
+  params: [],
   contract,
 });
 

@@ -1,6 +1,7 @@
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { AlertTriangle, CheckCircle2, Flag, Info, ShieldCheck, XCircle } from 'lucide-react';
 
+import { summarizeParams } from '../../domain/editor/params';
 import { useI18n } from '../../i18n/I18nProvider';
 import { CATEGORY_STYLE } from '../components/categoryStyle';
 import {
@@ -47,6 +48,11 @@ export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) 
           <p className="truncate font-mono text-sm font-semibold">{node.id}</p>
           {node.id !== node.implementationId && (
             <p className="truncate font-mono text-xs text-fg-muted">{node.implementationId}</p>
+          )}
+          {summarizeParams(node.params, component?.params ?? []).length > 0 && (
+            <p className="truncate font-mono text-xs text-fg-muted">
+              {summarizeParams(node.params, component?.params ?? []).join(' · ')}
+            </p>
           )}
           {run && run.visits > 0 && (
             <p className="truncate text-xs text-fg-muted">

@@ -10,3 +10,12 @@ export function useComponentDescription(): (component: ComponentInfo) => string 
     return isMessageKey(key) ? t(key) : component.description;
   };
 }
+
+/** The label of a component's parameter in the current language, or its raw name. */
+export function useParamLabel(): (implementationId: string, name: string) => string {
+  const { t } = useI18n();
+  return (implementationId, name) => {
+    const key = `param.${implementationId}.${name}`;
+    return isMessageKey(key) ? t(key) : name;
+  };
+}

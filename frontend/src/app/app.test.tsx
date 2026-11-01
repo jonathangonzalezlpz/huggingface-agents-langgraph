@@ -134,6 +134,7 @@ describe('builder page', () => {
                 description: 'Backend-provided text',
                 category: 'other',
                 recoverErrors: false,
+                params: [],
                 contract: {
                   requiredInputs: [],
                   optionalInputs: [],

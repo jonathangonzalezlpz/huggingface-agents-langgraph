@@ -33,12 +33,29 @@ export interface NodeContract {
   optionalOutputs: string[];
 }
 
+export type ParamValue = string | number | boolean;
+export type ParamKind = 'string' | 'text' | 'integer' | 'number' | 'boolean' | 'enum';
+
+/** One configurable parameter of a component, as the catalog declares it. */
+export interface ParamSpec {
+  name: string;
+  kind: ParamKind;
+  /** Null only for a required parameter that has no default. */
+  default: ParamValue | null;
+  required: boolean;
+  minimum: number | null;
+  maximum: number | null;
+  maxLength: number | null;
+  choices: string[];
+}
+
 export interface ComponentInfo {
   implementationId: string;
   description: string;
   category: Category;
   recoverErrors: boolean;
   contract: NodeContract;
+  params: ParamSpec[];
 }
 
 export interface RoutingStrategyInfo {
@@ -58,6 +75,8 @@ export interface NodeDefinition {
   id: string;
   implementationId: string;
   description: string;
+  /** Only the values chosen explicitly; the rest run with the component's defaults. */
+  params?: Record<string, ParamValue>;
 }
 
 export type EdgeDefinition =

@@ -3,12 +3,13 @@ import { useId } from 'react';
 
 import { renameArchitecture, renameNode, setDescription } from '../../domain/editor/commands';
 import { END, findNode, type EditorDocument } from '../../domain/editor/model';
-import type { Catalog, ComponentInfo } from '../../domain/types';
+import type { Catalog, ComponentInfo, ParamValue } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { CATEGORY_STYLE } from '../components/categoryStyle';
 import { useComponentDescription } from '../components/componentText';
 import { StatusBadge } from '../components/StatusBadge';
 import { AvailabilitySection, TextCommitField, type AvailabilityView } from './InspectorFields';
+import { ParamsSection } from './ParamFields';
 
 const FIELD = 'min-h-9 w-full rounded-lg border border-line-strong bg-surface px-2 text-sm';
 const ACTION =
@@ -22,6 +23,7 @@ export interface InspectorActions {
   disconnect: (id: string, branch: string | null) => void;
   setDecision: (id: string, strategy: string) => void;
   setDescription: (id: string, text: string) => void;
+  setParam: (id: string, name: string, value: ParamValue | null) => void;
   renameArchitecture: (name: string) => void;
 }
 
@@ -249,6 +251,17 @@ export function Inspector({
           </button>
         )}
       </div>
+
+      {component && (
+        <ParamsSection
+          doc={doc}
+          catalog={catalog}
+          node={node}
+          component={component}
+          readOnly={readOnly}
+          onSet={actions.setParam}
+        />
+      )}
 
       <OutputSection
         doc={doc}

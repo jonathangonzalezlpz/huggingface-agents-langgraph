@@ -1,3 +1,5 @@
+import type { ParamValue } from '../types';
+
 /**
  * The editable graph. Its shape makes the backend's structural rules unrepresentable
  * rather than merely forbidden: a node has at most one output (direct or a decision),
@@ -28,6 +30,8 @@ export interface EditorNode {
   id: string;
   implementationId: string;
   description: string;
+  /** Only the values chosen explicitly; absent when every parameter uses its default. */
+  params?: Record<string, ParamValue>;
   outgoing: Outgoing;
 }
 

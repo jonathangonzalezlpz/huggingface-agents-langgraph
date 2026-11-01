@@ -1,4 +1,5 @@
-import type { Catalog } from '../types';
+import type { Catalog, ParamValue } from '../types';
+import { checkParamValue } from './params';
 import {
   END,
   findNode,
@@ -23,7 +24,9 @@ export type RejectionCode =
   | 'invalid-position'
   | 'invalid-description'
   | 'invalid-name'
-  | 'reserved-name';
+  | 'reserved-name'
+  | 'unknown-param'
+  | 'invalid-param';
 
 export interface Rejection {
   code: RejectionCode;
@@ -285,4 +288,39 @@ export function renameArchitecture(doc: EditorDocument, name: string): CommandRe
   }
   if (RESERVED_ARCHITECTURE_NAMES.has(name)) return rejected('reserved-name', name);
   return accepted({ ...doc, graph: { ...doc.graph, architectureId: name } });
+}
+
+/**
+ * Set one parameter of a node, or return it to its default with `null`. Only values the
+ * component's spec accepts get in, so a stored definition never carries an invalid one.
+ */
+export function setParam(
+  doc: EditorDocument,
+  catalog: Catalog,
+  id: string,
+  name: string,
+  value: ParamValue | null,
+): CommandResult {
+  const node = findNode(doc.graph, id);
+  if (!node) return rejected('unknown-node', id);
+  const component = catalog.components.find((c) => c.implementationId === node.implementationId);
+  if (!component) return rejected('unknown-component', node.implementationId);
+  const spec = component.params.find((p) => p.name === name);
+  if (!spec) return rejected('unknown-param', name);
+
+  const current = node.params ?? {};
+  if (value === null) {
+    if (!(name in current)) return accepted(doc);
+    const rest = Object.fromEntries(Object.entries(current).filter(([key]) => key !== name));
+    return accepted(
+      withNode(doc, id, (n) => {
+        const others = { ...n };
+        delete others.params;
+        return Object.keys(rest).length > 0 ? { ...others, params: rest } : others;
+      }),
+    );
+  }
+  if (!checkParamValue(spec, value)) return rejected('invalid-param', name);
+  if (current[name] === value) return accepted(doc);
+  return accepted(withNode(doc, id, (n) => ({ ...n, params: { ...current, [name]: value } })));
 }

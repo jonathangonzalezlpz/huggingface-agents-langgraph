@@ -556,6 +556,17 @@ export const es = {
   'settings.vision.none':
     'Solo está el VLM original. Los modelos de visión adicionales aparecen con el modo de modelos exclusivo (start_agent.ps1 -ModelMode exclusive).',
 
+  'editor.reject.unknown-param': 'Ese parámetro no existe en este componente.',
+  'editor.reject.invalid-param': 'Ese valor no cumple los límites del parámetro.',
+  'editor.params': 'Parámetros',
+  'editor.params.reset': 'Restablecer',
+  'editor.params.default': 'Predeterminado: {value}',
+  'editor.params.required': 'obligatorio',
+  'editor.params.defaultOption': '{value} (predeterminado)',
+  'editor.params.none': 'sin valor',
+  'editor.announce.param': 'Parámetro {name} de {id} actualizado.',
+  'editor.announce.paramReset': 'Parámetro {name} de {id} restablecido.',
+
   'notfound.title': 'Página no encontrada',
   'notfound.body': 'Esa dirección no existe en Studio.',
   'notfound.back': 'Volver al Constructor',

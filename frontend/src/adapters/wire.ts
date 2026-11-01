@@ -49,6 +49,19 @@ export const validationSchema = z.object({
   ),
 });
 
+const paramValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+const paramSpecSchema = z.object({
+  name: z.string(),
+  kind: z.enum(['string', 'text', 'integer', 'number', 'boolean', 'enum']),
+  default: paramValueSchema.nullish(),
+  required: z.boolean().default(false),
+  minimum: z.number().nullish(),
+  maximum: z.number().nullish(),
+  max_length: z.number().nullish(),
+  choices: z.array(z.string()).default([]),
+});
+
 export const catalogSchema = z.object({
   categories: stringList,
   nodes: z.array(
@@ -63,6 +76,7 @@ export const catalogSchema = z.object({
         guaranteed_outputs: stringList,
         optional_outputs: stringList,
       }),
+      params: z.array(paramSpecSchema).default([]),
     }),
   ),
   routing_strategies: z.array(
@@ -91,6 +105,7 @@ const definitionSchema = z.object({
       id: z.string(),
       implementation_id: z.string(),
       description: z.string().default(''),
+      params: z.record(z.string(), paramValueSchema).optional(),
     }),
   ),
   edges: z.array(edgeSchema),
@@ -171,6 +186,7 @@ function toDefinition(wire: Wire<typeof definitionSchema>): AgentDefinition {
       id: node.id,
       implementationId: node.implementation_id,
       description: node.description,
+      ...(node.params && Object.keys(node.params).length > 0 ? { params: node.params } : {}),
     })),
     edges: wire.edges.map(toEdge),
   };
@@ -214,6 +230,16 @@ export function toCatalog(wire: Wire<typeof catalogSchema>): Catalog {
         guaranteedOutputs: node.contract.guaranteed_outputs,
         optionalOutputs: node.contract.optional_outputs,
       },
+      params: node.params.map((spec) => ({
+        name: spec.name,
+        kind: spec.kind,
+        default: spec.default ?? null,
+        required: spec.required,
+        minimum: spec.minimum ?? null,
+        maximum: spec.maximum ?? null,
+        maxLength: spec.max_length ?? null,
+        choices: spec.choices,
+      })),
     })),
     routingStrategies: wire.routing_strategies,
     state: {
@@ -258,6 +284,7 @@ export function definitionToWire(definition: AgentDefinition) {
       id: node.id,
       implementation_id: node.implementationId,
       description: node.description,
+      ...(node.params && Object.keys(node.params).length > 0 ? { params: node.params } : {}),
     })),
     edges: definition.edges.map((edge) =>
       edge.type === 'direct'
