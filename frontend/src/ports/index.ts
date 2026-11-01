@@ -1,5 +1,6 @@
 /** Outbound ports: what the Studio needs from the outside world. */
 import type { EditorDocument, Point } from '../domain/editor/model';
+import type { GaiaQuestion, ModelOption, RunRecord, RunRequest } from '../domain/run';
 import type {
   AgentDefinition,
   Architecture,
@@ -67,6 +68,24 @@ export interface DraftPort {
   savedMarker(id: string): SavedMarker | null;
 }
 
+export interface RunPort {
+  /**
+   * Run a saved version and return its record. A run that fails midway is still a record (with
+   * status `error` and the steps that happened); only a refusal before it started rejects.
+   */
+  run(request: RunRequest, signal?: AbortSignal): Promise<RunRecord>;
+  get(id: string): Promise<RunRecord>;
+}
+
+export interface ModelPort {
+  list(): Promise<ModelOption[]>;
+}
+
+export interface QuestionPort {
+  /** Benchmark questions. Rejects with kind `unavailable` where they must not be offered. */
+  list(): Promise<GaiaQuestion[]>;
+}
+
 export type StudioMode = 'live' | 'demo';
 
 export interface StudioServices {
@@ -77,4 +96,7 @@ export interface StudioServices {
   validation: ValidationPort;
   layouts: LayoutPort;
   drafts: DraftPort;
+  runs: RunPort;
+  models: ModelPort;
+  questions: QuestionPort;
 }

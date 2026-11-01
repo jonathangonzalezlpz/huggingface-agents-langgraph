@@ -14,6 +14,13 @@ const TERMINAL_WIDTH = 72;
 const TERMINAL_HEIGHT = 40;
 const TERMINAL_GAP = 90;
 
+/** How a node took part in a run being shown. */
+export type NodeRunState = {
+  state: 'visited' | 'skipped' | 'failed' | 'active';
+  visits: number;
+  seconds: number;
+};
+
 export type ComponentNodeData = {
   node: EditorNode;
   component: ComponentInfo | undefined;
@@ -21,6 +28,8 @@ export type ComponentNodeData = {
   /** Worst diagnostic attached to the node, if any. */
   severity: Severity | null;
   diagnosticCount: number;
+  /** Null outside a run. */
+  run: NodeRunState | null;
 };
 export type TerminalNodeData = { kind: 'start' | 'end' };
 
@@ -92,6 +101,7 @@ export function projectGraph(
         isEntry: doc.graph.initialNode === node.id,
         severity: attached?.severity ?? null,
         diagnosticCount: attached?.count ?? 0,
+        run: null,
       },
       width: NODE_WIDTH,
       height: nodeHeight(node),

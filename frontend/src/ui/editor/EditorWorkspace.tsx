@@ -1,6 +1,7 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   addNode,
@@ -49,6 +50,8 @@ export interface WorkspaceProps {
   readOnly: boolean;
   /** Persist the whole document as this local draft; also enables saving versions. */
   draftId?: string;
+  /** The stored version a read-only view can run. */
+  runVersionId?: string;
   /** Persist only the layout, for the saved or built-in version with this id. */
   layoutKey?: string;
   /** The stored validation of a saved version, shown until the graph is validated again. */
@@ -73,6 +76,7 @@ function Workspace({
   catalog,
   readOnly,
   draftId,
+  runVersionId,
   layoutKey,
   initialValidation,
   editLabel = 'editor.duplicate',
@@ -80,6 +84,7 @@ function Workspace({
 }: WorkspaceProps) {
   const { t, tp } = useI18n();
   const services = useServices();
+  const navigate = useNavigate();
   const [state, dispatch] = useReducer(editorReducer, initialDocument, initialState);
   const doc = state.history.present;
   const canvasApi = useRef<CanvasApi | null>(null);
@@ -192,11 +197,12 @@ function Workspace({
     return () => clearTimeout(timer);
   }, [doc.graph, readOnly, liveValidation]);
 
-  const saveVersion = async () => {
-    if (!draftId) return;
+  /** Save the draft as a version. Resolves to its id only when it is clean enough to run. */
+  const saveVersion = async (): Promise<string | null> => {
+    if (!draftId) return null;
     if (doc.graph.nodes.length === 0) {
       setSaveNotice({ tone: 'error', text: t('editor.save.empty') });
-      return;
+      return null;
     }
     const snapshot = doc;
     const snapshotJson = currentJson;
@@ -228,15 +234,39 @@ function Workspace({
         tone: errors > 0 || dropped.length > 0 ? 'warning' : 'success',
         text: parts.join(' '),
       });
+      return errors === 0 && dropped.length === 0 ? architecture.id : null;
     } catch (error) {
       const unavailable = error instanceof StudioError && error.kind === 'unavailable';
       setSaveNotice({
         tone: 'error',
         text: t(unavailable ? 'editor.save.unavailable' : 'editor.save.failed'),
       });
+      return null;
     } finally {
       setSaving(false);
     }
+  };
+
+  const live = services.mode === 'live';
+  const invalidNow = validated.view.status === 'done' && !stale && !validated.view.report.isValid;
+  const run: { label: 'editor.run' | 'editor.runSave'; disabled: boolean } | null = readOnly
+    ? runVersionId
+      ? { label: 'editor.run', disabled: !live || initialValidation?.isValid === false }
+      : null
+    : draftId
+      ? {
+          label: saveState === 'saved' ? 'editor.run' : 'editor.runSave',
+          disabled: !live || saving || invalidNow,
+        }
+      : null;
+
+  const startRun = async () => {
+    const versionId = readOnly
+      ? (runVersionId ?? null)
+      : saveState === 'saved'
+        ? (marker?.versionId ?? null)
+        : await saveVersion();
+    if (versionId) void navigate(`/runs?architecture=${encodeURIComponent(versionId)}`);
   };
 
   const goToNode = (id: string) => {
@@ -368,7 +398,9 @@ function Workspace({
         onLayout={runLayout}
         onFit={() => canvasApi.current?.fit()}
         onValidate={() => void runValidation(doc.graph)}
+        run={run}
         onSave={() => void saveVersion()}
+        onRun={() => void startRun()}
         onEdit={() => onEdit(doc)}
       />
       {readOnly && (

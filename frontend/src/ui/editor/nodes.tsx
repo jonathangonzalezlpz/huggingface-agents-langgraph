@@ -18,18 +18,27 @@ const SEVERITY_TONE = {
   info: 'text-info',
 } as const;
 
+const RUN_CLASSES = {
+  none: '',
+  visited: '',
+  skipped: 'opacity-40',
+  active: 'ring-2 ring-accent',
+  failed: 'border-error ring-2 ring-error',
+} as const;
+
 export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) {
-  const { t } = useI18n();
-  const { node, component, isEntry, severity, diagnosticCount } = data;
+  const { t, tp } = useI18n();
+  const { node, component, isEntry, severity, diagnosticCount, run } = data;
   const style = CATEGORY_STYLE[component?.category ?? 'other'];
   const SeverityIcon = severity ? SEVERITY_ICON[severity] : CheckCircle2;
   const { outgoing } = node;
 
   return (
     <div
+      data-run={run?.state}
       className={`h-full w-full overflow-hidden rounded-xl border border-l-4 bg-surface text-fg shadow-sm ${style.border} ${
         selected ? 'border-accent ring-2 ring-accent' : 'border-line-strong'
-      }`}
+      } ${RUN_CLASSES[run?.state ?? 'none']}`}
     >
       <Handle type="target" position={Position.Left} id={INPUT_HANDLE} />
       <div className="flex items-start gap-2 px-3 pt-2.5">
@@ -38,6 +47,11 @@ export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) 
           <p className="truncate font-mono text-sm font-semibold">{node.id}</p>
           {node.id !== node.implementationId && (
             <p className="truncate font-mono text-xs text-fg-muted">{node.implementationId}</p>
+          )}
+          {run && run.visits > 0 && (
+            <p className="truncate text-xs text-fg-muted">
+              {tp('runs.visits', run.visits)} · {run.seconds.toFixed(1)} s
+            </p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -51,6 +65,12 @@ export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) 
             <span title={t('builder.recoversErrors')} className="text-fg-muted">
               <ShieldCheck aria-hidden="true" className="size-3.5" />
               <span className="sr-only">{t('builder.recoversErrors')}</span>
+            </span>
+          )}
+          {run?.state === 'failed' && (
+            <span className="text-error" title={t('runs.status.error')}>
+              <XCircle aria-hidden="true" className="size-3.5" />
+              <span className="sr-only">{t('runs.status.error')}</span>
             </span>
           )}
           {severity && (

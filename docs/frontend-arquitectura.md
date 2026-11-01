@@ -88,6 +88,10 @@ proyecto solo se ha probado en Windows.
   dominio; proyección, autodisposición y búsqueda; y el espacio de trabajo completo con React
   Flow en jsdom (`src/test/reactFlow.ts` simula `ResizeObserver` y la geometría). jsdom no
   puede probar el arrastre ni el aspecto: eso se comprobó en un Edge real.
+- **Ejecuciones:** dominio del recorrido (`runPath`), superposición sobre la proyección del
+  grafo (`ui/run/overlay.ts`), página con puertos simulados (bloqueo de versiones inválidas,
+  ejecución, fallo en el nodo, dejar de esperar, preguntas de GAIA, demostración) y el botón
+  del editor. El camino de éxito con un modelo real no se ha comprobado.
 - **i18n:** mismas claves y marcadores en ambos idiomas, plurales y detección.
 - **Tokens:** todos los pares de color cumplen WCAG (4,5:1 texto, 3:1 componentes) en ambos
   temas. Se comprueba contra `tokens.css`, que es la única fuente de los colores.

@@ -10,10 +10,16 @@ import {
   catalogSchema,
   definitionToWire,
   layoutSchema,
+  modelsSchema,
+  questionsSchema,
+  runRecordSchema,
   savedRecordSchema,
   statusSchema,
   toArchitecture,
   toCatalog,
+  toModels,
+  toQuestions,
+  toRunRecord,
   toStatus,
   toSummary,
   toValidation,
@@ -55,6 +61,22 @@ async function requestJson<S extends z.ZodType>(
   }
   return parsed.data;
 }
+
+/** The settings every Studio run uses: the V3.1 pipeline with all its improvements. */
+const RUN_PRESET = {
+  name: 'Studio',
+  pipeline_version: '3.1',
+  improvements: [
+    'reasoning_control',
+    'answer_contract',
+    'web_sources',
+    'spreadsheet_tools',
+    'multimedia_tools',
+    'calculation_tools',
+  ],
+} as const;
+
+const isAbort = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
 
 const layoutPath = (architectureId: string) =>
   `/api/architectures/${encodeURIComponent(architectureId)}/layout`;
@@ -134,5 +156,64 @@ export function createHttpServices(
       },
     },
     drafts: createLocalStorageDrafts(),
+    runs: {
+      run: async (request, signal) => {
+        const body = {
+          task_id: request.taskId,
+          question: request.question,
+          file_name: request.fileName,
+          experiment: {
+            ...RUN_PRESET,
+            architecture: request.architectureId,
+            ...(request.model
+              ? { model: { provider: request.model.provider, model_id: request.model.modelId } }
+              : {}),
+          },
+        };
+        let response: Response;
+        try {
+          response = await fetchImpl('/api/run', {
+            method: 'POST',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            ...(signal ? { signal } : {}),
+          });
+        } catch (error) {
+          if (isAbort(error)) throw new StudioError('aborted', 'The wait was cancelled');
+          throw new StudioError(
+            'network',
+            error instanceof Error ? error.message : 'Network error',
+          );
+        }
+        const payload: unknown = await response.json().catch(() => null);
+        const fields = (payload && typeof payload === 'object' ? payload : {}) as {
+          run_id?: unknown;
+          error?: unknown;
+        };
+        if (typeof fields.run_id !== 'string') {
+          const reason =
+            typeof fields.error === 'string' ? fields.error : `responded ${response.status}`;
+          throw new StudioError('http', `/api/run ${reason}`, response.status);
+        }
+        return toRunRecord(
+          await requestJson(
+            fetchImpl,
+            `/api/runs/${encodeURIComponent(fields.run_id)}`,
+            runRecordSchema,
+          ),
+        );
+      },
+      get: async (id) =>
+        toRunRecord(
+          await requestJson(fetchImpl, `/api/runs/${encodeURIComponent(id)}`, runRecordSchema),
+        ),
+    },
+    models: {
+      list: async () => toModels(await requestJson(fetchImpl, '/api/models', modelsSchema)),
+    },
+    questions: {
+      list: async () =>
+        toQuestions(await requestJson(fetchImpl, '/api/questions', questionsSchema)),
+    },
   };
 }

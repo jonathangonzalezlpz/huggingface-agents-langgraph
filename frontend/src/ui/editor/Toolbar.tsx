@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Copy,
   Pencil,
+  Play,
   Save,
   LayoutGrid,
   Maximize,
@@ -63,6 +64,7 @@ export function Toolbar({
   savedVersion,
   saving,
   editLabel,
+  run,
   onUndo,
   onRedo,
   onAdd,
@@ -70,6 +72,7 @@ export function Toolbar({
   onFit,
   onValidate,
   onSave,
+  onRun,
   onEdit,
 }: {
   title: string;
@@ -83,6 +86,8 @@ export function Toolbar({
   savedVersion: number | null;
   saving: boolean;
   editLabel: 'editor.edit' | 'editor.duplicate';
+  /** Null when this view cannot start a run. */
+  run: { label: 'editor.run' | 'editor.runSave'; disabled: boolean } | null;
   onUndo: () => void;
   onRedo: () => void;
   onAdd: () => void;
@@ -90,6 +95,7 @@ export function Toolbar({
   onFit: () => void;
   onValidate: () => void;
   onSave: () => void;
+  onRun: () => void;
   onEdit: () => void;
 }) {
   const { t } = useI18n();
@@ -145,6 +151,9 @@ export function Toolbar({
         />
         {saveState !== null && (
           <ToolButton label="editor.save" Icon={Save} onClick={onSave} disabled={saving} />
+        )}
+        {run && (
+          <ToolButton label={run.label} Icon={Play} onClick={onRun} disabled={run.disabled} />
         )}
         {readOnly && (
           <ToolButton

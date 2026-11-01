@@ -24,8 +24,6 @@ function Placeholder({ title, description }: { title: MessageKey; description: M
   );
 }
 
-export const RunsPage = () => <Placeholder title="runs.title" description="runs.description" />;
-
 export const ExperimentsPage = () => (
   <Placeholder title="experiments.title" description="experiments.description" />
 );

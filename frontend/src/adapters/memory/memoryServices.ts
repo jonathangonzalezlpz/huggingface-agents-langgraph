@@ -58,5 +58,14 @@ export function createMemoryServices(): StudioServices {
       },
     },
     drafts: createLocalStorageDrafts(),
+    // Running needs the Python backend, and benchmark questions are never offered here.
+    runs: {
+      run: () => Promise.reject(new StudioError('unavailable', 'Running needs the backend')),
+      get: (id) => Promise.reject(new StudioError('http', `Run ${id} not found`, 404)),
+    },
+    models: { list: () => Promise.resolve([]) },
+    questions: {
+      list: () => Promise.reject(new StudioError('unavailable', 'Questions need the backend')),
+    },
   };
 }

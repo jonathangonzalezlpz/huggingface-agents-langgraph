@@ -74,6 +74,7 @@ export function ArchitectureEditorPage() {
       catalog={state.data.components}
       readOnly
       layoutKey={id}
+      runVersionId={state.data.architecture.id}
       initialValidation={state.data.architecture.validation}
       editLabel={state.data.architecture.readOnly ? 'editor.duplicate' : 'editor.edit'}
       onEdit={() => {
