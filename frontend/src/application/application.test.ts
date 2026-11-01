@@ -53,6 +53,7 @@ describe('loadLibrary', () => {
     const failing: ArchitecturePort = {
       list: () => createMemoryServices().architectures.list(),
       get: () => Promise.reject(new StudioError('network', 'down')),
+      save: () => Promise.reject(new StudioError('network', 'down')),
     };
     await expect(loadLibrary(failing)).rejects.toMatchObject({ kind: 'network' });
   });

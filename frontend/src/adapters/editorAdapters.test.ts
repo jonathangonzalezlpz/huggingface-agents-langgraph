@@ -205,3 +205,111 @@ describe('local drafts', () => {
     expect(drafts.load('d1')?.graph.nodes.some((n) => n.id === END)).toBe(false);
   });
 });
+
+describe('saving versions', () => {
+  const stored = {
+    ...demo.architecture,
+    id: '11111111-1111-5111-8111-111111111111',
+    architecture_id: 'mine',
+    version: 1,
+    read_only: false,
+  };
+
+  function server(existing: string[]) {
+    const calls: { path: string; method: string | undefined }[] = [];
+    const fetchImpl: FetchLike = (path, init) => {
+      calls.push({ path, method: init?.method });
+      if (path === '/api/architectures' && init?.method === 'POST')
+        return Promise.resolve(respond(stored));
+      if (path === '/api/architectures') {
+        const summary = Object.fromEntries(
+          Object.entries(stored).filter(([key]) => key !== 'definition'),
+        );
+        return Promise.resolve(
+          respond({ architectures: existing.map((id) => ({ ...summary, id })) }),
+        );
+      }
+      return Promise.resolve(respond({ ...stored, validation: demo.validation }));
+    };
+    return { fetchImpl, calls };
+  }
+
+  it('posts the definition and returns the saved version with its validation', async () => {
+    const { fetchImpl, calls } = server([]);
+    const result = await createHttpServices(fetchImpl).architectures.save(builtin.definition);
+    expect(result.architecture).toMatchObject({ id: stored.id, version: 1, readOnly: false });
+    expect(result.architecture.validation.isValid).toBe(true);
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+
+  it('tells a new version from one that already existed', async () => {
+    const fresh = await createHttpServices(server([]).fetchImpl).architectures.save(
+      builtin.definition,
+    );
+    expect(fresh.created).toBe(true);
+    const again = await createHttpServices(server([stored.id]).fetchImpl).architectures.save(
+      builtin.definition,
+    );
+    expect(again.created).toBe(false);
+  });
+
+  it('surfaces a refused save as a typed error', async () => {
+    const fetchImpl: FetchLike = (path, init) =>
+      Promise.resolve(
+        path === '/api/architectures' && init?.method === 'POST'
+          ? respond({ error: 'reserved' }, 400)
+          : respond({ architectures: [] }),
+      );
+    await expect(
+      createHttpServices(fetchImpl).architectures.save(builtin.definition),
+    ).rejects.toMatchObject({ kind: 'http', status: 400 });
+  });
+
+  it('is unavailable in demo mode', async () => {
+    await expect(memory.architectures.save(builtin.definition)).rejects.toMatchObject({
+      kind: 'unavailable',
+    });
+  });
+});
+
+describe('saved markers on drafts', () => {
+  const doc: EditorDocument = linearDocument('mine', catalog);
+  const marker = { versionId: 'v-id', version: 2, definitionJson: '{"a":1}' };
+
+  it('remembers which version a draft was saved as', () => {
+    const drafts = createLocalStorageDrafts(fakeStorage());
+    drafts.save('d1', doc);
+    expect(drafts.savedMarker('d1')).toBeNull();
+    drafts.markSaved('d1', marker);
+    expect(drafts.savedMarker('d1')).toEqual(marker);
+  });
+
+  it('keeps the marker while the draft is edited and saved again', () => {
+    const drafts = createLocalStorageDrafts(fakeStorage());
+    drafts.save('d1', doc);
+    drafts.markSaved('d1', marker);
+    drafts.save('d1', blankDocument('changed'));
+    expect(drafts.savedMarker('d1')).toEqual(marker);
+    expect(drafts.load('d1')?.graph.architectureId).toBe('changed');
+  });
+
+  it('ignores a marker for a draft that does not exist and drops it with the draft', () => {
+    const drafts = createLocalStorageDrafts(fakeStorage());
+    drafts.markSaved('ghost', marker);
+    expect(drafts.savedMarker('ghost')).toBeNull();
+    drafts.save('d1', doc);
+    drafts.markSaved('d1', marker);
+    drafts.remove('d1');
+    expect(drafts.savedMarker('d1')).toBeNull();
+  });
+
+  it('loads drafts written before markers existed', () => {
+    const legacy = JSON.stringify({
+      version: 1,
+      drafts: [{ id: 'old', updatedAt: 1, document: doc }],
+    });
+    const drafts = createLocalStorageDrafts(fakeStorage({ 'studio.drafts.v1': legacy }));
+    expect(drafts.load('old')).toEqual(doc);
+    expect(drafts.savedMarker('old')).toBeNull();
+  });
+});

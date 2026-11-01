@@ -180,6 +180,7 @@ describe('builder page', () => {
       architectures: {
         list: () => Promise.reject(new StudioError('http', 'boom', 503)),
         get: base.architectures.get,
+        save: base.architectures.save,
       },
     });
     expect(await screen.findByRole('alert')).toHaveTextContent(

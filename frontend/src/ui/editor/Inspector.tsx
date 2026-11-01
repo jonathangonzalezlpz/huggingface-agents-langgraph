@@ -1,15 +1,14 @@
 import { Trash2 } from 'lucide-react';
-import { useId, useState } from 'react';
-import type { FormEvent } from 'react';
+import { useId } from 'react';
 
-import { type CommandResult, renameNode } from '../../domain/editor/commands';
+import { renameArchitecture, renameNode, setDescription } from '../../domain/editor/commands';
 import { END, findNode, type EditorDocument } from '../../domain/editor/model';
 import type { Catalog, ComponentInfo } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
 import { CATEGORY_STYLE } from '../components/categoryStyle';
 import { useComponentDescription } from '../components/componentText';
 import { StatusBadge } from '../components/StatusBadge';
-import { rejectionText } from './rejectionText';
+import { AvailabilitySection, TextCommitField, type AvailabilityView } from './InspectorFields';
 
 const FIELD = 'min-h-9 w-full rounded-lg border border-line-strong bg-surface px-2 text-sm';
 const ACTION =
@@ -22,6 +21,8 @@ export interface InspectorActions {
   openConnect: (id: string, branch: string | null) => void;
   disconnect: (id: string, branch: string | null) => void;
   setDecision: (id: string, strategy: string) => void;
+  setDescription: (id: string, text: string) => void;
+  renameArchitecture: (name: string) => void;
 }
 
 function ContractList({ label, items }: { label: string; items: string[] }) {
@@ -41,58 +42,6 @@ function ContractList({ label, items }: { label: string; items: string[] }) {
         )}
       </dd>
     </div>
-  );
-}
-
-function RenameField({
-  id,
-  doc,
-  disabled,
-  onRename,
-}: {
-  id: string;
-  doc: EditorDocument;
-  disabled: boolean;
-  onRename: (newId: string) => void;
-}) {
-  const { t } = useI18n();
-  const fieldId = useId();
-  const [value, setValue] = useState(id);
-  const [problem, setProblem] = useState<CommandResult | null>(null);
-
-  const commitRename = (event?: FormEvent) => {
-    event?.preventDefault();
-    if (value === id) return setProblem(null);
-    const attempt = renameNode(doc, id, value);
-    if (attempt.ok) {
-      setProblem(null);
-      onRename(value);
-    } else {
-      setProblem(attempt);
-    }
-  };
-
-  return (
-    <form onSubmit={commitRename}>
-      <label htmlFor={fieldId} className="mb-1 block text-xs font-medium text-fg-muted">
-        {t('editor.node.id')}
-      </label>
-      <input
-        id={fieldId}
-        value={value}
-        disabled={disabled}
-        aria-invalid={problem !== null && !problem.ok}
-        aria-describedby={problem ? `${fieldId}-error` : undefined}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={() => commitRename()}
-        className={`${FIELD} font-mono`}
-      />
-      {problem && !problem.ok && (
-        <p id={`${fieldId}-error`} className="mt-1 text-xs text-error">
-          {rejectionText(t, problem.reason)}
-        </p>
-      )}
-    </form>
   );
 }
 
@@ -211,12 +160,14 @@ export function Inspector({
   selectedId,
   readOnly,
   actions,
+  availability,
 }: {
   doc: EditorDocument;
   catalog: Catalog;
   selectedId: string | null;
   readOnly: boolean;
   actions: InspectorActions;
+  availability: AvailabilityView;
 }) {
   const { t, tp } = useI18n();
   const describe = useComponentDescription();
@@ -231,11 +182,19 @@ export function Inspector({
         <h2 id="inspector-title" className="text-sm font-semibold">
           {t('editor.inspector')}
         </h2>
-        <dl className="mt-3 space-y-1 text-sm">
-          <dt className="text-xs font-medium text-fg-muted">{t('editor.inspector.graph')}</dt>
-          <dd className="font-mono">{doc.graph.architectureId}</dd>
-          <dd className="text-fg-muted">{tp('builder.components', doc.graph.nodes.length)}</dd>
-        </dl>
+        <div className="mt-3 space-y-2">
+          <TextCommitField
+            label={t('editor.architecture.name')}
+            value={doc.graph.architectureId}
+            disabled={readOnly}
+            mono
+            validate={(next) => renameArchitecture(doc, next)}
+            onCommit={actions.renameArchitecture}
+          />
+          <p className="text-sm text-fg-muted">
+            {tp('builder.components', doc.graph.nodes.length)}
+          </p>
+        </div>
         <p className="mt-4 text-sm text-fg-muted">{t('editor.inspector.empty')}</p>
       </section>
     );
@@ -251,12 +210,23 @@ export function Inspector({
         {t('editor.inspector')}
       </h2>
 
-      <RenameField
-        key={node.id}
-        id={node.id}
-        doc={doc}
+      <TextCommitField
+        key={`id-${node.id}`}
+        label={t('editor.node.id')}
+        value={node.id}
         disabled={readOnly}
-        onRename={(newId) => actions.rename(node.id, newId)}
+        mono
+        validate={(next) => renameNode(doc, node.id, next)}
+        onCommit={(next) => actions.rename(node.id, next)}
+      />
+      <TextCommitField
+        key={`description-${node.id}`}
+        label={t('editor.node.description')}
+        value={node.description}
+        disabled={readOnly}
+        multiline
+        validate={(next) => setDescription(doc, node.id, next)}
+        onCommit={(next) => actions.setDescription(node.id, next)}
       />
 
       <div>
@@ -308,6 +278,8 @@ export function Inspector({
           />
         </dl>
       )}
+
+      <AvailabilitySection view={availability} />
 
       <button
         type="button"

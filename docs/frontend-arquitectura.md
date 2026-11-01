@@ -54,7 +54,13 @@ traducen en comandos; así las reglas de prevención de errores se prueban sin n
 - **Conversión.** `fromDefinition`/`toDefinition`; lo que el editor no puede representar se
   informa, nunca se oculta. Las ramas sin conectar no se exportan, de modo que el validador
   las señala.
-- **Borradores.** Locales al navegador (`DraftPort`); guardar versiones es M3.2.
+- **Borradores.** Locales al navegador (`DraftPort`), con un marcador de qué versión se guardó
+  para saber si hay cambios sin guardar. Guardar una versión (`ArchitecturePort.save`) crea la
+  siguiente de esa arquitectura; el nombre decide a qué historial pertenece.
+- **Validación.** En vivo con retardo; una respuesta solo cuenta si ninguna petición posterior
+  empezó después. El informe incluye la disponibilidad de campos por nodo.
+- **Versiones.** `domain/versions.ts` agrupa y `domain/diff.ts` resume los cambios entre dos
+  definiciones; ambos son funciones puras.
 - **Carga bajo demanda.** El editor está en un fragmento aparte para no penalizar el resto.
 
 

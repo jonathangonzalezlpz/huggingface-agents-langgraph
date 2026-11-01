@@ -3,64 +3,17 @@ import { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { loadLibrary } from '../../application/loadLibrary';
-import { groupComponents, shortHash } from '../../domain/catalog';
-import type { Architecture } from '../../domain/types';
+import { groupComponents } from '../../domain/catalog';
+import { groupVersions } from '../../domain/versions';
 import { useI18n } from '../../i18n/I18nProvider';
 import { CATEGORY_STYLE } from '../components/categoryStyle';
 import { useComponentDescription } from '../components/componentText';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { PageHeader } from '../components/PageHeader';
-import { StatusBadge } from '../components/StatusBadge';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { buildDraft, saveNewDraft, type DraftKind } from '../editor/drafts';
 import { useServices } from '../services';
-
-function ArchitectureCard({ architecture }: { architecture: Architecture }) {
-  const { t, tp } = useI18n();
-  const { validation } = architecture;
-  return (
-    <li className="rounded-xl border border-line bg-surface p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="font-mono text-base font-semibold">{architecture.architectureId}</h3>
-          <p className="mt-1 text-sm text-fg-muted">
-            {architecture.version === null
-              ? t('builder.builtin')
-              : t('builder.version', { version: architecture.version })}
-            {' · '}
-            <span className="font-mono">{shortHash(architecture.contentSha256)}</span>
-            {' · '}
-            {tp('builder.components', architecture.definition.nodes.length)}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {architecture.readOnly && (
-            <StatusBadge tone="neutral">{t('builder.readOnly')}</StatusBadge>
-          )}
-          <StatusBadge tone={validation.isValid ? 'success' : 'error'}>
-            {validation.isValid ? t('builder.validation.valid') : t('builder.validation.invalid')}
-          </StatusBadge>
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-fg-muted">
-          {tp('diagnostics.errors', validation.counts.error)}
-          {' · '}
-          {tp('diagnostics.warnings', validation.counts.warning)}
-          {' · '}
-          {tp('diagnostics.infos', validation.counts.info)}
-        </p>
-        <Link
-          to={`/builder/architecture/${encodeURIComponent(architecture.id)}`}
-          aria-label={`${t('builder.open')} ${architecture.architectureId}`}
-          className="inline-flex min-h-9 items-center rounded-lg border border-line-strong bg-surface px-3 text-sm font-medium hover:bg-muted"
-        >
-          {t('builder.open')}
-        </Link>
-      </div>
-    </li>
-  );
-}
+import { ArchitectureGroupCard } from './ArchitectureGroupCard';
 
 function Library() {
   const { architectures } = useServices();
@@ -80,8 +33,8 @@ function Library() {
           <p className="text-fg-muted">{t('builder.library.empty')}</p>
         ) : (
           <ul className="space-y-3">
-            {state.data.map((architecture) => (
-              <ArchitectureCard key={architecture.id} architecture={architecture} />
+            {groupVersions(state.data).map((group) => (
+              <ArchitectureGroupCard key={group.architectureId} group={group} />
             ))}
           </ul>
         ))}

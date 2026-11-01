@@ -13,9 +13,17 @@ export interface CatalogPort {
   getCatalog(): Promise<Catalog>;
 }
 
+export interface SaveResult {
+  architecture: Architecture;
+  /** False when identical content was already stored, so no new version was created. */
+  created: boolean;
+}
+
 export interface ArchitecturePort {
   list(): Promise<ArchitectureSummary[]>;
   get(id: string): Promise<Architecture>;
+  /** Store a definition as a new immutable version. Rejects with kind `unavailable` in demo mode. */
+  save(definition: AgentDefinition): Promise<SaveResult>;
 }
 
 export interface SystemPort {
@@ -40,12 +48,23 @@ export interface DraftSummary {
   updatedAt: number;
 }
 
+/** Which saved version a draft last became, to tell whether it changed since. */
+export interface SavedMarker {
+  versionId: string;
+  version: number;
+  /** The definition as saved, serialized canonically for comparison. */
+  definitionJson: string;
+}
+
 /** Work in progress that is not a saved version yet. Local to this browser. */
 export interface DraftPort {
   list(): DraftSummary[];
   load(id: string): EditorDocument | null;
+  /** Keeps the saved marker, if any. */
   save(id: string, document: EditorDocument): void;
   remove(id: string): void;
+  markSaved(id: string, marker: SavedMarker): void;
+  savedMarker(id: string): SavedMarker | null;
 }
 
 export type StudioMode = 'live' | 'demo';

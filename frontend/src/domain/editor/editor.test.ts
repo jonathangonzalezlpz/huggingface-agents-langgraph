@@ -13,12 +13,14 @@ import {
   disconnectBranch,
   moveNodes,
   removeNode,
+  renameArchitecture,
   renameNode,
   setDecision,
+  setDescription,
   setInitial,
   type CommandResult,
 } from './commands';
-import { fromDefinition, toDefinition } from './convert';
+import { fromDefinition, toDefinition, unexportableDecisions } from './convert';
 import { commit, createHistory, redo, undo } from './history';
 import { END, checkInvariants, findNode, type EditorDocument } from './model';
 import { blankDocument, documentFromArchitecture, linearDocument } from './templates';
@@ -376,4 +378,54 @@ describe('invariants under arbitrary command sequences', () => {
 
 it('uses the demo fixture the backend generated', () => {
   expect(demo.architecture.id).toBe('builtin:gaia_v31');
+});
+
+describe('descriptions and the architecture name', () => {
+  it('sets a node description and ignores an unchanged one', () => {
+    const doc = twoNodes();
+    const described = ok(setDescription(doc, 'reasoning', 'Thinks about it'));
+    expect(findNode(described.graph, 'reasoning')?.description).toBe('Thinks about it');
+    expect(ok(setDescription(described, 'reasoning', 'Thinks about it'))).toBe(described);
+    expect(setDescription(doc, 'ghost', 'x')).toMatchObject({ reason: { code: 'unknown-node' } });
+  });
+
+  it('refuses descriptions that are too long', () => {
+    expect(setDescription(twoNodes(), 'reasoning', 'x'.repeat(501))).toMatchObject({
+      reason: { code: 'invalid-description' },
+    });
+  });
+
+  it('renames the architecture within the model rules', () => {
+    const doc = twoNodes();
+    expect(ok(renameArchitecture(doc, 'mi_agente')).graph.architectureId).toBe('mi_agente');
+    expect(ok(renameArchitecture(doc, 'demo'))).toBe(doc);
+    for (const bad of ['', '  ', ' padded ', 'x'.repeat(101)]) {
+      expect(renameArchitecture(doc, bad), bad).toMatchObject({ reason: { code: 'invalid-name' } });
+    }
+    expect(renameArchitecture(doc, 'gaia_v31')).toMatchObject({
+      reason: { code: 'reserved-name' },
+    });
+  });
+
+  it('keeps node ids, connections and layout untouched when renaming the architecture', () => {
+    const doc = ok(connect(twoNodes(), 'preprocessing', 'reasoning'));
+    const renamed = ok(renameArchitecture(doc, 'otro'));
+    expect(renamed.graph.nodes).toBe(doc.graph.nodes);
+    expect(renamed.layout).toBe(doc.layout);
+  });
+});
+
+describe('decisions that cannot be stored', () => {
+  it('lists decisions with no connected branch, which the export leaves out', () => {
+    let doc = twoNodes();
+    doc = ok(setDecision(doc, catalog, 'preprocessing', 'route_after_review'));
+    expect(unexportableDecisions(doc.graph)).toEqual(['preprocessing']);
+    doc = ok(connectBranch(doc, 'preprocessing', 'act', 'reasoning'));
+    expect(unexportableDecisions(doc.graph)).toEqual([]);
+  });
+
+  it('ignores nodes without a decision', () => {
+    expect(unexportableDecisions(twoNodes().graph)).toEqual([]);
+    expect(unexportableDecisions(linearDocument('x', catalog).graph)).toEqual([]);
+  });
 });

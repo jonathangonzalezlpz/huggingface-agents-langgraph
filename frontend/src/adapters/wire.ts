@@ -21,6 +21,12 @@ const stringList = z.array(z.string());
 export const validationSchema = z.object({
   is_valid: z.boolean(),
   counts: z.object({ error: z.number(), warning: z.number(), info: z.number() }),
+  availability: z
+    .record(
+      z.string(),
+      z.object({ guaranteed: z.array(z.string()), possible: z.array(z.string()) }),
+    )
+    .default({}),
   diagnostics: z.array(
     z.object({
       code: z.string(),
@@ -101,6 +107,9 @@ export const layoutSchema = z.object({
   }),
 });
 
+/** What saving returns: the stored version, without its validation. */
+export const savedRecordSchema = summarySchema.extend({ definition: definitionSchema });
+
 export const architectureListSchema = z.object({ architectures: z.array(summarySchema) });
 
 export const statusSchema = z.object({
@@ -153,6 +162,7 @@ export function toValidation(wire: Wire<typeof validationSchema>): ValidationRep
   return {
     isValid: wire.is_valid,
     counts: wire.counts,
+    availability: wire.availability,
     diagnostics: wire.diagnostics.map((item) => ({
       code: item.code,
       severity: item.severity,

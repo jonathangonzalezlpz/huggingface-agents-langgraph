@@ -115,3 +115,14 @@ export function toDefinition(graph: EditorGraph): AgentDefinition {
     edges,
   };
 }
+
+/** Decisions with no connected branch: the backend cannot store them, so saving drops them. */
+export function unexportableDecisions(graph: EditorGraph): string[] {
+  return graph.nodes
+    .filter(
+      (node) =>
+        node.outgoing.kind === 'decision' &&
+        Object.values(node.outgoing.branches).every((target) => target === null),
+    )
+    .map((node) => node.id);
+}

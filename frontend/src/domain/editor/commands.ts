@@ -20,7 +20,10 @@ export type RejectionCode =
   | 'unknown-branch'
   | 'has-decision'
   | 'no-decision'
-  | 'invalid-position';
+  | 'invalid-position'
+  | 'invalid-description'
+  | 'invalid-name'
+  | 'reserved-name';
 
 export interface Rejection {
   code: RejectionCode;
@@ -260,3 +263,26 @@ export function moveNodes(doc: EditorDocument, positions: Record<string, Point>)
 }
 
 export const applyLayout = moveNodes;
+
+const MAX_DESCRIPTION_LENGTH = 500;
+const MAX_NAME_LENGTH = 100;
+/** The backend keeps this name for the built-in pipeline. */
+export const RESERVED_ARCHITECTURE_NAMES: ReadonlySet<string> = new Set(['gaia_v31']);
+
+export function setDescription(doc: EditorDocument, id: string, text: string): CommandResult {
+  const node = findNode(doc.graph, id);
+  if (!node) return rejected('unknown-node', id);
+  if (text.length > MAX_DESCRIPTION_LENGTH) return rejected('invalid-description', id);
+  if (node.description === text) return accepted(doc);
+  return accepted(withNode(doc, id, (n) => ({ ...n, description: text })));
+}
+
+/** Rename the architecture itself, which decides which history a saved version joins. */
+export function renameArchitecture(doc: EditorDocument, name: string): CommandResult {
+  if (name === doc.graph.architectureId) return accepted(doc);
+  if (name.trim() === '' || name !== name.trim() || name.length > MAX_NAME_LENGTH) {
+    return rejected('invalid-name', name);
+  }
+  if (RESERVED_ARCHITECTURE_NAMES.has(name)) return rejected('reserved-name', name);
+  return accepted({ ...doc, graph: { ...doc.graph, architectureId: name } });
+}

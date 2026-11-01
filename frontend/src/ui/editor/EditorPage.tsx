@@ -3,13 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { StudioError } from '../../domain/errors';
 import { documentFromArchitecture } from '../../domain/editor/templates';
-import type { EditorDocument } from '../../domain/editor/model';
 import { useI18n } from '../../i18n/I18nProvider';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { useServices } from '../services';
 import { computeLayout } from './autoLayout';
-import { saveNewDraft, uniqueArchitectureId } from './drafts';
+import { saveNewDraft, startEditing } from './drafts';
 import { EditorWorkspace } from './EditorWorkspace';
 
 function Message({ children }: { children: string }) {
@@ -24,28 +23,13 @@ function Message({ children }: { children: string }) {
   );
 }
 
-function useDuplicate() {
-  const services = useServices();
-  const navigate = useNavigate();
-  return (doc: EditorDocument) => {
-    const taken = services.drafts.list().map((draft) => draft.architectureId);
-    const copy: EditorDocument = {
-      ...doc,
-      graph: {
-        ...doc.graph,
-        architectureId: uniqueArchitectureId(`${doc.graph.architectureId}_copy`, taken),
-      },
-    };
-    navigate(`/builder/draft/${saveNewDraft(services, copy)}`);
-  };
-}
-
 /** A saved or built-in version: structure is read-only, layout is kept. */
 export function ArchitectureEditorPage() {
   const { id = '' } = useParams();
   const { t } = useI18n();
   const { architectures, catalog, layouts } = useServices();
-  const duplicate = useDuplicate();
+  const navigate = useNavigate();
+  const services = useServices();
 
   const load = useCallback(async () => {
     const [architecture, components, stored] = await Promise.all([
@@ -91,7 +75,12 @@ export function ArchitectureEditorPage() {
       readOnly
       layoutKey={id}
       initialValidation={state.data.architecture.validation}
-      onDuplicate={duplicate}
+      editLabel={state.data.architecture.readOnly ? 'editor.duplicate' : 'editor.edit'}
+      onEdit={() => {
+        void startEditing(services, state.data.architecture).then((draftId) =>
+          navigate(`/builder/draft/${draftId}`),
+        );
+      }}
     />
   );
 }
@@ -101,7 +90,7 @@ export function DraftEditorPage() {
   const { id = '' } = useParams();
   const { t } = useI18n();
   const services = useServices();
-  const duplicate = useDuplicate();
+  const navigate = useNavigate();
   const draft = useMemo(() => services.drafts.load(id), [services.drafts, id]);
   const load = useCallback(() => services.catalog.getCatalog(), [services.catalog]);
   const state = useAsyncData(load);
@@ -123,7 +112,7 @@ export function DraftEditorPage() {
       catalog={state.data}
       readOnly={false}
       draftId={id}
-      onDuplicate={duplicate}
+      onEdit={(doc) => navigate(`/builder/draft/${saveNewDraft(services, doc)}`)}
     />
   );
 }

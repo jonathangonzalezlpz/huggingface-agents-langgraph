@@ -11,10 +11,17 @@ export interface Diagnostic {
   branch?: string;
 }
 
+/** Fields present when a node starts: on every path, or only on some. */
+export interface NodeAvailability {
+  guaranteed: string[];
+  possible: string[];
+}
+
 export interface ValidationReport {
   isValid: boolean;
   counts: Record<Severity, number>;
   diagnostics: Diagnostic[];
+  availability: Record<string, NodeAvailability>;
 }
 
 export type Category = 'input' | 'acquisition' | 'research' | 'reasoning' | 'output' | 'other';

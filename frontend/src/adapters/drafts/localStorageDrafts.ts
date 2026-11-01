@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 import { checkInvariants, type EditorDocument } from '../../domain/editor/model';
-import type { DraftPort, DraftSummary } from '../../ports';
+import type { DraftPort, DraftSummary, SavedMarker } from '../../ports';
 
 const STORAGE_KEY = 'studio.drafts.v1';
 const MAX_DRAFTS = 20;
 
-const pointSchema = z.object({ x: z.number().finite(), y: z.number().finite() });
+const pointSchema = z.object({ x: z.number(), y: z.number() });
 
 const outgoingSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }),
@@ -36,9 +36,22 @@ const documentSchema = z.object({
   layout: z.record(z.string(), pointSchema),
 });
 
+const markerSchema = z.object({
+  versionId: z.string(),
+  version: z.number().int(),
+  definitionJson: z.string(),
+});
+
 const storeSchema = z.object({
   version: z.literal(1),
-  drafts: z.array(z.object({ id: z.string(), updatedAt: z.number(), document: documentSchema })),
+  drafts: z.array(
+    z.object({
+      id: z.string(),
+      updatedAt: z.number(),
+      document: documentSchema,
+      saved: markerSchema.optional(),
+    }),
+  ),
 });
 
 type Stored = z.output<typeof storeSchema>['drafts'];
@@ -70,25 +83,34 @@ export function createLocalStorageDrafts(
     }
   }
 
+  const newestFirst = (drafts: Stored) => [...drafts].sort((a, b) => b.updatedAt - a.updatedAt);
+
   return {
     list(): DraftSummary[] {
-      return read()
-        .map((draft) => ({
-          id: draft.id,
-          architectureId: draft.document.graph.architectureId,
-          nodeCount: draft.document.graph.nodes.length,
-          updatedAt: draft.updatedAt,
-        }))
-        .sort((a, b) => b.updatedAt - a.updatedAt);
+      return newestFirst(read()).map((draft) => ({
+        id: draft.id,
+        architectureId: draft.document.graph.architectureId,
+        nodeCount: draft.document.graph.nodes.length,
+        updatedAt: draft.updatedAt,
+      }));
     },
     load: (id) => (read().find((draft) => draft.id === id)?.document as EditorDocument) ?? null,
     save(id, document) {
-      const others = read().filter((draft) => draft.id !== id);
-      const next = [...others, { id, updatedAt: now(), document }];
-      write(next.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_DRAFTS));
+      const drafts = read();
+      const saved = drafts.find((draft) => draft.id === id)?.saved;
+      const entry = { id, updatedAt: now(), document, ...(saved ? { saved } : {}) };
+      write(
+        newestFirst([...drafts.filter((draft) => draft.id !== id), entry]).slice(0, MAX_DRAFTS),
+      );
     },
     remove(id) {
       write(read().filter((draft) => draft.id !== id));
     },
+    markSaved(id, marker) {
+      const drafts = read();
+      if (!drafts.some((draft) => draft.id === id)) return;
+      write(drafts.map((draft) => (draft.id === id ? { ...draft, saved: marker } : draft)));
+    },
+    savedMarker: (id): SavedMarker | null => read().find((draft) => draft.id === id)?.saved ?? null,
   };
 }

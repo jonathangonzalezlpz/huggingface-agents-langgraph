@@ -40,6 +40,7 @@ export function createMemoryServices(): StudioServices {
         id === architecture.id
           ? Promise.resolve(architecture)
           : Promise.reject(new StudioError('http', `Architecture ${id} not found`, 404)),
+      save: () => Promise.reject(new StudioError('unavailable', 'Saving needs the backend')),
     },
     system: { getStatus: () => Promise.resolve({ backend: 'online', llm: null }) },
     // The validator runs on the Python backend, so only the built-in report is known here.

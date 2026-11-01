@@ -19,10 +19,12 @@ const TONE: Record<'error' | 'warning' | 'info', Tone> = {
 export function DiagnosticsPanel({
   view,
   stale,
+  updating,
   onGoto,
 }: {
   view: ValidationView;
   stale: boolean;
+  updating: boolean;
   onGoto: (nodeId: string) => void;
 }) {
   const { t, tp } = useI18n();
@@ -45,11 +47,14 @@ export function DiagnosticsPanel({
       </div>
 
       <div role="status" aria-live="polite">
-        {view.status === 'idle' && (
+        {view.status === 'idle' && !updating && (
           <p className="mt-2 text-sm text-fg-muted">{t('editor.diagnostics.idle')}</p>
         )}
-        {view.status === 'running' && (
+        {(view.status === 'running' || (updating && view.status === 'idle')) && (
           <p className="mt-2 text-sm text-fg-muted">{t('editor.diagnostics.running')}</p>
+        )}
+        {updating && view.status === 'done' && (
+          <p className="mt-2 text-sm text-fg-muted">{t('editor.diagnostics.updating')}</p>
         )}
         {view.status === 'unavailable' && (
           <p className="mt-2 text-sm text-warning">{t('editor.diagnostics.unavailable')}</p>
@@ -57,7 +62,9 @@ export function DiagnosticsPanel({
         {view.status === 'failed' && (
           <p className="mt-2 text-sm text-error">{t('editor.diagnostics.failed')}</p>
         )}
-        {stale && <p className="mt-2 text-sm text-warning">{t('editor.diagnostics.stale')}</p>}
+        {stale && !updating && (
+          <p className="mt-2 text-sm text-warning">{t('editor.diagnostics.stale')}</p>
+        )}
       </div>
 
       {view.status === 'done' && view.report.diagnostics.length === 0 && (

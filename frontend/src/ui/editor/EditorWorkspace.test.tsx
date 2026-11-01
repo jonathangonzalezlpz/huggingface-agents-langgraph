@@ -42,7 +42,7 @@ function renderEditor(overrides: Partial<WorkspaceProps> = {}, services: StudioS
     catalog,
     readOnly: false,
     draftId: 'draft-1',
-    onDuplicate: () => undefined,
+    onEdit: () => undefined,
     ...overrides,
   };
   return render(
@@ -278,6 +278,7 @@ describe('validation', () => {
     const report: ValidationReport = {
       isValid: false,
       counts: { error: 1, warning: 0, info: 0 },
+      availability: {},
       diagnostics: [
         {
           code: 'NO_PATH_TO_END',
@@ -311,6 +312,7 @@ describe('validation', () => {
           Promise.resolve({
             isValid: true,
             counts: { error: 0, warning: 0, info: 0 },
+            availability: {},
             diagnostics: [],
           }),
       },
@@ -380,7 +382,7 @@ describe('persistence', () => {
       initialDocument: builtinDoc,
       readOnly: true,
       draftId: undefined as never,
-      onDuplicate: duplicate,
+      onEdit: duplicate,
     });
     await userEvent.click(screen.getByRole('button', { name: 'Duplicar para editar' }));
     expect(duplicate).toHaveBeenCalledOnce();

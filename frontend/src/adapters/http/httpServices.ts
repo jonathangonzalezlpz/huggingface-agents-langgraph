@@ -10,6 +10,7 @@ import {
   catalogSchema,
   definitionToWire,
   layoutSchema,
+  savedRecordSchema,
   statusSchema,
   toArchitecture,
   toCatalog,
@@ -81,6 +82,25 @@ export function createHttpServices(
             architectureSchema,
           ),
         ),
+      save: async (definition) => {
+        const known = new Set(
+          (
+            await requestJson(fetchImpl, '/api/architectures', architectureListSchema)
+          ).architectures.map((item) => item.id),
+        );
+        const record = await requestJson(fetchImpl, '/api/architectures', savedRecordSchema, {
+          method: 'POST',
+          body: definitionToWire(definition),
+        });
+        const architecture = toArchitecture(
+          await requestJson(
+            fetchImpl,
+            `/api/architectures/${encodeURIComponent(record.id)}`,
+            architectureSchema,
+          ),
+        );
+        return { architecture, created: !known.has(record.id) };
+      },
     },
     system: {
       getStatus: async (): Promise<SystemStatus> => {

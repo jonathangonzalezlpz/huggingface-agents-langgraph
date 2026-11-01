@@ -11,6 +11,9 @@ const KEYS: Record<Rejection['code'], MessageKey> = {
   'has-decision': 'editor.reject.has-decision',
   'no-decision': 'editor.reject.no-decision',
   'invalid-position': 'editor.reject.invalid-position',
+  'invalid-description': 'editor.reject.invalid-description',
+  'invalid-name': 'editor.reject.invalid-name',
+  'reserved-name': 'editor.reject.reserved-name',
 };
 
 /** The user-facing reason a command was refused, in the current language. */

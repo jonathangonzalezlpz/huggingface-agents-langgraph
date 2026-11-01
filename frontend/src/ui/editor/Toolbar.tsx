@@ -1,6 +1,8 @@
 import {
   ArrowLeft,
   Copy,
+  Pencil,
+  Save,
   LayoutGrid,
   Maximize,
   Plus,
@@ -57,13 +59,18 @@ export function Toolbar({
   canUndo,
   canRedo,
   validating,
+  saveState,
+  savedVersion,
+  saving,
+  editLabel,
   onUndo,
   onRedo,
   onAdd,
   onLayout,
   onFit,
   onValidate,
-  onDuplicate,
+  onSave,
+  onEdit,
 }: {
   title: string;
   draft: boolean;
@@ -71,13 +78,19 @@ export function Toolbar({
   canUndo: boolean;
   canRedo: boolean;
   validating: boolean;
+  /** Null when this is not a draft, so there is nothing to save. */
+  saveState: 'saved' | 'unsaved' | null;
+  savedVersion: number | null;
+  saving: boolean;
+  editLabel: 'editor.edit' | 'editor.duplicate';
   onUndo: () => void;
   onRedo: () => void;
   onAdd: () => void;
   onLayout: () => void;
   onFit: () => void;
   onValidate: () => void;
-  onDuplicate: () => void;
+  onSave: () => void;
+  onEdit: () => void;
 }) {
   const { t } = useI18n();
   return (
@@ -93,6 +106,14 @@ export function Toolbar({
       <h1 className="font-mono text-sm font-semibold">{title}</h1>
       {draft && <StatusBadge tone="info">{t('editor.badge.draft')}</StatusBadge>}
       {readOnly && <StatusBadge tone="neutral">{t('editor.badge.readOnly')}</StatusBadge>}
+      {saveState === 'saved' && (
+        <StatusBadge tone="success">
+          {t('editor.save.status.saved', { version: savedVersion ?? 0 })}
+        </StatusBadge>
+      )}
+      {saveState === 'unsaved' && (
+        <StatusBadge tone="warning">{t('editor.save.status.unsaved')}</StatusBadge>
+      )}
 
       <div
         role="toolbar"
@@ -122,7 +143,16 @@ export function Toolbar({
           onClick={onValidate}
           disabled={validating}
         />
-        {readOnly && <ToolButton label="editor.duplicate" Icon={Copy} onClick={onDuplicate} />}
+        {saveState !== null && (
+          <ToolButton label="editor.save" Icon={Save} onClick={onSave} disabled={saving} />
+        )}
+        {readOnly && (
+          <ToolButton
+            label={editLabel}
+            Icon={editLabel === 'editor.edit' ? Pencil : Copy}
+            onClick={onEdit}
+          />
+        )}
       </div>
     </header>
   );

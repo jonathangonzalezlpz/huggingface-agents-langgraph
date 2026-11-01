@@ -5,7 +5,8 @@ import {
 } from '../../domain/editor/templates';
 import type { EditorDocument } from '../../domain/editor/model';
 import type { Architecture, Catalog } from '../../domain/types';
-import type { StudioServices } from '../../ports';
+import { toDefinition } from '../../domain/editor/convert';
+import type { SavedMarker, StudioServices } from '../../ports';
 import { computeLayout } from './autoLayout';
 
 export type DraftKind = 'blank' | 'linear' | 'copy';
@@ -52,5 +53,38 @@ export function buildDraft(
 export function saveNewDraft(services: StudioServices, doc: EditorDocument): string {
   const id = newDraftId();
   services.drafts.save(id, doc);
+  return id;
+}
+
+/**
+ * Begin editing a version. A saved version keeps its name, so saving the draft creates the next
+ * version of the same architecture; the built-in pipeline keeps a reserved name and is copied
+ * under a new one. Returns the id of the new draft.
+ */
+export async function startEditing(
+  services: StudioServices,
+  architecture: Architecture,
+): Promise<string> {
+  const [catalog, stored] = await Promise.all([
+    services.catalog.getCatalog(),
+    services.layouts.get(architecture.id).catch(() => ({})),
+  ]);
+  const taken = services.drafts.list().map((draft) => draft.architectureId);
+  const sameName = !architecture.readOnly;
+  const name = sameName
+    ? architecture.architectureId
+    : uniqueArchitectureId(`${architecture.architectureId}_copy`, taken);
+  const base = documentFromArchitecture(architecture, catalog, name, stored);
+  const doc =
+    Object.keys(stored).length > 0 ? base : { ...base, layout: computeLayout(base.graph) };
+  const id = saveNewDraft(services, doc);
+  if (sameName) {
+    const marker: SavedMarker = {
+      versionId: architecture.id,
+      version: architecture.version ?? 0,
+      definitionJson: JSON.stringify(toDefinition(doc.graph)),
+    };
+    services.drafts.markSaved(id, marker);
+  }
   return id;
 }
