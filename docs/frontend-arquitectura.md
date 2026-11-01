@@ -95,6 +95,9 @@ proyecto solo se ha probado en Windows.
 - **Experimentos:** dominio de ajustes y baterías, adaptadores (`/api/batteries`, lista de
   experimentos), la página con un servidor simulado y con estado (progreso, detener, 409,
   reanudar) y el panel de ajustes. El progreso es por sondeo; el servidor ejecuta la batería.
+- **Historial y puntuación:** dominio de lista, orden y filtro, adaptadores (lista con respuestas,
+  borrar, puntuar, envío oficial, comparar), historial, comparación, detalle y el diálogo de envío
+  oficial con puertos simulados (el envío real nunca se ejercita en las pruebas).
 - **i18n:** mismas claves y marcadores en ambos idiomas, plurales y detección.
 - **Tokens:** todos los pares de color cumplen WCAG (4,5:1 texto, 3:1 componentes) en ambos
   temas. Se comprueba contra `tokens.css`, que es la única fuente de los colores.

@@ -69,7 +69,13 @@ export function createMemoryServices(): StudioServices {
       current: () => Promise.resolve(IDLE_BATTERY),
       stop: () => Promise.resolve(IDLE_BATTERY),
     },
-    experiments: { list: () => Promise.resolve([]) },
+    experiments: {
+      list: () => Promise.resolve([]),
+      remove: () => Promise.reject(new StudioError('unavailable', 'Needs the backend')),
+      evaluate: () => Promise.reject(new StudioError('unavailable', 'Needs the backend')),
+      submitOfficial: () => Promise.reject(new StudioError('unavailable', 'Needs the backend')),
+      compare: () => Promise.reject(new StudioError('unavailable', 'Needs the backend')),
+    },
     models: { list: () => Promise.resolve([]) },
     questions: {
       list: () => Promise.reject(new StudioError('unavailable', 'Questions need the backend')),

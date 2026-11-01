@@ -42,8 +42,6 @@ export interface ExperimentSummary {
   total: number;
   createdAt: string | null;
   averageSeconds: number | null;
-  /** Null until the experiment is scored. */
-  score: { correct: number; attempted: number } | null;
 }
 
 /** Unfinished experiments can continue where they stopped. */

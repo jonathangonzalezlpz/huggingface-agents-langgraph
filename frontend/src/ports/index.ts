@@ -1,5 +1,6 @@
 /** Outbound ports: what the Studio needs from the outside world. */
-import type { BatteryRequest, BatteryStatus, ExperimentSummary } from '../domain/battery';
+import type { BatteryRequest, BatteryStatus } from '../domain/battery';
+import type { Comparison, ExperimentRecord, OfficialSubmission, Score } from '../domain/history';
 import type { EditorDocument, Point } from '../domain/editor/model';
 import type { GaiaQuestion, ModelOption, RunRecord, RunRequest } from '../domain/run';
 import type {
@@ -87,7 +88,17 @@ export interface BatteryPort {
 }
 
 export interface ExperimentPort {
-  list(): Promise<ExperimentSummary[]>;
+  /** Every stored experiment, with its answers. */
+  list(): Promise<ExperimentRecord[]>;
+  remove(id: string): Promise<void>;
+  /** Score a complete experiment locally; the server stores the result on the record. */
+  evaluate(id: string): Promise<Score>;
+  /**
+   * Send a stored experiment to the official evaluator. This publishes to an external service:
+   * only call it after an explicit confirmation from the user.
+   */
+  submitOfficial(submission: OfficialSubmission): Promise<{ score: Score; saved: boolean }>;
+  compare(request: { ids: string[]; base: string | null }): Promise<Comparison>;
 }
 
 export interface ModelPort {

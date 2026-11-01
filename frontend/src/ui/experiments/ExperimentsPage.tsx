@@ -12,7 +12,6 @@ import { StudioError } from '../../domain/errors';
 import { defaultSettings, settingsIssues } from '../../domain/experiment';
 import { useI18n } from '../../i18n/I18nProvider';
 import { ErrorNotice } from '../components/ErrorNotice';
-import { PageHeader } from '../components/PageHeader';
 import { StatusBadge, type Tone } from '../components/StatusBadge';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { SettingsPanel } from '../run/SettingsPanel';
@@ -80,8 +79,6 @@ export function ExperimentsPage({ pollMs }: { pollMs?: number } = {}) {
 
   return (
     <>
-      <PageHeader title={t('experiments.title')} description={t('experiments.description')} />
-
       {!live && (
         <p
           role="note"

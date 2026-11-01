@@ -117,7 +117,7 @@ describe('experiment list', () => {
               created_at: '2026-11-01T10:00:00Z',
               total_questions: 20,
               average_duration_seconds: 41.5,
-              answers: [{}, {}, {}],
+              answers: [{ task_id: 't1' }, { task_id: 't2' }, { task_id: 't3' }],
               config: {
                 name: 'V3.1 run',
                 pipeline_version: '3.1',
@@ -126,7 +126,7 @@ describe('experiment list', () => {
             },
             {
               id: 'b',
-              answers: new Array(20).fill({}),
+              answers: Array.from({ length: 20 }, (_, n) => ({ task_id: `t${n}` })),
               config: { name: 'old', pipeline_version: '3.1' },
               local_score: { correct_count: 10, total_attempted: 20 },
             },
@@ -143,12 +143,12 @@ describe('experiment list', () => {
       pipelineVersion: '3.1',
       architecture: 'builtin:gaia_v31',
       averageSeconds: 41.5,
-      score: null,
+      localScore: null,
     });
     expect(b).toMatchObject({
       status: 'completed',
       total: 20,
-      score: { correct: 10, attempted: 20 },
+      localScore: { correct: 10, attempted: 20, percent: 50 },
     });
     expect(c).toMatchObject({ name: 'c', pipelineVersion: null });
   });

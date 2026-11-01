@@ -8,7 +8,11 @@ import { createLocalStorageDrafts } from '../drafts/localStorageDrafts';
 import {
   architectureListSchema,
   batterySchema,
+  comparisonSchema,
+  deletedSchema,
+  evaluateSchema,
   experimentListSchema,
+  submitSchema,
   architectureSchema,
   catalogSchema,
   definitionToWire,
@@ -21,7 +25,9 @@ import {
   toArchitecture,
   toBatteryStatus,
   toCatalog,
-  toExperimentSummaries,
+  toComparison,
+  toExperimentRecords,
+  toScore,
   toModels,
   toQuestions,
   toRunRecord,
@@ -37,13 +43,13 @@ async function requestJson<S extends z.ZodType>(
   fetchImpl: FetchLike,
   path: string,
   schema: S,
-  send?: { method: 'POST' | 'PUT'; body: unknown },
+  send?: { method: 'POST' | 'PUT' | 'DELETE'; body?: unknown },
 ): Promise<z.output<S>> {
   const init: RequestInit = { headers: { Accept: 'application/json' } };
   if (send) {
     init.method = send.method;
     init.headers = { ...init.headers, 'Content-Type': 'application/json' };
-    init.body = JSON.stringify(send.body);
+    if (send.body !== undefined) init.body = JSON.stringify(send.body);
   }
   let response: Response;
   try {
@@ -219,8 +225,39 @@ export function createHttpServices(
     },
     experiments: {
       list: async () =>
-        toExperimentSummaries(
-          await requestJson(fetchImpl, '/api/experiments', experimentListSchema),
+        toExperimentRecords(await requestJson(fetchImpl, '/api/experiments', experimentListSchema)),
+      remove: async (id) => {
+        await requestJson(fetchImpl, `/api/experiments/${encodeURIComponent(id)}`, deletedSchema, {
+          method: 'DELETE',
+        });
+      },
+      evaluate: async (id) => {
+        const score = toScore(
+          await requestJson(
+            fetchImpl,
+            `/api/experiments/${encodeURIComponent(id)}/evaluate`,
+            evaluateSchema,
+            { method: 'POST' },
+          ),
+        );
+        if (!score) throw new StudioError('contract', 'The evaluation returned no score');
+        return score;
+      },
+      submitOfficial: async ({ experimentId, username, agentCode }) => {
+        const result = await requestJson(fetchImpl, '/api/score', submitSchema, {
+          method: 'POST',
+          body: { experiment_id: experimentId, username, agent_code: agentCode },
+        });
+        const score = toScore(result);
+        if (!score) throw new StudioError('contract', 'The evaluator returned no score');
+        return { score, saved: result.saved };
+      },
+      compare: async ({ ids, base }) =>
+        toComparison(
+          await requestJson(fetchImpl, '/api/experiments/compare', comparisonSchema, {
+            method: 'POST',
+            body: { ids, ...(base ? { base } : {}) },
+          }),
         ),
     },
     models: {

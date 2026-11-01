@@ -14,8 +14,22 @@ const DraftEditorPage = lazy(() =>
   import('../ui/editor/EditorPage').then((m) => ({ default: m.DraftEditorPage })),
 );
 
+const ExperimentsLayout = lazy(() =>
+  import('../ui/experiments/ExperimentsLayout').then((m) => ({ default: m.ExperimentsLayout })),
+);
 const ExperimentsPage = lazy(() =>
   import('../ui/experiments/ExperimentsPage').then((m) => ({ default: m.ExperimentsPage })),
+);
+const HistoryPage = lazy(() =>
+  import('../ui/experiments/HistoryPage').then((m) => ({ default: m.HistoryPage })),
+);
+const ExperimentDetailPage = lazy(() =>
+  import('../ui/experiments/ExperimentDetailPage').then((m) => ({
+    default: m.ExperimentDetailPage,
+  })),
+);
+const RunViewPage = lazy(() =>
+  import('../ui/run/RunViewPage').then((m) => ({ default: m.RunViewPage })),
 );
 const RunsPage = lazy(() => import('../ui/run/RunsPage').then((m) => ({ default: m.RunsPage })));
 
@@ -55,13 +69,46 @@ export function AppRoutes() {
           }
         />
         <Route
-          path="experiments"
+          path="runs/:id"
           element={
             <Suspense fallback={<Loading />}>
-              <ExperimentsPage />
+              <RunViewPage />
             </Suspense>
           }
         />
+        <Route
+          path="experiments"
+          element={
+            <Suspense fallback={<Loading />}>
+              <ExperimentsLayout />
+            </Suspense>
+          }
+        >
+          <Route
+            index
+            element={
+              <Suspense fallback={<Loading />}>
+                <ExperimentsPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="history"
+            element={
+              <Suspense fallback={<Loading />}>
+                <HistoryPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path=":id"
+            element={
+              <Suspense fallback={<Loading />}>
+                <ExperimentDetailPage />
+              </Suspense>
+            }
+          />
+        </Route>
         <Route path="system" element={<SystemPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

@@ -8,7 +8,7 @@ import { StudioProviders } from '../../app/bootstrap';
 import { createMemoryServices } from '../../adapters/memory/memoryServices';
 import { IDLE_BATTERY, type BatteryRequest, type BatteryStatus } from '../../domain/battery';
 import { StudioError } from '../../domain/errors';
-import type { ExperimentSummary } from '../../domain/battery';
+import type { ExperimentRecord } from '../../domain/history';
 import type { Architecture, ArchitectureSummary } from '../../domain/types';
 import { LANGUAGE_STORAGE_KEY } from '../../i18n';
 import type { BatteryPort, StudioServices } from '../../ports';
@@ -42,7 +42,7 @@ const status = (over: Partial<BatteryStatus>): BatteryStatus => ({
   ...over,
 });
 
-const unfinished: ExperimentSummary = {
+const unfinished: ExperimentRecord = {
   id: 'exp-1',
   status: 'cancelled',
   name: 'Corrida parcial',
@@ -52,8 +52,22 @@ const unfinished: ExperimentSummary = {
   total: 20,
   createdAt: null,
   averageSeconds: null,
-  score: null,
+  answers: [],
+  localScore: null,
+  officialScore: null,
 };
+
+const unsupported = () => Promise.reject(new Error('not used here'));
+
+function experimentsPort(list: () => Promise<ExperimentRecord[]>): StudioServices['experiments'] {
+  return {
+    list,
+    remove: unsupported,
+    evaluate: unsupported,
+    submitOfficial: unsupported,
+    compare: unsupported,
+  };
+}
 
 function services(over: Partial<StudioServices> = {}): StudioServices {
   const all = [builtin, bad, good];
@@ -77,7 +91,7 @@ function services(over: Partial<StudioServices> = {}): StudioServices {
       save: base.architectures.save,
     },
     models: { list: () => Promise.resolve([{ provider: 'ollama', modelId: 'llama3' }]) },
-    experiments: { list: () => Promise.resolve([unfinished]) },
+    experiments: experimentsPort(() => Promise.resolve([unfinished])),
     batteries: {
       start: () => Promise.resolve(status({ state: 'running', total: 20 })),
       current: () => Promise.resolve(IDLE_BATTERY),
@@ -183,7 +197,7 @@ describe('following a battery', () => {
     const list = vi.fn(() => Promise.resolve([unfinished]));
     renderPage(
       services({
-        experiments: { list },
+        experiments: experimentsPort(list),
         batteries: {
           ...services().batteries,
           current: () =>
@@ -258,9 +272,9 @@ describe('unfinished experiments', () => {
   it('does not list finished experiments', async () => {
     renderPage(
       services({
-        experiments: {
-          list: () => Promise.resolve([{ ...unfinished, status: 'completed', completed: 20 }]),
-        },
+        experiments: experimentsPort(() =>
+          Promise.resolve([{ ...unfinished, status: 'completed', completed: 20 }]),
+        ),
       }),
     );
     expect(await screen.findByText('No hay experimentos sin terminar.')).toBeVisible();

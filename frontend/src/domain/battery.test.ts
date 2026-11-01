@@ -18,7 +18,6 @@ const summary = (over: Partial<ExperimentSummary> = {}): ExperimentSummary => ({
   total: 20,
   createdAt: null,
   averageSeconds: null,
-  score: null,
   ...over,
 });
 
