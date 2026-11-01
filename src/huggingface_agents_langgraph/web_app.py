@@ -12,8 +12,11 @@ from urllib.request import Request, urlopen
 from huggingface_agents_langgraph.architecture_store import (
     ArchitectureNotFoundError,
     architecture_detail,
+    get_catalog,
+    get_layout,
     list_architectures,
     save_architecture,
+    save_layout,
     validate_definition,
 )
 from huggingface_agents_langgraph.attachments import get_attachment_path
@@ -39,6 +42,27 @@ from huggingface_agents_langgraph.run_tracking import (
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
 FRONTEND_DIRECTORY = Path(__file__).parent / "frontend"
+APP_DIRECTORY = Path(__file__).parent / "static" / "app"
+APP_PREFIX = "/app"
+WEB_CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".map": "application/json; charset=utf-8",
+}
+BUNDLE_NOT_BUILT = (
+    "<!doctype html><meta charset=utf-8><title>GAIA Agent Studio</title>"
+    "<h1>GAIA Agent Studio is not built</h1>"
+    "<p>Run <code>scripts/build_frontend.ps1</code> and reload. "
+    'The previous interface is still available at <a href="/">/</a>.</p>'
+)
 MAX_REQUEST_BYTES = 1_000_000
 MAX_COMPARED_EXPERIMENTS = 20
 
@@ -49,7 +73,9 @@ class WebAppHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         """Serve the application, questions, or an attachment."""
         request_path = urlsplit(self.path).path
-        if request_path == "/":
+        if request_path == APP_PREFIX or request_path.startswith(APP_PREFIX + "/"):
+            self._serve_app(request_path.removeprefix(APP_PREFIX))
+        elif request_path == "/":
             self._serve_asset("index.html")
         elif request_path == "/assets/app.js":
             self._serve_asset("app.js")
@@ -135,10 +161,15 @@ class WebAppHandler(BaseHTTPRequestHandler):
             )
         elif request_path == "/api/architectures":
             self._send_json(200, {"architectures": list_architectures()})
+        elif request_path == "/api/catalog":
+            self._send_json(200, get_catalog())
         elif request_path.startswith("/api/architectures/"):
+            identifier = unquote(request_path.removeprefix("/api/architectures/"))
             try:
-                identifier = request_path.removeprefix("/api/architectures/")
-                self._send_json(200, architecture_detail(identifier))
+                if identifier.endswith("/layout"):
+                    self._send_json(200, get_layout(identifier.removesuffix("/layout")))
+                else:
+                    self._send_json(200, architecture_detail(identifier))
             except ArchitectureNotFoundError:
                 self._send_json(404, {"error": "Architecture not found"})
         elif request_path.startswith("/api/runs/"):
@@ -216,6 +247,21 @@ class WebAppHandler(BaseHTTPRequestHandler):
 
         result["duration_seconds"] = round(perf_counter() - started_at, 3)
         self._send_json(200, result)
+
+    def do_PUT(self) -> None:
+        """Store the node layout of an architecture version."""
+        path = urlsplit(self.path).path
+        prefix, suffix = "/api/architectures/", "/layout"
+        if not (path.startswith(prefix) and path.endswith(suffix)):
+            self._send_json(404, {"error": "Not found"})
+            return
+        version_id = unquote(path.removeprefix(prefix).removesuffix(suffix))
+        try:
+            self._send_json(200, save_layout(version_id, self._read_json_object()))
+        except ArchitectureNotFoundError:
+            self._send_json(404, {"error": "Architecture not found"})
+        except (ValueError, TypeError) as error:
+            self._send_json(400, {"error": str(error)})
 
     def do_DELETE(self) -> None:
         """Remove a selected persisted experiment without deleting other runs."""
@@ -442,6 +488,32 @@ class WebAppHandler(BaseHTTPRequestHandler):
             "file_name": file_name,
             "experiment": normalize_experiment(payload.get("experiment")),
         }
+
+    def _serve_app(self, relative_path: str) -> None:
+        """Serve the compiled application; client routes fall back to the index."""
+        root = APP_DIRECTORY.resolve()
+        index = root / "index.html"
+        if not index.is_file():
+            self._send_bytes(404, BUNDLE_NOT_BUILT.encode(), WEB_CONTENT_TYPES[".html"])
+            return
+        requested = unquote(relative_path).strip("/")
+        target = (root / requested).resolve() if requested else index
+        if not target.is_relative_to(root):
+            target = index
+        if target.is_file():
+            asset = target
+        elif Path(requested).suffix:
+            self._send_json(404, {"error": "Asset not found"})
+            return
+        else:
+            asset = index
+        cache = "no-cache" if asset == index else "public, max-age=31536000, immutable"
+        self._send_bytes(
+            200,
+            asset.read_bytes(),
+            WEB_CONTENT_TYPES.get(asset.suffix.lower(), "application/octet-stream"),
+            {"Cache-Control": cache},
+        )
 
     def _serve_asset(self, file_name: str) -> None:
         asset_path = FRONTEND_DIRECTORY / file_name

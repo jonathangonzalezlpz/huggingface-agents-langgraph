@@ -7,6 +7,7 @@ stored too; validation is computed on read so it never goes stale.
 
 import hashlib
 import json
+import math
 import threading
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,7 @@ from huggingface_agents_langgraph.graph_definition import (
     GraphValidator,
     ValidationReport,
 )
+from huggingface_agents_langgraph.graph_definition.catalog import build_catalog
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
 )
@@ -32,8 +34,12 @@ from huggingface_agents_langgraph.run_tracking import (
     read_record,
     write_record,
 )
+from huggingface_agents_langgraph.state import AgentState
 
 KIND = "architectures"
+LAYOUT_KIND = "layouts"
+MAX_LAYOUT_NODES = 500
+MAX_LAYOUT_COORDINATE = 1_000_000
 BUILTIN_V31_ID = "builtin:gaia_v31"
 _SAVE_LOCK = threading.Lock()
 
@@ -160,3 +166,80 @@ def architecture_detail(identifier: str) -> dict:
     """A stored version together with its current validation report."""
     record = get_architecture(identifier)
     return {**record, "validation": validate_definition(record["definition"])}
+
+
+def get_catalog() -> dict:
+    """Components, routing strategies and state schema available for graphs."""
+    return build_catalog(
+        create_gaia_v3_registry(),
+        create_gaia_v31_routing_registry(),
+        state_types=[AgentState.__name__],
+        state_fields=AgentState.__annotations__,
+        initial_fields=AgentState.__required_keys__,
+    )
+
+
+def _layout_record_id(version_id: str) -> str:
+    return str(uuid5(NAMESPACE_OID, f"layout:{version_id}"))
+
+
+def _is_coordinate(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and abs(value) <= MAX_LAYOUT_COORDINATE
+    )
+
+
+def _validated_layout(layout: object, node_ids: set[str]) -> dict:
+    if not isinstance(layout, dict) or set(layout) != {"nodes"}:
+        raise ValueError("layout must be an object with a single 'nodes' key")
+    nodes = layout["nodes"]
+    if not isinstance(nodes, dict) or len(nodes) > MAX_LAYOUT_NODES:
+        raise ValueError("layout nodes must be an object of limited size")
+    for node_id, position in nodes.items():
+        if node_id not in node_ids:
+            raise ValueError(f"layout references unknown node '{node_id}'")
+        if (
+            not isinstance(position, dict)
+            or set(position) != {"x", "y"}
+            or not all(_is_coordinate(position[axis]) for axis in ("x", "y"))
+        ):
+            raise ValueError(
+                f"layout position of '{node_id}' needs finite numeric x and y"
+            )
+    return {"nodes": {k: {"x": v["x"], "y": v["y"]} for k, v in nodes.items()}}
+
+
+def get_layout(version_id: str) -> dict:
+    """Node positions of a version; empty when none were stored yet."""
+    get_architecture(version_id)
+    try:
+        record = read_record(LAYOUT_KIND, _layout_record_id(version_id))
+    except FileNotFoundError:
+        return {
+            "architecture_version_id": version_id,
+            "layout": {"nodes": {}},
+            "updated_at": None,
+        }
+    return {
+        "architecture_version_id": version_id,
+        "layout": record["layout"],
+        "updated_at": record["updated_at"],
+    }
+
+
+def save_layout(version_id: str, layout: object) -> dict:
+    """Store node positions for a version without altering its identity."""
+    definition = get_architecture(version_id)["definition"]
+    node_ids = {node["id"] for node in definition["nodes"]}
+    validated = _validated_layout(layout, node_ids)
+    record = {
+        "id": _layout_record_id(version_id),
+        "architecture_version_id": version_id,
+        "layout": validated,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    write_record(LAYOUT_KIND, record)
+    return get_layout(version_id)

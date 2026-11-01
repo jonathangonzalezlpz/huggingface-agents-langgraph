@@ -172,6 +172,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Preprocessing
     registry.register(
         "preprocessing",
+        metadata={"category": "input"},
         contract=NodeContract(
             required_inputs=frozenset({"question"}),
             guaranteed_outputs=frozenset({"question"}),
@@ -185,6 +186,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Attachment Resolver
     registry.register(
         "attachment_resolver",
+        metadata={"category": "input"},
         contract=NodeContract(
             required_inputs=frozenset({"file_name"}),
             optional_inputs=frozenset({"task_id"}),
@@ -199,6 +201,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Router
     registry.register(
         "router",
+        metadata={"category": "input"},
         contract=NodeContract(
             required_inputs=frozenset({"question", "file_name"}),
             optional_inputs=frozenset({"file_path"}),
@@ -224,6 +227,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     registry.register(
         "code_processing",
         recover_errors=True,
+        metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.code_processing", "code_processing"
@@ -235,6 +239,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     registry.register(
         "spreadsheet_processing",
         recover_errors=True,
+        metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.spreadsheet_processing",
@@ -247,6 +252,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     registry.register(
         "document_processing",
         recover_errors=True,
+        metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.document_processing",
@@ -259,6 +265,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     registry.register(
         "multimedia_processing",
         recover_errors=True,
+        metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.multimedia_processing",
@@ -271,6 +278,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     registry.register(
         "web_research",
         recover_errors=True,
+        metadata={"category": "acquisition"},
         contract=NodeContract(
             required_inputs=frozenset({"question"}),
             optional_inputs=frozenset({"file_path"}),
@@ -286,6 +294,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Review
     registry.register(
         "review",
+        metadata={"category": "research"},
         contract=NodeContract(
             required_inputs=frozenset({"question"}),
             optional_inputs=frozenset(
@@ -303,6 +312,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Research Action
     registry.register(
         "research_action",
+        metadata={"category": "research"},
         contract=NodeContract(
             required_inputs=frozenset({"question", "research_action"}),
             optional_inputs=frozenset({"evidence", "action_history", "research_steps"}),
@@ -325,6 +335,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Reasoning
     registry.register(
         "reasoning",
+        metadata={"category": "reasoning"},
         contract=NodeContract(
             required_inputs=frozenset({"question"}),
             optional_inputs=frozenset({"evidence", "research_notes"}),
@@ -340,6 +351,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Answer Production
     registry.register(
         "answer_production",
+        metadata={"category": "output"},
         contract=NodeContract(
             required_inputs=frozenset({"question", "draft_answer"}),
             guaranteed_outputs=frozenset({"submitted_answer", "answer_warnings"}),

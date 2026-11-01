@@ -11,8 +11,10 @@ from huggingface_agents_langgraph.architecture_store import (
     ArchitectureNotFoundError,
     content_sha256,
     get_architecture,
+    get_layout,
     list_architectures,
     save_architecture,
+    save_layout,
     validate_definition,
 )
 from huggingface_agents_langgraph.graph_definition import (
@@ -152,3 +154,69 @@ class TestValidate:
         report = validate_definition({"schema_version": "4.0"})
         assert report["is_valid"] is False
         assert report["diagnostics"][0]["code"] == "INVALID_DEFINITION"
+
+
+class TestLayout:
+    def _saved(self):
+        return save_architecture(_definition())
+
+    def test_defaults_to_an_empty_layout(self):
+        layout = get_layout(self._saved()["id"])
+        assert layout["layout"] == {"nodes": {}}
+        assert layout["updated_at"] is None
+
+    def test_round_trip_and_overwrite(self):
+        version_id = self._saved()["id"]
+        save_layout(version_id, {"nodes": {"a": {"x": 1.5, "y": -2}}})
+        save_layout(
+            version_id, {"nodes": {"a": {"x": 10, "y": 20}, "b": {"x": 0, "y": 0}}}
+        )
+        stored = get_layout(version_id)
+        assert stored["layout"]["nodes"]["a"] == {"x": 10, "y": 20}
+        assert set(stored["layout"]["nodes"]) == {"a", "b"}
+        assert stored["updated_at"]
+
+    def test_moving_nodes_never_changes_the_version(self):
+        saved = self._saved()
+        save_layout(saved["id"], {"nodes": {"a": {"x": 5, "y": 5}}})
+        assert save_architecture(_definition()) == saved
+        assert (
+            get_architecture(saved["id"])["content_sha256"] == saved["content_sha256"]
+        )
+
+    def test_builtin_layout_can_be_stored_without_persisting_the_definition(
+        self, tmp_path
+    ):
+        save_layout(BUILTIN_V31_ID, {"nodes": {"router": {"x": 3, "y": 4}}})
+        assert get_layout(BUILTIN_V31_ID)["layout"]["nodes"]["router"] == {
+            "x": 3,
+            "y": 4,
+        }
+        assert not (tmp_path / "architectures").exists()
+
+    def test_unknown_version_is_not_found(self):
+        with pytest.raises(ArchitectureNotFoundError):
+            get_layout("00000000-0000-0000-0000-000000000000")
+        with pytest.raises(ArchitectureNotFoundError):
+            save_layout("nope", {"nodes": {}})
+
+    @pytest.mark.parametrize(
+        "layout",
+        [
+            [],
+            {},
+            {"nodes": []},
+            {"nodes": {"a": {"x": 1}}},
+            {"nodes": {"a": {"x": 1, "y": 2, "z": 3}}},
+            {"nodes": {"a": {"x": "1", "y": 2}}},
+            {"nodes": {"a": {"x": True, "y": 2}}},
+            {"nodes": {"a": {"x": float("nan"), "y": 2}}},
+            {"nodes": {"a": {"x": float("inf"), "y": 2}}},
+            {"nodes": {"a": {"x": 10**7, "y": 2}}},
+            {"nodes": {"ghost": {"x": 1, "y": 2}}},
+            {"nodes": {"a": {"x": 1, "y": 2}}, "extra": 1},
+        ],
+    )
+    def test_invalid_layouts_are_rejected(self, layout):
+        with pytest.raises(ValueError, match="layout"):
+            save_layout(self._saved()["id"], layout)

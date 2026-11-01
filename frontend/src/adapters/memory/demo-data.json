@@ -1,0 +1,533 @@
+{
+  "catalog": {
+    "categories": [
+      "input",
+      "acquisition",
+      "research",
+      "reasoning",
+      "output"
+    ],
+    "nodes": [
+      {
+        "implementation_id": "answer_production",
+        "description": "Formats concise final answer adhering to GAIA conventions.",
+        "category": "output",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "draft_answer",
+            "question"
+          ],
+          "optional_inputs": [],
+          "guaranteed_outputs": [
+            "answer_warnings",
+            "submitted_answer"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
+        "implementation_id": "attachment_resolver",
+        "description": "Resolves and verifies physical existence of attachment.",
+        "category": "input",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "file_name"
+          ],
+          "optional_inputs": [
+            "task_id"
+          ],
+          "guaranteed_outputs": [
+            "file_path"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
+        "implementation_id": "code_processing",
+        "description": "Static inspection or sandboxed execution of Python code.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "contract": {
+          "required_inputs": [
+            "file_path",
+            "question"
+          ],
+          "optional_inputs": [],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "document_processing",
+        "description": "PDF text extraction with relevance filtering.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "contract": {
+          "required_inputs": [
+            "file_path",
+            "question"
+          ],
+          "optional_inputs": [],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "multimedia_processing",
+        "description": "Audio transcription, sound classification, and VLM inspection.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "contract": {
+          "required_inputs": [
+            "file_path",
+            "question"
+          ],
+          "optional_inputs": [],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "preprocessing",
+        "description": "Normalizes whitespace and prepares question string.",
+        "category": "input",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [],
+          "guaranteed_outputs": [
+            "question"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
+        "implementation_id": "reasoning",
+        "description": "Synthesizes evidence to produce a reasoning draft answer.",
+        "category": "reasoning",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "evidence",
+            "research_notes"
+          ],
+          "guaranteed_outputs": [
+            "draft_answer"
+          ],
+          "optional_outputs": [
+            "reasoning_warnings"
+          ]
+        }
+      },
+      {
+        "implementation_id": "research_action",
+        "description": "Dispatches and executes the action chosen by the review node.",
+        "category": "research",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "question",
+            "research_action"
+          ],
+          "optional_inputs": [
+            "action_history",
+            "evidence",
+            "research_steps"
+          ],
+          "guaranteed_outputs": [
+            "action_history",
+            "evidence",
+            "research_notes",
+            "research_steps"
+          ],
+          "optional_outputs": [
+            "source_links"
+          ]
+        }
+      },
+      {
+        "implementation_id": "review",
+        "description": "Iterative review loop deciding the next research action.",
+        "category": "research",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "action_history",
+            "evidence",
+            "research_action",
+            "research_steps"
+          ],
+          "guaranteed_outputs": [
+            "research_action"
+          ],
+          "optional_outputs": [
+            "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "router",
+        "description": "Deterministic extension-based router with LLM fallback.",
+        "category": "input",
+        "recover_errors": false,
+        "contract": {
+          "required_inputs": [
+            "file_name",
+            "question"
+          ],
+          "optional_inputs": [
+            "file_path"
+          ],
+          "guaranteed_outputs": [
+            "route"
+          ],
+          "optional_outputs": []
+        }
+      },
+      {
+        "implementation_id": "spreadsheet_processing",
+        "description": "Tabular data extraction and structured analysis.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "contract": {
+          "required_inputs": [
+            "file_path",
+            "question"
+          ],
+          "optional_inputs": [],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes"
+          ]
+        }
+      },
+      {
+        "implementation_id": "web_research",
+        "description": "Search engine and encyclopedia retrieval.",
+        "category": "acquisition",
+        "recover_errors": true,
+        "contract": {
+          "required_inputs": [
+            "question"
+          ],
+          "optional_inputs": [
+            "file_path"
+          ],
+          "guaranteed_outputs": [],
+          "optional_outputs": [
+            "evidence",
+            "research_notes"
+          ]
+        }
+      }
+    ],
+    "routing_strategies": [
+      {
+        "identifier": "route_after_preprocessing",
+        "description": "Resolves the attachment only when the experiment allows it.",
+        "outputs": [
+          "resolve_attachment",
+          "skip_attachment"
+        ]
+      },
+      {
+        "identifier": "route_after_review",
+        "description": "Continues researching or moves on to reasoning.",
+        "outputs": [
+          "act",
+          "solve"
+        ]
+      },
+      {
+        "identifier": "route_after_router",
+        "description": "Sends the task to its source-specific node or straight to review.",
+        "outputs": [
+          "code",
+          "direct",
+          "document",
+          "finish",
+          "multimedia",
+          "spreadsheet",
+          "web"
+        ]
+      }
+    ],
+    "state": {
+      "types": [
+        "AgentState"
+      ],
+      "fields": [
+        "action_history",
+        "answer_warnings",
+        "draft_answer",
+        "evidence",
+        "experiment",
+        "file_name",
+        "file_path",
+        "question",
+        "reasoning_warnings",
+        "research_action",
+        "research_notes",
+        "research_steps",
+        "route",
+        "run_id",
+        "source_links",
+        "submitted_answer",
+        "task_id",
+        "video_path"
+      ],
+      "initial_fields": [
+        "file_name",
+        "question",
+        "task_id"
+      ]
+    }
+  },
+  "architecture": {
+    "id": "builtin:gaia_v31",
+    "architecture_id": "gaia_v31",
+    "version": null,
+    "parent_id": null,
+    "content_sha256": "e42d786d3179bdc42045947dfea1e459c265398f8189ed33fa5308674cfdeb44",
+    "created_at": null,
+    "read_only": true,
+    "definition": {
+      "schema_version": "4.0",
+      "architecture_id": "gaia_v31",
+      "state_type": "AgentState",
+      "initial_node": "preprocessing",
+      "nodes": [
+        {
+          "id": "preprocessing",
+          "implementation_id": "preprocessing",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "attachment_resolver",
+          "implementation_id": "attachment_resolver",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "router",
+          "implementation_id": "router",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "code_processing",
+          "implementation_id": "code_processing",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "spreadsheet_processing",
+          "implementation_id": "spreadsheet_processing",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "document_processing",
+          "implementation_id": "document_processing",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "multimedia_processing",
+          "implementation_id": "multimedia_processing",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "web_research",
+          "implementation_id": "web_research",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "review",
+          "implementation_id": "review",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "research_action",
+          "implementation_id": "research_action",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "reasoning",
+          "implementation_id": "reasoning",
+          "description": "",
+          "metadata": {}
+        },
+        {
+          "id": "answer_production",
+          "implementation_id": "answer_production",
+          "description": "",
+          "metadata": {}
+        }
+      ],
+      "edges": [
+        {
+          "source": "preprocessing",
+          "edge_type": "conditional",
+          "routing_strategy": "route_after_preprocessing",
+          "conditional_targets": {
+            "resolve_attachment": "attachment_resolver",
+            "skip_attachment": "router"
+          }
+        },
+        {
+          "source": "attachment_resolver",
+          "edge_type": "direct",
+          "target": "router"
+        },
+        {
+          "source": "router",
+          "edge_type": "conditional",
+          "routing_strategy": "route_after_router",
+          "conditional_targets": {
+            "code": "code_processing",
+            "spreadsheet": "spreadsheet_processing",
+            "document": "document_processing",
+            "multimedia": "multimedia_processing",
+            "web": "web_research",
+            "direct": "review",
+            "finish": "review"
+          }
+        },
+        {
+          "source": "code_processing",
+          "edge_type": "direct",
+          "target": "review"
+        },
+        {
+          "source": "spreadsheet_processing",
+          "edge_type": "direct",
+          "target": "review"
+        },
+        {
+          "source": "document_processing",
+          "edge_type": "direct",
+          "target": "review"
+        },
+        {
+          "source": "multimedia_processing",
+          "edge_type": "direct",
+          "target": "review"
+        },
+        {
+          "source": "web_research",
+          "edge_type": "direct",
+          "target": "review"
+        },
+        {
+          "source": "review",
+          "edge_type": "conditional",
+          "routing_strategy": "route_after_review",
+          "conditional_targets": {
+            "act": "research_action",
+            "solve": "reasoning"
+          }
+        },
+        {
+          "source": "research_action",
+          "edge_type": "direct",
+          "target": "review"
+        },
+        {
+          "source": "reasoning",
+          "edge_type": "direct",
+          "target": "answer_production"
+        },
+        {
+          "source": "answer_production",
+          "edge_type": "direct",
+          "target": "__end__"
+        }
+      ],
+      "metadata": {}
+    }
+  },
+  "validation": {
+    "is_valid": true,
+    "counts": {
+      "error": 0,
+      "warning": 4,
+      "info": 1
+    },
+    "diagnostics": [
+      {
+        "code": "REQUIRED_INPUT_NOT_GUARANTEED",
+        "severity": "warning",
+        "message": "Node 'code_processing' requires 'file_path', which is produced on some paths but not guaranteed on all.",
+        "node_id": "code_processing",
+        "details": {
+          "field": "file_path"
+        }
+      },
+      {
+        "code": "REQUIRED_INPUT_NOT_GUARANTEED",
+        "severity": "warning",
+        "message": "Node 'document_processing' requires 'file_path', which is produced on some paths but not guaranteed on all.",
+        "node_id": "document_processing",
+        "details": {
+          "field": "file_path"
+        }
+      },
+      {
+        "code": "REQUIRED_INPUT_NOT_GUARANTEED",
+        "severity": "warning",
+        "message": "Node 'multimedia_processing' requires 'file_path', which is produced on some paths but not guaranteed on all.",
+        "node_id": "multimedia_processing",
+        "details": {
+          "field": "file_path"
+        }
+      },
+      {
+        "code": "REQUIRED_INPUT_NOT_GUARANTEED",
+        "severity": "warning",
+        "message": "Node 'spreadsheet_processing' requires 'file_path', which is produced on some paths but not guaranteed on all.",
+        "node_id": "spreadsheet_processing",
+        "details": {
+          "field": "file_path"
+        }
+      },
+      {
+        "code": "CYCLE_DETECTED",
+        "severity": "info",
+        "message": "Cycle through ['research_action', 'review']; termination depends on runtime budgets and is not proven statically.",
+        "node_id": "research_action",
+        "details": {
+          "nodes": [
+            "research_action",
+            "review"
+          ]
+        }
+      }
+    ]
+  }
+}
