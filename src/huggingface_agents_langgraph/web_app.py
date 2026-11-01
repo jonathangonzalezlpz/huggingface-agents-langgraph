@@ -27,6 +27,11 @@ from huggingface_agents_langgraph.batteries import (
 )
 from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
 from huggingface_agents_langgraph.experiment_comparison import compare_experiments
+from huggingface_agents_langgraph.experiment_scoring import (
+    evaluate_experiment,
+    official_answers,
+    record_official_score,
+)
 from huggingface_agents_langgraph.graph_definition import AgentDefinition
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
@@ -216,6 +221,13 @@ class WebAppHandler(BaseHTTPRequestHandler):
             return
         if request_path == "/api/score":
             self._submit_score()
+            return
+        if request_path.startswith("/api/experiments/") and request_path.endswith(
+            "/evaluate"
+        ):
+            self._evaluate_stored(
+                request_path.removeprefix("/api/experiments/").removesuffix("/evaluate")
+            )
             return
         if request_path == "/api/evaluate":
             self._evaluate_locally()
@@ -420,6 +432,16 @@ class WebAppHandler(BaseHTTPRequestHandler):
             return
         self._send_json(200, result)
 
+    def _evaluate_stored(self, experiment_id: str) -> None:
+        try:
+            self._send_json(200, evaluate_experiment(experiment_id))
+        except FileNotFoundError:
+            self._send_json(404, {"error": "Experiment not found"})
+        except ValueError as error:
+            self._send_json(400, {"error": str(error)})
+        except RuntimeError as error:
+            self._send_json(503, {"error": str(error)})
+
     def _get_questions(self, request_path: str) -> None:
         endpoint = (
             "/questions" if request_path == "/api/questions" else "/random-question"
@@ -471,10 +493,16 @@ class WebAppHandler(BaseHTTPRequestHandler):
             username = payload.get("username")
             agent_code = payload.get("agent_code")
             answers = payload.get("answers")
+            experiment_id = payload.get("experiment_id")
             if not isinstance(username, str) or not username.strip():
                 raise ValueError("username is required")
             if not isinstance(agent_code, str) or not agent_code.strip():
                 raise ValueError("agent_code is required")
+            if experiment_id is not None:
+                if not isinstance(experiment_id, str):
+                    raise ValueError("experiment_id must be a string")
+                # The stored record is the only source of the answers that get sent.
+                answers = official_answers(experiment_id)
             if not isinstance(answers, list) or len(answers) != 20:
                 raise ValueError("Exactly 20 answers are required")
             for answer in answers:
@@ -502,9 +530,18 @@ class WebAppHandler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             self._send_json(400, {"error": str(error)})
             return
+        except FileNotFoundError:
+            self._send_json(404, {"error": "Experiment not found"})
+            return
         except (HTTPError, URLError, TimeoutError, OSError) as error:
             self._send_json(502, {"error": f"Official scoring failed: {error}"})
             return
+        if experiment_id is not None and isinstance(result, dict):
+            try:
+                record_official_score(experiment_id, result)
+                result = {**result, "saved": True}
+            except (ValueError, OSError):
+                result = {**result, "saved": False}
         self._send_json(200, result)
 
     @staticmethod
