@@ -1,13 +1,17 @@
 import { z } from 'zod';
 
 import { StudioError } from '../../domain/errors';
+import type { Point } from '../../domain/editor/model';
 import type { StudioServices } from '../../ports';
+import { createLocalStorageDrafts } from '../drafts/localStorageDrafts';
 import {
   architectureSchema,
   catalogSchema,
+  definitionToWire,
   toArchitecture,
   toCatalog,
   toSummary,
+  toValidation,
   validationSchema,
 } from '../wire';
 import rawDemoData from './demo-data.json';
@@ -25,6 +29,8 @@ const demoSchema = z.object({
 export function createMemoryServices(): StudioServices {
   const demo = demoSchema.parse(rawDemoData);
   const architecture = toArchitecture({ ...demo.architecture, validation: demo.validation });
+  const builtinDefinition = JSON.stringify(definitionToWire(architecture.definition));
+  const layouts = new Map<string, Record<string, Point>>();
   return {
     mode: 'demo',
     catalog: { getCatalog: () => Promise.resolve(toCatalog(demo.catalog)) },
@@ -36,5 +42,20 @@ export function createMemoryServices(): StudioServices {
           : Promise.reject(new StudioError('http', `Architecture ${id} not found`, 404)),
     },
     system: { getStatus: () => Promise.resolve({ backend: 'online', llm: null }) },
+    // The validator runs on the Python backend, so only the built-in report is known here.
+    validation: {
+      validate: (definition) =>
+        JSON.stringify(definitionToWire(definition)) === builtinDefinition
+          ? Promise.resolve(toValidation(demo.validation))
+          : Promise.reject(new StudioError('unavailable', 'Validation needs the backend')),
+    },
+    layouts: {
+      get: (architectureId) => Promise.resolve({ ...layouts.get(architectureId) }),
+      save: (architectureId, positions) => {
+        layouts.set(architectureId, { ...positions });
+        return Promise.resolve();
+      },
+    },
+    drafts: createLocalStorageDrafts(),
   };
 }

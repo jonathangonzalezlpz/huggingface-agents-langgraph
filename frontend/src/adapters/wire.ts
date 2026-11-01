@@ -95,6 +95,12 @@ export const architectureSchema = summarySchema.extend({
   validation: validationSchema,
 });
 
+export const layoutSchema = z.object({
+  layout: z.object({
+    nodes: z.record(z.string(), z.object({ x: z.number(), y: z.number() })),
+  }),
+});
+
 export const architectureListSchema = z.object({ architectures: z.array(summarySchema) });
 
 export const statusSchema = z.object({
@@ -200,5 +206,30 @@ export function toStatus(wire: Wire<typeof statusSchema>): SystemStatus {
           name: wire.llm.name,
         }
       : null,
+  };
+}
+
+/** Serialize a definition the way the backend expects it. */
+export function definitionToWire(definition: AgentDefinition) {
+  return {
+    schema_version: definition.schemaVersion,
+    architecture_id: definition.architectureId,
+    state_type: definition.stateType,
+    initial_node: definition.initialNode,
+    nodes: definition.nodes.map((node) => ({
+      id: node.id,
+      implementation_id: node.implementationId,
+      description: node.description,
+    })),
+    edges: definition.edges.map((edge) =>
+      edge.type === 'direct'
+        ? { source: edge.source, edge_type: 'direct', target: edge.target }
+        : {
+            source: edge.source,
+            edge_type: 'conditional',
+            routing_strategy: edge.routingStrategy,
+            conditional_targets: edge.branches,
+          },
+    ),
   };
 }

@@ -20,7 +20,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.test.{ts,tsx}', 'src/test/**'],
+    files: ['**/*.test.{ts,tsx}', 'src/test/**', 'scripts/**', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } },
   },
   prettier,
