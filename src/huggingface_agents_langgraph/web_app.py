@@ -9,8 +9,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from huggingface_agents_langgraph.architecture_store import (
+    ArchitectureNotFoundError,
+    architecture_detail,
+    list_architectures,
+    save_architecture,
+    validate_definition,
+)
 from huggingface_agents_langgraph.attachments import get_attachment_path
 from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
+from huggingface_agents_langgraph.graph_definition import AgentDefinition
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
 from huggingface_agents_langgraph.model_server import gpu_memory, model_inventory
@@ -123,6 +131,14 @@ class WebAppHandler(BaseHTTPRequestHandler):
                     ]
                 },
             )
+        elif request_path == "/api/architectures":
+            self._send_json(200, {"architectures": list_architectures()})
+        elif request_path.startswith("/api/architectures/"):
+            try:
+                identifier = request_path.removeprefix("/api/architectures/")
+                self._send_json(200, architecture_detail(identifier))
+            except ArchitectureNotFoundError:
+                self._send_json(404, {"error": "Architecture not found"})
         elif request_path.startswith("/api/runs/"):
             try:
                 record = read_record("runs", request_path.removeprefix("/api/runs/"))
@@ -139,6 +155,12 @@ class WebAppHandler(BaseHTTPRequestHandler):
         request_path = urlsplit(self.path).path
         if request_path == "/api/experiments":
             self._save_experiment()
+            return
+        if request_path == "/api/architectures/validate":
+            self._validate_architecture()
+            return
+        if request_path == "/api/architectures":
+            self._save_architecture()
             return
         if request_path == "/api/score":
             self._submit_score()
@@ -202,6 +224,35 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": str(error)})
             return
         self._send_json(200, {"deleted": True})
+
+    def _read_json_object(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0"))
+        if not 0 < length <= MAX_REQUEST_BYTES:
+            raise ValueError("Request body is empty or too large")
+        payload = json.loads(self.rfile.read(length))
+        if not isinstance(payload, dict):
+            raise ValueError("Request body must be a JSON object")
+        return payload
+
+    def _validate_architecture(self) -> None:
+        try:
+            report = validate_definition(self._read_json_object())
+        except (ValueError, TypeError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(200, report)
+
+    def _save_architecture(self) -> None:
+        try:
+            definition = AgentDefinition.from_dict(self._read_json_object())
+            record = save_architecture(definition)
+        except (KeyError, ValueError, TypeError, AttributeError) as error:
+            message = (
+                f"Missing field {error}" if isinstance(error, KeyError) else str(error)
+            )
+            self._send_json(400, {"error": message})
+            return
+        self._send_json(200, record)
 
     def _save_experiment(self) -> None:
         try:
