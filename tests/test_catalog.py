@@ -41,7 +41,7 @@ def test_every_v31_component_has_a_known_category():
 
 def test_the_studio_catalog_adds_configurable_roles_to_the_v31_components():
     nodes = get_catalog()["nodes"]
-    assert len(nodes) == 16
+    assert len(nodes) == 22
     assert {node["category"] for node in nodes} == set(CATEGORIES)
     configurable = {n["implementation_id"] for n in nodes if n["params"]}
     assert configurable == {
@@ -49,6 +49,10 @@ def test_the_studio_catalog_adds_configurable_roles_to_the_v31_components():
         "llm_verifier",
         "llm_reflect",
         "self_consistency",
+        "tool_node",
+        "web_search",
+        "wikipedia_search",
+        "calculator",
     }
 
 

@@ -48,9 +48,16 @@ AUTHORIZED_CALLABLES: frozenset[tuple[str, str]] = frozenset(
     }
 )
 
-# Builders of the configurable LLM roles, which are not part of the V3.1 pipeline.
+# Builders and handlers of the Studio components (LLM roles and tool components),
+# which are not part of the V3.1 pipeline.
 AUTHORIZED_ROLE_BUILDERS: frozenset[tuple[str, str]] = frozenset(
     {
+        ("huggingface_agents_langgraph.tool_components", "build_tool_node"),
+        ("huggingface_agents_langgraph.tool_components", "build_web_search"),
+        ("huggingface_agents_langgraph.tool_components", "build_wikipedia_search"),
+        ("huggingface_agents_langgraph.tool_components", "build_calculator"),
+        ("huggingface_agents_langgraph.tool_components", "transcribe_audio"),
+        ("huggingface_agents_langgraph.tool_components", "describe_image"),
         ("huggingface_agents_langgraph.llm_roles", "build_planner"),
         ("huggingface_agents_langgraph.llm_roles", "build_verifier"),
         ("huggingface_agents_langgraph.llm_roles", "build_reflect"),
@@ -439,6 +446,7 @@ def create_studio_registry() -> NodeRegistry:
     """The V3.1 components plus the configurable ones a Studio architecture may use."""
     registry = create_gaia_v3_registry()
     _register_llm_roles(registry)
+    _register_tool_components(registry)
     return registry
 
 
@@ -513,6 +521,97 @@ def _register_llm_roles(registry: NodeRegistry) -> None:
             ParamSpec("max_tokens", "integer", default=600, minimum=128, maximum=4096),
         ),
         description="Samples several answers in turn and keeps the majority vote.",
+    )
+
+
+def _register_tool_components(registry: NodeRegistry) -> None:
+    """Components that add evidence with the vetted tools of ``tool_library``."""
+    from huggingface_agents_langgraph.tool_library import TOOLS
+
+    module = "huggingface_agents_langgraph.tool_components"
+
+    def builder(name: str):
+        return lambda params: _resolve_module_attr(module, name)(params)
+
+    gathering = {
+        "optional_inputs": frozenset(
+            {"evidence", "research_notes", "source_links", "draft_answer"}
+        ),
+        "optional_outputs": frozenset({"evidence", "research_notes", "source_links"}),
+    }
+    query = ParamSpec(
+        "query",
+        "string",
+        default="",
+        max_length=200,
+    )
+    registry.register(
+        "tool_node",
+        metadata={"category": "tools"},
+        recover_errors=True,
+        contract=NodeContract(required_inputs=frozenset({"question"}), **gathering),
+        builder=builder("build_tool_node"),
+        params=(
+            ParamSpec("tool", "enum", default="web_search", choices=tuple(TOOLS)),
+            ParamSpec(
+                "input_from",
+                "enum",
+                default="question",
+                choices=("question", "draft_answer", "text"),
+            ),
+            ParamSpec("text", "string", default="", max_length=200),
+        ),
+        description="Runs one vetted tool and adds what it finds to the evidence.",
+    )
+    registry.register(
+        "web_search",
+        metadata={"category": "tools"},
+        recover_errors=True,
+        contract=NodeContract(required_inputs=frozenset({"question"}), **gathering),
+        builder=builder("build_web_search"),
+        params=(query,),
+        description="Searches the web with the question (or a fixed query).",
+    )
+    registry.register(
+        "wikipedia_search",
+        metadata={"category": "tools"},
+        recover_errors=True,
+        contract=NodeContract(required_inputs=frozenset({"question"}), **gathering),
+        builder=builder("build_wikipedia_search"),
+        params=(query,),
+        description="Searches Wikipedia with the question (or a fixed query).",
+    )
+    registry.register(
+        "calculator",
+        metadata={"category": "tools"},
+        recover_errors=True,
+        contract=NodeContract(required_inputs=frozenset({"question"}), **gathering),
+        builder=builder("build_calculator"),
+        params=(
+            ParamSpec("max_tokens", "integer", default=160, minimum=32, maximum=512),
+        ),
+        description="Has the model write one expression and evaluates it safely.",
+    )
+    media = {
+        "required_inputs": frozenset({"question", "file_path"}),
+        "optional_inputs": frozenset({"evidence", "research_notes", "source_links"}),
+        "optional_outputs": frozenset({"evidence", "research_notes", "source_links"}),
+    }
+    registry.register(
+        "transcribe_audio",
+        metadata={"category": "acquisition"},
+        recover_errors=True,
+        contract=NodeContract(**media),
+        resolver=lambda: _resolve_module_attr(module, "transcribe_audio"),
+        description="Transcribes the attached audio file.",
+    )
+    registry.register(
+        "describe_image",
+        metadata={"category": "acquisition"},
+        recover_errors=True,
+        contract=NodeContract(**media),
+        resolver=lambda: _resolve_module_attr(module, "describe_image"),
+        description="Describes the attached image with the vision model.",
     )
 
 

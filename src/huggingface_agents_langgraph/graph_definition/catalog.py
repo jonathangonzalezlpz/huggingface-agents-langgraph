@@ -14,6 +14,7 @@ CATEGORIES = (
     "planning",
     "reasoning",
     "verification",
+    "tools",
     "output",
 )
 UNCATEGORIZED = "other"
