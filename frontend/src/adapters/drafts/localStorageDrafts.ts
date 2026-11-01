@@ -29,6 +29,8 @@ const documentSchema = z.object({
         id: z.string(),
         implementationId: z.string(),
         description: z.string(),
+        // Dropping this would silently lose the parameters of every stored draft.
+        params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
         outgoing: outgoingSchema,
       }),
     ),

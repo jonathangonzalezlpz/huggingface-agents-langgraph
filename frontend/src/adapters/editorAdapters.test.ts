@@ -150,6 +150,33 @@ describe('local drafts', () => {
     expect(drafts.load('d1')).toBeNull();
   });
 
+  it('keeps the parameters chosen on a node when a draft is stored and read back', () => {
+    const drafts = createLocalStorageDrafts(fakeStorage(), () => 1000);
+    const [first, ...rest] = doc.graph.nodes;
+    if (!first) throw new Error('the template has no nodes');
+    const withParams: EditorDocument = {
+      ...doc,
+      graph: {
+        ...doc.graph,
+        nodes: [{ ...first, params: { n: 3, mode: 'slow', flag: true } }, ...rest],
+      },
+    };
+    drafts.save('p1', withParams);
+    expect(drafts.load('p1')).toEqual(withParams);
+    expect(drafts.load('p1')?.graph.nodes[0]?.params).toEqual({ n: 3, mode: 'slow', flag: true });
+    expect(drafts.load('p1')?.graph.nodes[1]).not.toHaveProperty('params');
+  });
+
+  it('discards a stored draft whose parameters are not plain values', () => {
+    const storage = fakeStorage();
+    const drafts = createLocalStorageDrafts(storage, () => 1000);
+    drafts.save('p2', doc);
+    const raw = JSON.parse(storage.getItem('studio.drafts.v1') ?? '{}');
+    raw.drafts[0].document.graph.nodes[0].params = { n: { nested: 1 } };
+    storage.setItem('studio.drafts.v1', JSON.stringify(raw));
+    expect(drafts.load('p2')).toBeNull();
+  });
+
   it('lists the most recently edited draft first', () => {
     let now = 1;
     const drafts = createLocalStorageDrafts(fakeStorage(), () => now);
