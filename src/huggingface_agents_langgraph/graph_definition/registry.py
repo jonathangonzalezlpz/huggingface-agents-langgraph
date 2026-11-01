@@ -53,6 +53,7 @@ class NodeRegistration:
     resolver: Callable[[], Callable[..., Any]] | None = None
     description: str = ""
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    recover_errors: bool = False
 
     def __post_init__(self) -> None:
         if not self.implementation_id or not self.implementation_id.strip():
@@ -103,6 +104,7 @@ class NodeRegistry:
         resolver: Callable[[], Callable[..., Any]] | None = None,
         description: str = "",
         metadata: Mapping[str, Any] | None = None,
+        recover_errors: bool = False,
         override: bool = False,
     ) -> None:
         """Register an authorized node implementation with its contract."""
@@ -127,6 +129,7 @@ class NodeRegistry:
             resolver=resolver,
             description=description,
             metadata=dict(metadata or {}),
+            recover_errors=recover_errors,
         )
 
     def get_registration(self, implementation_id: str) -> NodeRegistration:
@@ -220,6 +223,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Code Processing
     registry.register(
         "code_processing",
+        recover_errors=True,
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.code_processing", "code_processing"
@@ -230,6 +234,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Spreadsheet Processing
     registry.register(
         "spreadsheet_processing",
+        recover_errors=True,
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.spreadsheet_processing",
@@ -241,6 +246,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Document Processing
     registry.register(
         "document_processing",
+        recover_errors=True,
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.document_processing",
@@ -252,6 +258,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Multimedia Processing
     registry.register(
         "multimedia_processing",
+        recover_errors=True,
         contract=acquisition_contract,
         resolver=lambda: _resolve_module_attr(
             "huggingface_agents_langgraph.multimedia_processing",
@@ -263,6 +270,7 @@ def create_gaia_v3_registry() -> NodeRegistry:
     # Web Research (file_path is optional)
     registry.register(
         "web_research",
+        recover_errors=True,
         contract=NodeContract(
             required_inputs=frozenset({"question"}),
             optional_inputs=frozenset({"file_path"}),

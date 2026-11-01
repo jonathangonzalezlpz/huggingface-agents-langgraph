@@ -396,3 +396,26 @@ class TestGaiaV31:
         mutated = replace(definition, edges=tuple(edges))
         report = self._validate(mutated)
         assert expected in _codes(report, "error")
+
+
+class TestStateType:
+    def test_unknown_state_type_is_an_error(self):
+        definition = replace(
+            _definition(["a"], [_direct("a", END)]), state_type="OtherState"
+        )
+        report = _validator(_registry(a=NodeContract())).validate(definition)
+        assert _codes(report, "error") == ["UNKNOWN_STATE_TYPE"]
+        assert report.errors[0].details["state_type"] == "OtherState"
+
+    def test_state_types_are_configurable(self):
+        definition = replace(
+            _definition(["a"], [_direct("a", END)]), state_type="OtherState"
+        )
+        validator = GraphValidator(
+            _registry(a=NodeContract()),
+            _routing(),
+            initial_fields=frozenset({"question"}),
+            state_fields=STATE_FIELDS,
+            state_types={"OtherState"},
+        )
+        assert validator.validate(definition).diagnostics == ()

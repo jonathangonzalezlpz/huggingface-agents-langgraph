@@ -1,5 +1,9 @@
 """Declarative contracts, registries and validation for GAIA Agent V4 workflows."""
 
+from huggingface_agents_langgraph.graph_definition.compiler import (
+    GraphCompilationError,
+    GraphCompiler,
+)
 from huggingface_agents_langgraph.graph_definition.contracts import NodeContract
 from huggingface_agents_langgraph.graph_definition.diagnostics import (
     Diagnostic,
@@ -24,6 +28,8 @@ __all__ = [
     "AgentDefinition",
     "Diagnostic",
     "EdgeDefinition",
+    "GraphCompilationError",
+    "GraphCompiler",
     "GraphValidator",
     "NodeContract",
     "NodeDefinition",

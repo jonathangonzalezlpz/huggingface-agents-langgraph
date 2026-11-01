@@ -48,6 +48,7 @@ class GraphValidator:
         *,
         initial_fields: Collection[str] | None = None,
         state_fields: Collection[str] | None = None,
+        state_types: Collection[str] | None = None,
     ) -> None:
         self._nodes = node_registry
         self._routing = routing_registry
@@ -57,10 +58,22 @@ class GraphValidator:
         self._state_fields = frozenset(
             AgentState.__annotations__ if state_fields is None else state_fields
         )
+        self._state_types = frozenset(
+            {AgentState.__name__} if state_types is None else state_types
+        )
 
     def validate(self, definition: AgentDefinition) -> ValidationReport:
         """Return all findings for the definition, ordered deterministically."""
         diagnostics: list[Diagnostic] = []
+        if definition.state_type not in self._state_types:
+            diagnostics.append(
+                Diagnostic(
+                    "UNKNOWN_STATE_TYPE",
+                    "error",
+                    f"State type '{definition.state_type}' is not supported.",
+                    details={"state_type": definition.state_type},
+                )
+            )
         contracts = self._known_contracts(definition, diagnostics)
         successors = self._check_edges(definition, diagnostics)
 

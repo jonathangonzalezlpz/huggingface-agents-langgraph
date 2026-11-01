@@ -617,3 +617,39 @@ class TestStructuralValidation:
             id="n1", implementation_id="p", metadata={"v": 1.5, "n": 0}
         )
         assert node.metadata["v"] == 1.5
+
+
+class TestRecoverErrorsPolicy:
+    ACQUISITION = {
+        "code_processing",
+        "spreadsheet_processing",
+        "document_processing",
+        "multimedia_processing",
+        "web_research",
+    }
+
+    def test_default_is_not_recoverable(self):
+        registry = NodeRegistry()
+        registry.register("n", NodeContract(), handler=lambda state: {})
+        assert registry.get_registration("n").recover_errors is False
+
+    def test_registration_keeps_recover_errors(self):
+        registry = NodeRegistry()
+        registry.register(
+            "n", NodeContract(), handler=lambda state: {}, recover_errors=True
+        )
+        assert registry.get_registration("n").recover_errors is True
+
+    def test_v31_catalog_marks_exactly_the_acquisition_nodes(self):
+        registry = create_gaia_v3_registry()
+        recoverable = {
+            name
+            for name in registry.list_implementations()
+            if registry.get_registration(name).recover_errors
+        }
+        assert recoverable == self.ACQUISITION
+
+    def test_recoverable_nodes_declare_research_notes_as_optional_output(self):
+        registry = create_gaia_v3_registry()
+        for name in self.ACQUISITION:
+            assert "research_notes" in registry.get_contract(name).all_outputs

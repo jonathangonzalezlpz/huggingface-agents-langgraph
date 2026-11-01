@@ -1,11 +1,32 @@
 """Closed registry of routing strategies usable by conditional edges.
 
-A strategy declares only its identifier and the closed set of branch labels it
-can return. Binding to the runtime routing functions is the compiler's concern.
+A strategy declares its identifier and the closed set of branch labels it can
+return. The routing function itself is bound lazily through an authorized
+resolver, so validation never imports runtime modules.
 """
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+import importlib
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
+from typing import Any
+
+AUTHORIZED_ROUTING_CALLABLES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("huggingface_agents_langgraph.graph", "_route_after_preprocessing"),
+        ("huggingface_agents_langgraph.graph", "_route_after_router"),
+        ("huggingface_agents_langgraph.graph", "_route_after_review"),
+    }
+)
+
+
+def resolve_routing_attr(module_name: str, attr_name: str) -> Callable[..., Any]:
+    """Resolve a pre-approved routing function; reject anything else."""
+    if (module_name, attr_name) not in AUTHORIZED_ROUTING_CALLABLES:
+        raise PermissionError(
+            "Unauthorized routing attribute resolution attempt: "
+            f"'{module_name}.{attr_name}'"
+        )
+    return getattr(importlib.import_module(module_name), attr_name)
 
 
 @dataclass(frozen=True)
@@ -15,6 +36,9 @@ class RoutingStrategy:
     identifier: str
     outputs: frozenset[str]
     description: str = ""
+    resolver: Callable[[], Callable[..., Any]] | None = field(
+        default=None, compare=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         if not self.identifier or not self.identifier.strip():
@@ -57,13 +81,34 @@ class RoutingRegistry:
     def has(self, identifier: str) -> bool:
         return identifier in self._strategies
 
+    def resolve(self, identifier: str) -> Callable[..., Any]:
+        """Resolve and return the routing function of a registered strategy."""
+        strategy = self.get(identifier)
+        if strategy.resolver is None:
+            raise ValueError(f"Routing strategy '{identifier}' has no resolver")
+        resolved = strategy.resolver()
+        if not callable(resolved):
+            raise TypeError(
+                f"Resolver for '{identifier}' returned non-callable "
+                f"{type(resolved).__name__}"
+            )
+        return resolved
+
     def list_strategies(self) -> list[str]:
         """Return the sorted identifiers of all registered strategies."""
         return sorted(self._strategies)
 
 
 def _strategy(identifier: str, outputs: Iterable[str], description: str):
-    return RoutingStrategy(identifier, frozenset(outputs), description)
+    function_name = "_" + identifier
+    return RoutingStrategy(
+        identifier,
+        frozenset(outputs),
+        description,
+        resolver=lambda: resolve_routing_attr(
+            "huggingface_agents_langgraph.graph", function_name
+        ),
+    )
 
 
 def create_gaia_v31_routing_registry() -> RoutingRegistry:
