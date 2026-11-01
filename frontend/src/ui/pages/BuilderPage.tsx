@@ -11,7 +11,7 @@ import { useComponentDescription } from '../components/componentText';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { PageHeader } from '../components/PageHeader';
 import { useAsyncData } from '../hooks/useAsyncData';
-import { buildDraft, saveNewDraft, type DraftKind } from '../editor/drafts';
+import { NEEDS_BUILTIN, buildDraft, saveNewDraft, type DraftKind } from '../editor/drafts';
 import { useServices } from '../services';
 import { ArchitectureGroupCard } from './ArchitectureGroupCard';
 
@@ -42,13 +42,33 @@ function Library() {
   );
 }
 
-const NEW_DRAFT_KINDS: {
-  kind: DraftKind;
-  label: 'builder.new.blank' | 'builder.new.linear' | 'builder.new.copy';
-}[] = [
+type TemplateLabel =
+  | 'builder.new.blank'
+  | 'builder.new.linear'
+  | 'builder.new.copy'
+  | 'builder.new.verified'
+  | 'builder.new.planned'
+  | 'builder.new.consistency';
+
+const NEW_DRAFT_KINDS: { kind: DraftKind; label: TemplateLabel }[] = [
   { kind: 'blank', label: 'builder.new.blank' },
   { kind: 'linear', label: 'builder.new.linear' },
   { kind: 'copy', label: 'builder.new.copy' },
+];
+
+/** Starting points that use the newer components, meant to be compared in a battery. */
+const TEMPLATE_KINDS: {
+  kind: DraftKind;
+  label: TemplateLabel;
+  hint: 'builder.template.verified' | 'builder.template.planned' | 'builder.template.consistency';
+}[] = [
+  { kind: 'verified', label: 'builder.new.verified', hint: 'builder.template.verified' },
+  { kind: 'planned', label: 'builder.new.planned', hint: 'builder.template.planned' },
+  {
+    kind: 'consistency',
+    label: 'builder.new.consistency',
+    hint: 'builder.template.consistency',
+  },
 ];
 
 function Drafts() {
@@ -68,7 +88,9 @@ function Drafts() {
       ]);
       const builtin = library.find((item) => item.readOnly);
       const source =
-        kind === 'copy' && builtin ? await services.architectures.get(builtin.id) : undefined;
+        NEEDS_BUILTIN.includes(kind) && builtin
+          ? await services.architectures.get(builtin.id)
+          : undefined;
       const taken = services.drafts.list().map((draft) => draft.architectureId);
       const doc = buildDraft(kind, catalog, taken, source);
       navigate(`/builder/draft/${saveNewDraft(services, doc)}`);
@@ -105,6 +127,31 @@ function Drafts() {
         </div>
       </div>
       <p className="mb-4 text-sm text-fg-muted">{t('builder.drafts.hint')}</p>
+      <div
+        role="group"
+        aria-label={t('builder.templates')}
+        className="mb-4 rounded-xl border border-line bg-surface p-4"
+      >
+        <h3 className="text-sm font-semibold">{t('builder.templates')}</h3>
+        <p className="mb-3 text-sm text-fg-muted">{t('builder.templates.hint')}</p>
+        <ul className="grid gap-3 sm:grid-cols-3">
+          {TEMPLATE_KINDS.map(({ kind, label, hint }) => (
+            <li key={kind} className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => void create(kind)}
+                aria-describedby={`template-${kind}`}
+                className="min-h-9 rounded-lg border border-line-strong bg-surface px-3 text-left text-sm font-medium hover:bg-muted"
+              >
+                {t(label)}
+              </button>
+              <p id={`template-${kind}`} className="text-xs text-fg-muted">
+                {t(hint)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
       {failure !== null && <ErrorNotice error={failure} onRetry={() => setFailure(null)} />}
       {drafts.length === 0 ? (
         <p className="text-fg-muted">{t('builder.drafts.empty')}</p>

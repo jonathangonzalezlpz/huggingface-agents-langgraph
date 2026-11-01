@@ -600,6 +600,18 @@ export const es = {
   'param.wikipedia_search.query': 'Consulta fija (vacío: la pregunta)',
   'param.calculator.max_tokens': 'Tokens máximos',
 
+  'builder.templates': 'Plantillas para comparar',
+  'builder.templates.hint':
+    'Puntos de partida con los componentes nuevos. Guárdalos y compáralos con la V3.1 en una batería. No gestionan adjuntos.',
+  'builder.new.verified': 'V3.1 + verificador',
+  'builder.new.planned': 'Planificar → herramienta → razonar',
+  'builder.new.consistency': 'Autoconsistencia',
+  'builder.template.verified':
+    'La V3.1 completa con un bucle: el verificador acepta el borrador o lo manda a revisión.',
+  'builder.template.planned': 'Un plan corto, una búsqueda web y luego razonar y responder.',
+  'builder.template.consistency':
+    'Una búsqueda y tres respuestas independientes; gana la mayoritaria.',
+
   'notfound.title': 'Página no encontrada',
   'notfound.body': 'Esa dirección no existe en Studio.',
   'notfound.back': 'Volver al Constructor',

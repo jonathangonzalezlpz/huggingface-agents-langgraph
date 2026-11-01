@@ -214,3 +214,59 @@ describe('editing from the library', () => {
     ).toEqual(['gaia_v31_copy', 'gaia_v31_copy_2']);
   });
 });
+
+describe('starting from a template', () => {
+  async function create(label: string) {
+    const current = services();
+    renderLibrary(current);
+    const templates = within(
+      await screen.findByRole('group', { name: 'Plantillas para comparar' }),
+    );
+    await userEvent.click(templates.getByRole('button', { name: label }));
+    const opened = await screen.findByText(/opened draft/);
+    const id = opened.textContent?.replace('opened draft ', '') ?? '';
+    return current.drafts.load(id);
+  }
+
+  it('describes each template next to its button', async () => {
+    renderLibrary(services());
+    const templates = within(
+      await screen.findByRole('group', { name: 'Plantillas para comparar' }),
+    );
+    expect(
+      templates.getByRole('button', { name: 'V3.1 + verificador' }),
+    ).toHaveAccessibleDescription(/bucle: el verificador acepta/);
+    expect(templates.getByText(/No gestionan adjuntos/)).toBeVisible();
+  });
+
+  it('opens a verified V3.1 with the verification loop already wired', async () => {
+    const draft = await create('V3.1 + verificador');
+    expect(draft?.graph.architectureId).toBe('verified_v31');
+    const ids = draft?.graph.nodes.map((node) => node.id) ?? [];
+    expect(ids).toEqual(expect.arrayContaining(['router', 'reasoning', 'verify', 'revise']));
+    expect(draft?.graph.nodes.find((n) => n.id === 'verify')?.params).toEqual({ max_revisions: 1 });
+    expect(Object.keys(draft?.layout ?? {})).toHaveLength(ids.length);
+  });
+
+  it('opens the planning and the self-consistency templates', async () => {
+    const planned = await create('Planificar → herramienta → razonar');
+    expect(planned?.graph.nodes.map((n) => n.implementationId)).toEqual([
+      'preprocessing',
+      'llm_planner',
+      'web_search',
+      'reasoning',
+      'answer_production',
+    ]);
+  });
+
+  it('names each draft after its template and keeps names unique', async () => {
+    const current = services();
+    renderLibrary(current);
+    const templates = within(
+      await screen.findByRole('group', { name: 'Plantillas para comparar' }),
+    );
+    await userEvent.click(templates.getByRole('button', { name: 'Autoconsistencia' }));
+    await screen.findByText(/opened draft/);
+    expect(current.drafts.list().map((d) => d.architectureId)).toEqual(['consistent_agent']);
+  });
+});

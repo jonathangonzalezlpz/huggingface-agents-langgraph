@@ -1,7 +1,10 @@
 import {
   blankDocument,
-  linearDocument,
+  consistencyDocument,
   documentFromArchitecture,
+  linearDocument,
+  plannedDocument,
+  verifiedDocument,
 } from '../../domain/editor/templates';
 import type { EditorDocument } from '../../domain/editor/model';
 import type { Architecture, Catalog } from '../../domain/types';
@@ -9,9 +12,21 @@ import { toDefinition } from '../../domain/editor/convert';
 import type { SavedMarker, StudioServices } from '../../ports';
 import { computeLayout } from './autoLayout';
 
-export type DraftKind = 'blank' | 'linear' | 'copy';
-
 const DEFAULT_NAME = 'my_agent';
+
+export type DraftKind = 'blank' | 'linear' | 'copy' | 'verified' | 'planned' | 'consistency';
+
+/** The kinds that start from the built-in pipeline and so need it as a source. */
+export const NEEDS_BUILTIN: readonly DraftKind[] = ['copy', 'verified'];
+
+const BASE_NAMES: Record<DraftKind, string> = {
+  blank: DEFAULT_NAME,
+  linear: DEFAULT_NAME,
+  copy: DEFAULT_NAME,
+  verified: 'verified_v31',
+  planned: 'planned_agent',
+  consistency: 'consistent_agent',
+};
 
 export function newDraftId(): string {
   return (
@@ -40,12 +55,15 @@ export function buildDraft(
   source?: Architecture,
 ): EditorDocument {
   const name = uniqueArchitectureId(
-    kind === 'copy' ? `${source?.architectureId ?? DEFAULT_NAME}_copy` : DEFAULT_NAME,
+    kind === 'copy' ? `${source?.architectureId ?? DEFAULT_NAME}_copy` : BASE_NAMES[kind],
     taken,
   );
   if (kind === 'blank') return blankDocument(name);
   if (kind === 'linear') return withLayout(linearDocument(name, catalog));
-  if (!source) throw new Error('A copy needs a source architecture');
+  if (kind === 'planned') return withLayout(plannedDocument(name, catalog));
+  if (kind === 'consistency') return withLayout(consistencyDocument(name, catalog));
+  if (!source) throw new Error('This draft needs the built-in architecture as its source');
+  if (kind === 'verified') return withLayout(verifiedDocument(name, catalog, source));
   return withLayout(documentFromArchitecture(source, catalog, name));
 }
 

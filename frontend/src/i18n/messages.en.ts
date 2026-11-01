@@ -592,6 +592,17 @@ export const en: Record<MessageKey, string> = {
   'param.wikipedia_search.query': 'Fixed query (empty: the question)',
   'param.calculator.max_tokens': 'Maximum tokens',
 
+  'builder.templates': 'Templates to compare',
+  'builder.templates.hint':
+    'Starting points that use the newer components. Save them and compare them with V3.1 in a battery. They do not handle attachments.',
+  'builder.new.verified': 'V3.1 + verifier',
+  'builder.new.planned': 'Plan → tool → reason',
+  'builder.new.consistency': 'Self-consistency',
+  'builder.template.verified':
+    'The full V3.1 with a loop: the verifier accepts the draft or sends it back for revision.',
+  'builder.template.planned': 'A short plan, a web search, then reason and answer.',
+  'builder.template.consistency': 'One search and three independent answers; the majority wins.',
+
   'notfound.title': 'Page not found',
   'notfound.body': 'That address does not exist in Studio.',
   'notfound.back': 'Back to the Builder',
