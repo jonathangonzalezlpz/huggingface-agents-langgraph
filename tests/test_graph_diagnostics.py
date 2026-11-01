@@ -70,3 +70,9 @@ class TestValidationReport:
         assert data["is_valid"] is False
         assert data["counts"] == {"error": 1, "warning": 1, "info": 0}
         assert len(data["diagnostics"]) == 2
+
+
+def test_availability_defaults_to_empty_and_is_serialized():
+    report = ValidationReport(diagnostics=())
+    assert report.availability == {}
+    assert report.to_dict()["availability"] == {}

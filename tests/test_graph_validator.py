@@ -419,3 +419,46 @@ class TestStateType:
             state_types={"OtherState"},
         )
         assert validator.validate(definition).diagnostics == ()
+
+
+class TestAvailabilityReport:
+    @staticmethod
+    def _report():
+        return GraphValidator(
+            create_gaia_v3_registry(), create_gaia_v31_routing_registry()
+        ).validate(create_gaia_v31_definition())
+
+    def test_entry_node_sees_exactly_the_initial_fields(self):
+        availability = self._report().availability
+        assert availability["preprocessing"].guaranteed == (
+            "file_name",
+            "question",
+            "task_id",
+        )
+        assert availability["preprocessing"].possible == ()
+
+    def test_distinguishes_guaranteed_from_merely_possible_fields(self):
+        node = self._report().availability["code_processing"]
+        assert "route" in node.guaranteed
+        assert "file_path" not in node.guaranteed
+        assert node.possible == ("file_path",)
+
+    def test_downstream_nodes_see_what_upstream_nodes_guarantee(self):
+        availability = self._report().availability
+        assert "draft_answer" in availability["answer_production"].guaranteed
+        assert "draft_answer" not in availability["reasoning"].guaranteed
+
+    def test_every_reachable_node_has_an_entry(self):
+        availability = self._report().availability
+        assert set(availability) == {n.id for n in create_gaia_v31_definition().nodes}
+
+    def test_unreachable_nodes_have_no_availability(self):
+        report = _validator().validate(
+            _definition(["a", "b"], [_direct("a", END), _direct("b", END)])
+        )
+        assert set(report.availability) == {"a"}
+
+    def test_serializes_as_guaranteed_and_possible_lists(self):
+        data = self._report().to_dict()["availability"]["code_processing"]
+        assert data["possible"] == ["file_path"]
+        assert isinstance(data["guaranteed"], list)

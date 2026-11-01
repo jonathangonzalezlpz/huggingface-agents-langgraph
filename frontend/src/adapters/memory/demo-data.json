@@ -528,6 +528,159 @@
           ]
         }
       }
-    ]
+    ],
+    "availability": {
+      "answer_production": {
+        "guaranteed": [
+          "draft_answer",
+          "file_name",
+          "question",
+          "research_action",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "action_history",
+          "evidence",
+          "file_path",
+          "reasoning_warnings",
+          "research_notes",
+          "research_steps",
+          "source_links"
+        ]
+      },
+      "attachment_resolver": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "task_id"
+        ],
+        "possible": []
+      },
+      "code_processing": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "file_path"
+        ]
+      },
+      "document_processing": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "file_path"
+        ]
+      },
+      "multimedia_processing": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "file_path"
+        ]
+      },
+      "preprocessing": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "task_id"
+        ],
+        "possible": []
+      },
+      "reasoning": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "research_action",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "action_history",
+          "evidence",
+          "file_path",
+          "research_notes",
+          "research_steps",
+          "source_links"
+        ]
+      },
+      "research_action": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "research_action",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "action_history",
+          "evidence",
+          "file_path",
+          "research_notes",
+          "research_steps",
+          "source_links"
+        ]
+      },
+      "review": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "action_history",
+          "evidence",
+          "file_path",
+          "research_action",
+          "research_notes",
+          "research_steps",
+          "source_links"
+        ]
+      },
+      "router": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "task_id"
+        ],
+        "possible": [
+          "file_path"
+        ]
+      },
+      "spreadsheet_processing": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "file_path"
+        ]
+      },
+      "web_research": {
+        "guaranteed": [
+          "file_name",
+          "question",
+          "route",
+          "task_id"
+        ],
+        "possible": [
+          "file_path"
+        ]
+      }
+    }
   }
 }

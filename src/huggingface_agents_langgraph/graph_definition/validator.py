@@ -13,6 +13,7 @@ from collections.abc import Collection, Iterable, Mapping
 from huggingface_agents_langgraph.graph_definition.contracts import NodeContract
 from huggingface_agents_langgraph.graph_definition.diagnostics import (
     Diagnostic,
+    NodeAvailability,
     Severity,
     ValidationReport,
 )
@@ -100,13 +101,15 @@ class GraphValidator:
                     )
                 )
         diagnostics.extend(self._cycle_diagnostics(reachable, successors, can_end))
-        diagnostics.extend(
-            self._availability_diagnostics(
-                definition.initial_node, reachable, successors, contracts
-            )
+        availability_findings, availability = self._availability(
+            definition.initial_node, reachable, successors, contracts
         )
+        diagnostics.extend(availability_findings)
         diagnostics.extend(self._state_field_diagnostics(contracts))
-        return ValidationReport(diagnostics=tuple(sorted(diagnostics, key=_sort_key)))
+        return ValidationReport(
+            diagnostics=tuple(sorted(diagnostics, key=_sort_key)),
+            availability=availability,
+        )
 
     def _known_contracts(
         self, definition: AgentDefinition, diagnostics: list[Diagnostic]
@@ -266,13 +269,13 @@ class GraphValidator:
                 )
         return diagnostics
 
-    def _availability_diagnostics(
+    def _availability(
         self,
         entry: str,
         reachable: set[str],
         successors: Successors,
         contracts: Mapping[str, NodeContract],
-    ) -> list[Diagnostic]:
+    ) -> tuple[list[Diagnostic], dict[str, NodeAvailability]]:
         nodes = sorted(reachable)
         predecessors: dict[str, set[str]] = {node: set() for node in nodes}
         for source in nodes:
@@ -313,7 +316,14 @@ class GraphValidator:
                             details={"field": field_name},
                         )
                     )
-        return diagnostics
+        availability = {
+            node: NodeAvailability(
+                guaranteed=tuple(sorted(guaranteed_in[node])),
+                possible=tuple(sorted(possible_in[node] - guaranteed_in[node])),
+            )
+            for node in nodes
+        }
+        return diagnostics, availability
 
     def _state_field_diagnostics(
         self, contracts: Mapping[str, NodeContract]

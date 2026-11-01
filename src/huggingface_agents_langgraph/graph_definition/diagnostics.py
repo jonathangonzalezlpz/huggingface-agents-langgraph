@@ -6,6 +6,7 @@ node or edge without parsing messages.
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any, Literal
 
 from huggingface_agents_langgraph.graph_definition.schema import (
@@ -56,13 +57,29 @@ class Diagnostic:
 
 
 @dataclass(frozen=True)
+class NodeAvailability:
+    """State fields present when a node starts.
+
+    ``guaranteed`` fields exist on every path that reaches the node; ``possible``
+    fields exist on some paths only.
+    """
+
+    guaranteed: tuple[str, ...]
+    possible: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ValidationReport:
     """Ordered collection of diagnostics for one agent definition."""
 
     diagnostics: tuple[Diagnostic, ...]
+    availability: Mapping[str, NodeAvailability] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
+        object.__setattr__(
+            self, "availability", MappingProxyType(dict(self.availability))
+        )
 
     def _with_severity(self, severity: Severity) -> tuple[Diagnostic, ...]:
         return tuple(d for d in self.diagnostics if d.severity == severity)
@@ -89,4 +106,11 @@ class ValidationReport:
             "is_valid": self.is_valid,
             "counts": {s: len(self._with_severity(s)) for s in SEVERITIES},
             "diagnostics": [d.to_dict() for d in self.diagnostics],
+            "availability": {
+                node: {
+                    "guaranteed": list(item.guaranteed),
+                    "possible": list(item.possible),
+                }
+                for node, item in sorted(self.availability.items())
+            },
         }
