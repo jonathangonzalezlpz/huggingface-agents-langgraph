@@ -23,6 +23,9 @@ from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 RECURSION_LIMIT = 40
 
 
+TIMING_KEYS = {"duration_seconds", "started_offset_seconds"}
+
+
 def _declarative_graph():
     return GraphCompiler(
         create_gaia_v3_registry(), create_gaia_v31_routing_registry()
@@ -40,7 +43,7 @@ def _run(graph, task):
     finally:
         current_trace.reset(token)
     steps = [
-        {key: value for key, value in step.items() if key != "duration_seconds"}
+        {key: value for key, value in step.items() if key not in TIMING_KEYS}
         for step in trace.steps
     ]
     return result, error, steps

@@ -35,7 +35,11 @@ def _stable(result):
 def _steps(run_id):
     record = records.read_record("runs", run_id)
     return [
-        {k: v for k, v in step.items() if k != "duration_seconds"}
+        {
+            k: v
+            for k, v in step.items()
+            if k not in ("duration_seconds", "started_offset_seconds")
+        }
         for step in record["steps"]
     ]
 

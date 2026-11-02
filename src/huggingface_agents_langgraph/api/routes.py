@@ -9,6 +9,7 @@ from huggingface_agents_langgraph.api.handlers import (
     runs,
     scoring,
     system,
+    traces,
 )
 from huggingface_agents_langgraph.api.router import Router
 
@@ -19,6 +20,7 @@ RESOURCES = (
     architectures,
     experiments,
     batteries,
+    traces,
     runs,
     scoring,
 )

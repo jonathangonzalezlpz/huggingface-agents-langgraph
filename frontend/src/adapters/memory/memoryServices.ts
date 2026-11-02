@@ -83,5 +83,11 @@ export function createMemoryServices(): StudioServices {
     questions: {
       list: () => Promise.reject(new StudioError('unavailable', 'Questions need the backend')),
     },
+    traces: {
+      getTrace: () => Promise.reject(new StudioError('unavailable', 'Traces need the backend')),
+      getSpanPayload: () =>
+        Promise.reject(new StudioError('unavailable', 'Traces need the backend')),
+      getInsights: () => Promise.reject(new StudioError('unavailable', 'Traces need the backend')),
+    },
   };
 }

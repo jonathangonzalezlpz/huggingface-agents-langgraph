@@ -14,7 +14,7 @@ Paquetes bajo `src/huggingface_agents_langgraph/`:
 
 | Paquete | Contiene |
 |---|---|
-| `domain` | Reglas y datos puros: estado del agente, configuración de experimento, comparación, métricas, contrato de respuesta, evaluación local. |
+| `domain` | Reglas y datos puros: estado del agente, configuración de experimento, comparación, métricas, contrato de respuesta, evaluación local, trazas y su exportación. |
 | `pipeline` | Los nodos del agente (preprocesado, router, procesadores por capacidad, revisión, razonamiento, respuesta) y `graph.py`. |
 | `adapters` | Cliente del LLM, registros JSON de `.runtime` y seguimiento de recursos. |
 | `application` | Casos de uso: ejecutar un experimento y una pregunta, baterías, puntuación, almacén de arquitecturas, selección de grafo. |
@@ -64,6 +64,7 @@ Cada recurso tiene su módulo en `api/handlers/`:
 |---|---|
 | Arquitecturas | `GET /api/catalog`, `GET/POST /api/architectures`, `POST /api/architectures/validate`, `GET/PUT /api/architectures/{id}/layout` |
 | Ejecuciones | `POST /api/run`, `GET /api/runs/{id}` |
+| Trazas | `GET /api/runs/{id}/trace`, `/spans/{span}`, `/trace.jsonl`, `/trace.otlp.json`, `/report.md`; `GET /api/experiments/{id}/insights`, `/trace.csv` (ver más abajo) |
 | Experimentos | `GET/POST /api/experiments`, `POST /api/experiments/compare`, `POST /api/experiments/{id}/evaluate`, `DELETE /api/experiments/{id}` |
 | Baterías | `POST /api/batteries`, `GET /api/batteries/current`, `POST /api/batteries/stop` |
 | Puntuación | `POST /api/evaluate`, `POST /api/score` (envío oficial) |
@@ -150,6 +151,34 @@ mediana, P95, errores técnicos, truncamientos) y alineación por tarea (ganadas
 experimentos con la misma configuración, código y tareas se agrupan como repeticiones; con al menos dos a
 cada lado, una diferencia se clasifica como dentro o fuera del rango observado, y con una sola ejecución
 como no valorable. No expone textos de respuesta ni respuestas de referencia.
+
+## Trazas y observabilidad
+
+Cada ejecución guarda en `.runtime/runs/` sus pasos (`steps`: nodo, actualización, error, duración, inicio) y sus
+llamadas al modelo (`calls`: mensajes, parámetros, respuesta con `usage`, duración, inicio y el nodo que la
+hizo). `tracing.py` registra el inicio y el nodo de cada llamada; es lo único que cambió del núcleo, y solo
+añade campos. Sobre ese registro, `domain/` deriva la vista de observabilidad sin dependencias nuevas:
+
+| Módulo | Qué hace |
+|---|---|
+| `trace_spans.py` | `build_trace(registro)` devuelve un árbol de spans (`run` → `node` → `llm`) con estado, tiempos y atributos pequeños (modelo, tokens de entrada, salida y caché, motivo de fin), más un resumen. `span_payload` entrega bajo demanda el contenido pesado de un span. El registro de una ejecución puede pasar de 800 KB; el árbol ocupa unos 3 KB. Los ids de span son estables. |
+| `trace_activity.py` | Una línea de «qué hizo» por nodo, calculada con los campos que cambió (`fetch <url> — <motivo>`, `fetch failed: HTTP Error 403 · evidence: 5`, `route: web`, `answer: …`), sin depender del nombre del nodo. Y `unsupported_figures`: las cifras que una decisión de `review` o la respuesta final citan y que no están en la pregunta, en las fuentes ni en las notas de adquisición. Solo detecta números. |
+| `trace_linking.py` | Los registros anteriores al seguimiento por nodo no dicen en qué nodo se hizo cada llamada. Se deduce por duración y orden (una llamada tan larga como un nodo es suya; una más corta se coloca entre sus vecinas) y se marca `inferred_link`. Es una estimación. |
+| `trace_export.py` | JSONL de spans, OTLP/JSON (ids en hexadecimal, tiempos en nanosegundos, atributos `gen_ai.*` en las llamadas al modelo), resumen en Markdown por ejecución y tabla CSV por batería. La tabla no lleva respuestas ni respuestas de referencia. |
+| `battery_insights.py` | Agregados de una batería a partir del registro del experimento: aciertos sobre las puntuadas, tiempo por etapa, acierto por ruta, errores agrupados, truncaciones y las preguntas más lentas. |
+
+Los manejadores están en `api/handlers/traces.py`:
+
+| Ruta | Devuelve |
+|---|---|
+| `GET /api/runs/{id}/trace` | El árbol de spans y su resumen. |
+| `GET /api/runs/{id}/spans/{span}` | El contenido de un span (actualización de un nodo o mensajes y salida de una llamada). |
+| `GET /api/runs/{id}/trace.jsonl`, `trace.otlp.json`, `report.md` | Las exportaciones de una ejecución. |
+| `GET /api/experiments/{id}/insights`, `trace.csv` | Los agregados de una batería y su tabla. |
+
+Todo es local: nada se envía a terceros. No hay progreso en vivo (se decidió que la traza se consulta al terminar).
+El formato OTLP permite, si algún día se quiere, enviar los datos a Phoenix o Langfuse sin cambiar el modelo; hoy
+no se hace.
 
 ## Pruebas
 

@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { StudioError } from '../../domain/errors';
@@ -7,6 +7,8 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { PageHeader } from '../components/PageHeader';
 import { useAsyncData } from '../hooks/useAsyncData';
+import { TabBar } from '../observability/TabBar';
+import { TraceView } from '../observability/TraceView';
 import { useServices } from '../services';
 import { RunResult } from './RunResult';
 
@@ -16,6 +18,7 @@ export function RunViewPage() {
   const { runs } = useServices();
   const { id = '' } = useParams();
   const state = useAsyncData(useCallback(() => runs.get(id), [runs, id]));
+  const [view, setView] = useState<'path' | 'trace'>('path');
 
   return (
     <>
@@ -34,7 +37,22 @@ export function RunViewPage() {
         ) : (
           <ErrorNotice error={state.error} onRetry={state.reload} />
         ))}
-      {state.status === 'success' && <RunResult record={state.data} />}
+      {state.status === 'success' && (
+        <>
+          <TabBar
+            label={t('obs.tab.label')}
+            value={view}
+            onChange={setView}
+            tabs={[
+              { id: 'path', label: t('obs.tab.path') },
+              { id: 'trace', label: t('obs.tab.trace') },
+            ]}
+          />
+          <div role="tabpanel" id={`panel-${view}`} aria-labelledby={`tab-${view}`}>
+            {view === 'path' ? <RunResult record={state.data} /> : <TraceView runId={id} />}
+          </div>
+        </>
+      )}
     </>
   );
 }

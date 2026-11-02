@@ -73,8 +73,9 @@ Reglas de redacción: nunca «inválido» para un aviso ni «correcto» para alg
 - **Ejecuciones:** solo versiones guardadas y sin errores. Se elige el modelo y los ajustes (versión del
   pipeline, mejoras, semilla y, en «Avanzado», capacidades, razonamiento, tokens, muestreo y modelo de
   visión) y una pregunta libre o de GAIA. El resultado muestra respuesta, ruta, duración y el recorrido
-  sobre el grafo (nodos no visitados atenuados, el que falló marcado), con reproducción paso a paso. No hay
-  progreso en vivo: la petición es síncrona y «Dejar de esperar» no cancela en el servidor.
+  sobre el grafo (nodos no visitados atenuados, el que falló marcado), con reproducción paso a paso. La
+  petición es síncrona y «Dejar de esperar» no cancela en el servidor; la traza detallada se ve al terminar
+  (ver [Observabilidad](#observabilidad)).
 - **Baterías:** las ejecuta el servidor (`application/batteries.py`), no el navegador, para que los registros
   sean comparables con los del ejecutor de línea de comandos. Una a la vez, 1 a 20 preguntas, progreso por
   sondeo, detener y reanudar.
@@ -85,6 +86,28 @@ Reglas de redacción: nunca «inválido» para un aviso ni «correcto» para alg
 - **Puntuación:** la local se calcula y se guarda en el servidor con las respuestas del registro guardado
   (el navegador nunca envía respuestas). **El envío oficial** abre un diálogo que explica qué se envía, a
   dónde y que actualiza una clasificación pública, y exige confirmación explícita.
+
+## Observabilidad
+
+La traza se consulta cuando la ejecución ha terminado. No hay progreso en vivo, ni lo necesita el análisis. La
+interfaz vive en `ui/observability/` y lee los endpoints descritos en [backend.md](backend.md).
+
+- **Detalle de una ejecución (`/runs/:id`):** dos pestañas, «Recorrido» (el grafo) y «Traza». La traza muestra un
+  resumen (duración, llamadas al modelo, tokens de entrada y salida, errores, nodo más lento) y una cascada con
+  una fila por span, filtros por tipo y «Solo errores», y la línea de «qué hizo» bajo cada nodo. Al pulsar una fila
+  se carga bajo demanda su contenido (la actualización de un nodo o los mensajes, parámetros y salida de una
+  llamada) y su error si lo hay.
+- **Avisos:** una franja amarilla si una decisión o respuesta cita cifras sin respaldo en la evidencia; una azul si
+  las llamadas de un registro antiguo se asignaron a su nodo por estimación; y una amarilla si alguna no pudo
+  enlazarse.
+- **Detalle de un experimento:** pestañas «Respuestas» y «Observabilidad». La segunda muestra acierto local, tiempo
+  medio, tokens de salida y errores técnicos; el tiempo por etapa con su parte del total; las rutas con su acierto;
+  los fallos agrupados; y las preguntas más lentas con su etapa más lenta.
+- **Exportar:** enlaces con el nombre del formato (JSONL, OTLP, Markdown en una ejecución; CSV en una batería).
+  El JSONL y el CSV sirven para analizar con un script o con una IA; el Markdown es el resumen legible.
+- **Capas:** `domain/trace.ts` y `domain/insights.ts` (tipos, filas de la cascada, formato de duraciones y enlaces
+  de exportación, con pruebas), `TracePort` en `ports/`, esquema zod en `adapters/wire/trace.ts` (tolera atributos
+  que no sean escalares) y el adaptador HTTP. En el modo demostración las trazas no están disponibles.
 
 ## Arquitectura
 
