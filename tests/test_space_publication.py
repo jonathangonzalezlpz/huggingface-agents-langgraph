@@ -121,3 +121,37 @@ def test_publication_records_uploaded_commit_before_verification_failure(
     )
     assert report["published_commit"] == "published"
     assert report["verification"] == "pending"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "frontend/src/domain/editor/commands.ts",
+        "frontend/src/ui/editor/Inspector.tsx",
+        "frontend/package.json",
+        "frontend/package-lock.json",
+        "frontend/vite.config.ts",
+        "frontend/public/favicon.svg",
+        "frontend/scripts/check-dependency-age.mjs",
+        "frontend/.npmrc",
+    ],
+)
+def test_publication_includes_the_studio_sources(publisher, name):
+    assert publisher["is_publishable"](name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "frontend/node_modules/react/index.js",
+        "frontend/.env",
+        "frontend/.env.local",
+        "frontend/dist/index.html",
+        "frontend/src/untyped.bin",
+        "docs/data.json",
+        "src/data.json",
+        "tests/fixture.ts",
+    ],
+)
+def test_publication_limits_studio_extensions_to_the_frontend(publisher, name):
+    assert not publisher["is_publishable"](name)

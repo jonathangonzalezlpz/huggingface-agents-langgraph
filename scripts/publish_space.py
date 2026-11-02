@@ -21,7 +21,7 @@ PUBLICATION_FILES = {
     "LICENSE",
     "space/index.html",
     "scripts/publish_space.py",
-    "docs/publicacion-space.md",
+    "docs/ejecucion.md",
     "tests/test_space_publication.py",
 }
 ROOT_FILES = {
@@ -35,6 +35,9 @@ ROOT_FILES = {
 }
 SOURCE_DIRECTORIES = {"src", "tests", "scripts", "docs", "space"}
 SOURCE_EXTENSIONS = {".py", ".ps1", ".md", ".html", ".css", ".js"}
+FRONTEND_DIRECTORY = "frontend"
+FRONTEND_EXTENSIONS = SOURCE_EXTENSIONS | {".ts", ".tsx", ".json", ".mjs", ".svg"}
+FRONTEND_FILES = {"frontend/.npmrc", "frontend/.prettierrc", "frontend/.prettierignore"}
 PRIVATE_PARTS = {
     ".env",
     ".git",
@@ -45,6 +48,8 @@ PRIVATE_PARTS = {
     ".codex",
     ".agents",
     "__pycache__",
+    "node_modules",
+    "dist",
 }
 MAX_FILE_BYTES = 2_000_000
 PATTERNS = {
@@ -77,6 +82,8 @@ def is_publishable(name: str) -> bool:
         return False
     if path.name.startswith(".env") and name != ".env.example":
         return False
+    if path.parts[0] == FRONTEND_DIRECTORY:
+        return name in FRONTEND_FILES or path.suffix in FRONTEND_EXTENSIONS
     return name in ROOT_FILES or (
         path.parts[0] in SOURCE_DIRECTORIES and path.suffix in SOURCE_EXTENSIONS
     )
