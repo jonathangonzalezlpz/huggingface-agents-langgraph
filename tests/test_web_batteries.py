@@ -5,9 +5,10 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import records, web_app
+from huggingface_agents_langgraph import web_app
+from huggingface_agents_langgraph.adapters import records
 from huggingface_agents_langgraph.api.handlers import batteries as batteries_handlers
-from huggingface_agents_langgraph.batteries import (
+from huggingface_agents_langgraph.application.batteries import (
     BatteryBusyError,
     BatteryUnavailableError,
 )

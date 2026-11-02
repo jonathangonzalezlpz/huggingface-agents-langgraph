@@ -3,9 +3,11 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import llm, model_server, multimedia_processing
-from huggingface_agents_langgraph.experiments import normalize_experiment
+from huggingface_agents_langgraph import model_server
+from huggingface_agents_langgraph.adapters import llm
+from huggingface_agents_langgraph.domain.experiments import normalize_experiment
 from huggingface_agents_langgraph.model_trials import MODEL_PAIRS, trial_config
+from huggingface_agents_langgraph.pipeline import multimedia_processing
 from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 

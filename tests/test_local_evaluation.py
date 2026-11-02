@@ -1,6 +1,6 @@
 import pytest
 
-from huggingface_agents_langgraph.local_evaluation import score_answers
+from huggingface_agents_langgraph.domain.local_evaluation import score_answers
 
 
 def _answers() -> list[dict[str, str]]:

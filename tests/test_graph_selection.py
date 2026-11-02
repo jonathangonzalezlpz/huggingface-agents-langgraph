@@ -4,18 +4,18 @@ from dataclasses import replace
 
 import pytest
 
-from huggingface_agents_langgraph import graph as runtime_graph
-from huggingface_agents_langgraph import records
-from huggingface_agents_langgraph.architecture_store import (
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.architecture_store import (
     BUILTIN_V31_ID,
     content_sha256,
     save_architecture,
 )
+from huggingface_agents_langgraph.application.graph_selection import select_graph
 from huggingface_agents_langgraph.graph_definition import GraphCompilationError
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
 )
-from huggingface_agents_langgraph.graph_selection import select_graph
+from huggingface_agents_langgraph.pipeline import graph as runtime_graph
 
 
 @pytest.fixture(autouse=True)

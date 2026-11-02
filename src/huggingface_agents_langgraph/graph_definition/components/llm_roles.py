@@ -13,7 +13,7 @@ def register_llm_roles(registry: NodeRegistry) -> None:
 
     def builder(name: str):
         return lambda params: resolve_authorized_callable(
-            "huggingface_agents_langgraph.llm_roles", name
+            "huggingface_agents_langgraph.studio.llm_roles", name
         )(params)
 
     registry.register(

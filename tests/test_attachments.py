@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from huggingface_hub.errors import EntryNotFoundError
 
-from huggingface_agents_langgraph import attachments
+from huggingface_agents_langgraph.pipeline import attachments
 
 
 @pytest.fixture(autouse=True)

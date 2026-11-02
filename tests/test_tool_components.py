@@ -4,8 +4,7 @@ import json
 
 import pytest
 
-from huggingface_agents_langgraph import tool_components, tool_library
-from huggingface_agents_langgraph.architecture_service import get_catalog
+from huggingface_agents_langgraph.application.architecture_service import get_catalog
 from huggingface_agents_langgraph.graph_definition import (
     AgentDefinition,
     EdgeDefinition,
@@ -19,6 +18,7 @@ from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_studio_routing_registry,
 )
 from huggingface_agents_langgraph.graph_definition.validator import GraphValidator
+from huggingface_agents_langgraph.studio import tool_components, tool_library
 
 TASK = {"task_id": "t", "question": "Who wrote Hamlet?", "file_name": ""}
 
@@ -306,7 +306,8 @@ class TestCatalogAndGraphs:
             return "Shakespeare"
 
         monkeypatch.setattr(
-            "huggingface_agents_langgraph.reasoning.chat_completion", fake_reasoning
+            "huggingface_agents_langgraph.pipeline.reasoning.chat_completion",
+            fake_reasoning,
         )
         definition = self._definition(
             NodeDefinition("find", "web_search"),
@@ -326,7 +327,7 @@ class TestCatalogAndGraphs:
 
         monkeypatch.setattr(tool_components, "run_tool", broken)
         monkeypatch.setattr(
-            "huggingface_agents_langgraph.reasoning.chat_completion",
+            "huggingface_agents_langgraph.pipeline.reasoning.chat_completion",
             lambda *a, **k: "unknown",
         )
         definition = self._definition(

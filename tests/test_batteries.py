@@ -4,14 +4,14 @@ import threading
 
 import pytest
 
-from huggingface_agents_langgraph import records
-from huggingface_agents_langgraph.batteries import (
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.batteries import (
     BatteryBusyError,
     BatteryManager,
     BatteryUnavailableError,
     load_reference_tasks,
 )
-from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
+from huggingface_agents_langgraph.domain.pipeline_versions import V2_REFERENCE_ID
 
 TASKS = [{"task_id": f"t{n}", "question": f"q{n}", "file_name": ""} for n in (1, 2)]
 

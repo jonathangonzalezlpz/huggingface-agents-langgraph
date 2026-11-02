@@ -2,8 +2,8 @@
 
 import pytest
 
-from huggingface_agents_langgraph import records
-from huggingface_agents_langgraph.experiment_scoring import (
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.experiment_scoring import (
     evaluate_experiment,
     official_answers,
     record_official_score,

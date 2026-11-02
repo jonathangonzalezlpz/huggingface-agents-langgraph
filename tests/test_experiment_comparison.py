@@ -5,7 +5,9 @@ from copy import deepcopy
 
 import pytest
 
-from huggingface_agents_langgraph.experiment_comparison import compare_experiments
+from huggingface_agents_langgraph.domain.experiment_comparison import (
+    compare_experiments,
+)
 
 BASE_CONFIG = {
     "name": "run",

@@ -1,16 +1,16 @@
 import pytest
 
-from huggingface_agents_langgraph.experiments import (
+from huggingface_agents_langgraph.domain.experiments import (
     CAPABILITIES,
     DEFAULT_EXPERIMENT,
     is_capability_enabled,
     normalize_experiment,
 )
-from huggingface_agents_langgraph.graph import (
+from huggingface_agents_langgraph.pipeline.graph import (
     _route_after_preprocessing,
     _route_after_router,
 )
-from huggingface_agents_langgraph.routing import router
+from huggingface_agents_langgraph.pipeline.routing import router
 
 
 def test_default_experiment_enables_all_capabilities() -> None:
@@ -90,7 +90,7 @@ def test_router_sends_attachment_direct_when_capability_disabled() -> None:
 
 def test_router_sends_web_question_direct_when_web_disabled(monkeypatch) -> None:
     monkeypatch.setattr(
-        "huggingface_agents_langgraph.routing._classify_question",
+        "huggingface_agents_langgraph.pipeline.routing._classify_question",
         lambda _question, _model=None: "web",
     )
     state = {

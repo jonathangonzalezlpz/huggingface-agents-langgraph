@@ -10,12 +10,17 @@ from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
-from huggingface_agents_langgraph.experiment_metrics import timing_summary
-from huggingface_agents_langgraph.experiments import IMPROVEMENTS, normalize_experiment
-from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
-from huggingface_agents_langgraph.pipeline_run import run_pipeline
-from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.records import read_record, write_record
+from huggingface_agents_langgraph.adapters.records import read_record, write_record
+from huggingface_agents_langgraph.application.pipeline_run import run_pipeline
+from huggingface_agents_langgraph.domain.experiment_metrics import timing_summary
+from huggingface_agents_langgraph.domain.experiments import (
+    IMPROVEMENTS,
+    normalize_experiment,
+)
+from huggingface_agents_langgraph.domain.local_evaluation import (
+    evaluate_validation_answers,
+)
+from huggingface_agents_langgraph.domain.pipeline_versions import V2_REFERENCE_ID
 
 
 def source_identity() -> dict:

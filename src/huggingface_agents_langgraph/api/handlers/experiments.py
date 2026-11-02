@@ -1,15 +1,21 @@
 """Stored experiments: list, save, compare, delete and score locally."""
 
-from huggingface_agents_langgraph.api.http import Request, Response, failure, ok
-from huggingface_agents_langgraph.api.router import Router
-from huggingface_agents_langgraph.experiment_comparison import compare_experiments
-from huggingface_agents_langgraph.experiment_scoring import evaluate_experiment
-from huggingface_agents_langgraph.pipeline_versions import experiment_presentation
-from huggingface_agents_langgraph.records import (
+from huggingface_agents_langgraph.adapters.records import (
     delete_record,
     list_records,
     read_record,
     write_record,
+)
+from huggingface_agents_langgraph.api.http import Request, Response, failure, ok
+from huggingface_agents_langgraph.api.router import Router
+from huggingface_agents_langgraph.application.experiment_scoring import (
+    evaluate_experiment,
+)
+from huggingface_agents_langgraph.domain.experiment_comparison import (
+    compare_experiments,
+)
+from huggingface_agents_langgraph.domain.pipeline_versions import (
+    experiment_presentation,
 )
 
 MAX_COMPARED_EXPERIMENTS = 20

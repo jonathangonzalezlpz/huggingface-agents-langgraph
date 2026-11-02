@@ -2,7 +2,7 @@
 
 import pytest
 
-from huggingface_agents_langgraph.architecture_store import content_sha256
+from huggingface_agents_langgraph.application.architecture_store import content_sha256
 from huggingface_agents_langgraph.graph_definition import (
     AgentDefinition,
     EdgeDefinition,
@@ -315,8 +315,11 @@ class TestRunRecord:
     def test_the_selected_graph_records_them_in_the_run_description(
         self, monkeypatch, tmp_path
     ):
-        from huggingface_agents_langgraph import graph_selection, records
-        from huggingface_agents_langgraph.architecture_store import save_architecture
+        from huggingface_agents_langgraph.adapters import records
+        from huggingface_agents_langgraph.application import graph_selection
+        from huggingface_agents_langgraph.application.architecture_store import (
+            save_architecture,
+        )
 
         monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
         monkeypatch.setattr(
@@ -327,8 +330,12 @@ class TestRunRecord:
         assert info["node_params"] == {"t": {"n": 6, "mode": "fast", "label": "rec"}}
 
     def test_a_version_without_params_adds_nothing_to_the_description(self):
-        from huggingface_agents_langgraph.architecture_store import BUILTIN_V31_ID
-        from huggingface_agents_langgraph.graph_selection import select_graph
+        from huggingface_agents_langgraph.application.architecture_store import (
+            BUILTIN_V31_ID,
+        )
+        from huggingface_agents_langgraph.application.graph_selection import (
+            select_graph,
+        )
 
         _graph, info = select_graph({"architecture": BUILTIN_V31_ID})
         assert "node_params" not in info

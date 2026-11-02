@@ -5,7 +5,8 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import records, web_app
+from huggingface_agents_langgraph import web_app
+from huggingface_agents_langgraph.adapters import records
 from huggingface_agents_langgraph.api import course_service
 from huggingface_agents_langgraph.api.handlers import experiments as experiment_handlers
 from huggingface_agents_langgraph.api.handlers import scoring as scoring_handlers

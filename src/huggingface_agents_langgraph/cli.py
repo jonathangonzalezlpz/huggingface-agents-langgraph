@@ -5,7 +5,7 @@ from time import perf_counter
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-from huggingface_agents_langgraph.pipeline_run import run_pipeline
+from huggingface_agents_langgraph.application.pipeline_run import run_pipeline
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
 

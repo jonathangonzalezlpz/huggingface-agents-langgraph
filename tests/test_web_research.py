@@ -1,7 +1,7 @@
 import json
 from io import BytesIO
 
-from huggingface_agents_langgraph import web_research
+from huggingface_agents_langgraph.pipeline import web_research
 
 
 class FakeDDGS:

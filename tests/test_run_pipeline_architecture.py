@@ -2,8 +2,9 @@
 
 import pytest
 
-from huggingface_agents_langgraph import pipeline_run, records
-from huggingface_agents_langgraph.architecture_store import BUILTIN_V31_ID
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application import pipeline_run
+from huggingface_agents_langgraph.application.architecture_store import BUILTIN_V31_ID
 
 VOLATILE = {
     "run_id",

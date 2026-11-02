@@ -1,8 +1,9 @@
-"""Dependency rules between the modules of the package.
+"""Dependency rules between the packages of the backend.
 
-These are the boundaries that already hold today. They are not the final layering:
-they exist so a refactor (or a new feature) cannot quietly add a dependency in the
-wrong direction. Tighten them as modules move into their layers.
+Hexagonal layering without formal ports: each package may import only what is
+listed in ``ALLOWED``. The rules are enforced here instead of with abstract
+interfaces, which keeps the V3.1 runtime untouched. Fix an exception and remove it
+from ``KNOWN_VIOLATIONS``: the list only ever shrinks.
 """
 
 import ast
@@ -21,35 +22,47 @@ ENTRY_POINTS = {"web_app", "cli", "__main__"}
 KNOWN_CYCLES: set[frozenset[str]] = set()
 
 # Edges that break a rule today. Fix one and remove it here: the list only ever shrinks.
-KNOWN_VIOLATIONS: set[tuple[str, str]] = set()
+KNOWN_VIOLATIONS: set[tuple[str, str]] = {
+    # F3 moves the experiment use case out of the entry module.
+    ("application.batteries", "experiment_runner"),
+}
 
-# The declarative layer describes graphs; it must not reach into infrastructure.
-DECLARATIVE_MAY_IMPORT = {"state", "tracing", "tool_library"}
+# Shared by every layer: settings and per-run tracing.
+KERNEL = {"config", "tracing"}
+
+# Top-level package -> the top-level packages (or modules) it may import.
+ALLOWED: dict[str, set[str]] = {
+    "domain": {"domain"},
+    "adapters": {"adapters", "domain", "model_server"},
+    "pipeline": {"pipeline", "adapters", "domain", "model_server"},
+    "studio": {"studio", "pipeline", "adapters", "domain"},
+    "graph_definition": {"graph_definition", "studio", "domain"},
+    "application": {
+        "application",
+        "pipeline",
+        "adapters",
+        "domain",
+        "graph_definition",
+    },
+}
 
 # Pure data and rules: no model, network, file or HTTP code behind them.
 PURE_MODULES = {
-    "state",
-    "pipeline_versions",
-    "experiment_comparison",
+    "domain.state",
+    "domain.pipeline_versions",
+    "domain.experiment_comparison",
     "graph_definition.schema",
     "graph_definition.contracts",
     "graph_definition.params",
     "graph_definition.diagnostics",
 }
-INFRASTRUCTURE = {
-    "llm",
-    "web_research",
-    "multimedia_processing",
-    "model_server",
-    "attachments",
-    "web_app",
-    "cli",
-    "batteries",
-    "experiment_runner",
-}
 
 # Components the declarative registry points at: they must not import it back.
-COMPONENT_MODULES = {"llm_roles", "tool_components", "tool_library"}
+COMPONENT_MODULES = {
+    "studio.llm_roles",
+    "studio.tool_components",
+    "studio.tool_library",
+}
 
 
 def _module_name(path: Path) -> str:
@@ -106,7 +119,7 @@ def _top(module: str) -> str:
 
 def test_the_analysis_sees_the_package():
     assert len(_modules()) > 40
-    assert "records" in GRAPH["batteries"]
+    assert "adapters.records" in GRAPH["application.batteries"]
 
 
 def test_nothing_depends_on_an_entry_point():
@@ -119,37 +132,22 @@ def test_nothing_depends_on_an_entry_point():
     assert offenders == []
 
 
-def test_the_declarative_layer_only_reaches_what_it_must():
+def test_each_package_only_imports_what_it_may():
     offenders = [
         f"{source} -> {target}"
         for source, targets in GRAPH.items()
-        if _top(source) == "graph_definition"
+        if _top(source) in ALLOWED
         for target in targets
-        if _top(target) != "graph_definition" and target not in DECLARATIVE_MAY_IMPORT
+        if _top(target) not in ALLOWED[_top(source)] | KERNEL
+        and (source, target) not in KNOWN_VIOLATIONS
     ]
     assert offenders == []
 
 
-def test_pure_modules_do_not_import_infrastructure():
-    offenders = [
-        (source, target)
-        for source in PURE_MODULES
-        for target in GRAPH.get(source, set())
-        if _top(target) in INFRASTRUCTURE
-    ]
-    assert set(offenders) <= KNOWN_VIOLATIONS, set(offenders) - KNOWN_VIOLATIONS
-
-
-@pytest.mark.parametrize("source", sorted(PURE_MODULES - {"state"}))
-def test_the_data_core_does_not_depend_on_runtime_tracking(source):
-    # ``state`` is the only module every layer shares; the others stay free of tracing.
-    allowed = {"state", "experiments", "pipeline_versions", "experiment_metrics"}
-    extra = {
-        target
-        for target in GRAPH.get(source, set())
-        if _top(target) not in {"graph_definition", *allowed}
-        and (source, target) not in KNOWN_VIOLATIONS
-    }
+@pytest.mark.parametrize("source", sorted(PURE_MODULES))
+def test_pure_modules_stay_pure(source):
+    infrastructure = {"adapters", "pipeline", "application", "studio", "api"}
+    extra = {t for t in GRAPH.get(source, set()) if _top(t) in infrastructure}
     assert extra == set(), f"{source} imports {sorted(extra)}"
 
 
@@ -177,8 +175,8 @@ def test_the_registry_mechanism_does_not_know_the_components():
 
 def test_the_version_store_does_not_know_validation_or_layouts():
     """Versions are stored on their own; validation and layouts build on the store."""
-    forbidden = {"architecture_service", "architecture_layouts"}
-    imported = GRAPH.get("architecture_store", set())
+    forbidden = {"application.architecture_service", "application.architecture_layouts"}
+    imported = GRAPH.get("application.architecture_store", set())
     assert imported & forbidden == set()
     assert not any(
         target.startswith("graph_definition.components") for target in imported

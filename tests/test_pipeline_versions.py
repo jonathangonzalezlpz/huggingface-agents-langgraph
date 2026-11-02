@@ -6,12 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from huggingface_agents_langgraph import baseline_archive, graph, records
-from huggingface_agents_langgraph.pipeline_versions import (
+from huggingface_agents_langgraph import baseline_archive
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.domain.pipeline_versions import (
     V2_REFERENCE_ID,
     V2_REFERENCE_NAME,
     experiment_presentation,
 )
+from huggingface_agents_langgraph.pipeline import graph
 from huggingface_agents_langgraph.web_app import WebAppHandler
 
 

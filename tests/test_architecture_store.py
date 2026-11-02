@@ -5,10 +5,15 @@ from uuid import UUID
 
 import pytest
 
-from huggingface_agents_langgraph import records
-from huggingface_agents_langgraph.architecture_layouts import get_layout, save_layout
-from huggingface_agents_langgraph.architecture_service import validate_definition
-from huggingface_agents_langgraph.architecture_store import (
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.architecture_layouts import (
+    get_layout,
+    save_layout,
+)
+from huggingface_agents_langgraph.application.architecture_service import (
+    validate_definition,
+)
+from huggingface_agents_langgraph.application.architecture_store import (
     BUILTIN_V31_ID,
     ArchitectureNotFoundError,
     content_sha256,

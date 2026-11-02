@@ -6,8 +6,7 @@ benchmark is involved; routing functions and wrappers are the real ones.
 
 import pytest
 
-from huggingface_agents_langgraph import graph as runtime_graph
-from huggingface_agents_langgraph.experiments import normalize_experiment
+from huggingface_agents_langgraph.domain.experiments import normalize_experiment
 from huggingface_agents_langgraph.graph_definition import GraphCompiler
 from huggingface_agents_langgraph.graph_definition.components import (
     create_gaia_v3_registry,
@@ -18,6 +17,7 @@ from huggingface_agents_langgraph.graph_definition.definitions import (
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_gaia_v31_routing_registry,
 )
+from huggingface_agents_langgraph.pipeline import graph as runtime_graph
 from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 RECURSION_LIMIT = 40

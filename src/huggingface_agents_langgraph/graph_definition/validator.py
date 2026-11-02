@@ -10,6 +10,7 @@ claims either.
 from collections import deque
 from collections.abc import Collection, Iterable, Mapping
 
+from huggingface_agents_langgraph.domain.state import AgentState
 from huggingface_agents_langgraph.graph_definition.contracts import NodeContract
 from huggingface_agents_langgraph.graph_definition.diagnostics import (
     Diagnostic,
@@ -27,7 +28,6 @@ from huggingface_agents_langgraph.graph_definition.schema import (
     AgentDefinition,
     _unfreeze_metadata,
 )
-from huggingface_agents_langgraph.state import AgentState
 
 END = "__end__"
 END_TERMINALS = SPECIAL_TERMINALS - START_TERMINALS

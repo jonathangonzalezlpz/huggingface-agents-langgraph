@@ -1,7 +1,7 @@
 import json
 from io import BytesIO
 
-from huggingface_agents_langgraph import llm
+from huggingface_agents_langgraph.adapters import llm
 
 
 class FakeResponse(BytesIO):

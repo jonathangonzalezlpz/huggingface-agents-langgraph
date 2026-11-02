@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from huggingface_agents_langgraph import records
+from huggingface_agents_langgraph.adapters import records
 from huggingface_agents_langgraph.web_app import WebAppHandler
 
 

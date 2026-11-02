@@ -17,8 +17,9 @@ depende de lo accesorio (modelos, red, ficheros, HTTP). Las dependencias apuntan
 |---|---|
 | `domain` | reglas y datos puros: estado, configuración de experimento, comparación, métricas |
 | `application` | casos de uso: ejecutar, baterías, puntuar, guardar arquitecturas |
-| `ports` | interfaces de lo que se necesita de fuera: LLM, almacén de registros, búsqueda |
-| `adapters` | implementaciones: llama.cpp y Ollama, ficheros de `.runtime`, web y Wikipedia, modelos multimedia, HTTP |
+| `adapters` | cliente del LLM, ficheros de `.runtime`, seguimiento de recursos |
+| `studio` | componentes del constructor: roles de LLM y herramientas |
+| `api` | HTTP |
 | `pipeline` | los nodos de la V3.1 |
 | `graph_definition` | la capa declarativa (ya existe y es el modelo a seguir) |
 
@@ -40,8 +41,8 @@ dejar una base sólida.
 |---|---|
 | F0 | Barandillas: un test que fija las dependencias entre módulos y límites de complejidad y tamaño con una línea base. Solo pueden reducirse |
 | F1 | Ordenar lo añadido en los últimos hitos: dividir `registry.py`, `web_app.py`, `architecture_store.py`, `wire.ts` y las páginas más largas |
-| F2 | Mover el backend a su estructura (carpetas por rol y puertos). Toca los imports del runtime V3.1, sin cambiar su comportamiento |
-| F3 | Trocear las funciones largas de la V3.1, una por commit y con tests de caracterización antes |
+| F2 | Mover el backend a su estructura (carpetas por rol; sin puertos formales, las reglas de `tests/test_architecture.py` fijan quién puede importar a quién). Toca los imports del runtime V3.1, sin cambiar su comportamiento |
+| F3 | Trocear las funciones largas de la V3.1, un commit por módulo y con tests de caracterización antes |
 
 Reglas de cada paso:
 - Los tests y las comprobaciones pasan antes y después; no se avanza si algo falla.

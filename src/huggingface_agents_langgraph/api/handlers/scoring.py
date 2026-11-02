@@ -6,11 +6,13 @@ from urllib.error import HTTPError, URLError
 from huggingface_agents_langgraph.api import course_service
 from huggingface_agents_langgraph.api.http import Request, Response, failure, ok
 from huggingface_agents_langgraph.api.router import Router
-from huggingface_agents_langgraph.experiment_scoring import (
+from huggingface_agents_langgraph.application.experiment_scoring import (
     official_answers,
     record_official_score,
 )
-from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
+from huggingface_agents_langgraph.domain.local_evaluation import (
+    evaluate_validation_answers,
+)
 
 ANSWER_COUNT = 20
 

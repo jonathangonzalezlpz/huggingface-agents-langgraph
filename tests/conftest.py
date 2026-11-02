@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from huggingface_agents_langgraph import graph as runtime_graph
-from huggingface_agents_langgraph import llm
+from huggingface_agents_langgraph.adapters import llm
 from huggingface_agents_langgraph.graph_definition.authorization import (
     AUTHORIZED_CALLABLES,
 )
+from huggingface_agents_langgraph.pipeline import graph as runtime_graph
 
 
 @pytest.fixture(autouse=True)

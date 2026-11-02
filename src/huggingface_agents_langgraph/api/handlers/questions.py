@@ -12,7 +12,7 @@ from huggingface_agents_langgraph.api.http import (
     failure,
 )
 from huggingface_agents_langgraph.api.router import Router
-from huggingface_agents_langgraph.attachments import get_attachment_path
+from huggingface_agents_langgraph.pipeline.attachments import get_attachment_path
 
 
 def _questions(endpoint: str) -> Response:

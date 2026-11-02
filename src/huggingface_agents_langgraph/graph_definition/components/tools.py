@@ -10,9 +10,9 @@ from huggingface_agents_langgraph.graph_definition.registry import NodeRegistry
 
 def register_tool_components(registry: NodeRegistry) -> None:
     """Components that add evidence with the vetted tools of ``tool_library``."""
-    from huggingface_agents_langgraph.tool_library import TOOLS
+    from huggingface_agents_langgraph.studio.tool_library import TOOLS
 
-    module = "huggingface_agents_langgraph.tool_components"
+    module = "huggingface_agents_langgraph.studio.tool_components"
 
     def builder(name: str):
         return lambda params: resolve_authorized_callable(module, name)(params)

@@ -10,28 +10,28 @@ from typing import Any
 # Exact whitelist of approved internal node implementations
 AUTHORIZED_CALLABLES: frozenset[tuple[str, str]] = frozenset(
     {
-        ("huggingface_agents_langgraph.preprocessing", "preprocessing"),
-        ("huggingface_agents_langgraph.attachments", "attachment_resolver"),
-        ("huggingface_agents_langgraph.routing", "router"),
-        ("huggingface_agents_langgraph.code_processing", "code_processing"),
+        ("huggingface_agents_langgraph.pipeline.preprocessing", "preprocessing"),
+        ("huggingface_agents_langgraph.pipeline.attachments", "attachment_resolver"),
+        ("huggingface_agents_langgraph.pipeline.routing", "router"),
+        ("huggingface_agents_langgraph.pipeline.code_processing", "code_processing"),
         (
-            "huggingface_agents_langgraph.spreadsheet_processing",
+            "huggingface_agents_langgraph.pipeline.spreadsheet_processing",
             "spreadsheet_processing",
         ),
         (
-            "huggingface_agents_langgraph.document_processing",
+            "huggingface_agents_langgraph.pipeline.document_processing",
             "document_processing",
         ),
         (
-            "huggingface_agents_langgraph.multimedia_processing",
+            "huggingface_agents_langgraph.pipeline.multimedia_processing",
             "multimedia_processing",
         ),
-        ("huggingface_agents_langgraph.web_research", "web_research"),
-        ("huggingface_agents_langgraph.research", "review"),
-        ("huggingface_agents_langgraph.research", "research_action"),
-        ("huggingface_agents_langgraph.reasoning", "reasoning"),
+        ("huggingface_agents_langgraph.pipeline.web_research", "web_research"),
+        ("huggingface_agents_langgraph.pipeline.research", "review"),
+        ("huggingface_agents_langgraph.pipeline.research", "research_action"),
+        ("huggingface_agents_langgraph.pipeline.reasoning", "reasoning"),
         (
-            "huggingface_agents_langgraph.answer_production",
+            "huggingface_agents_langgraph.pipeline.answer_production",
             "answer_production",
         ),
     }
@@ -41,16 +41,19 @@ AUTHORIZED_CALLABLES: frozenset[tuple[str, str]] = frozenset(
 # which are not part of the V3.1 pipeline.
 AUTHORIZED_ROLE_BUILDERS: frozenset[tuple[str, str]] = frozenset(
     {
-        ("huggingface_agents_langgraph.tool_components", "build_tool_node"),
-        ("huggingface_agents_langgraph.tool_components", "build_web_search"),
-        ("huggingface_agents_langgraph.tool_components", "build_wikipedia_search"),
-        ("huggingface_agents_langgraph.tool_components", "build_calculator"),
-        ("huggingface_agents_langgraph.tool_components", "transcribe_audio"),
-        ("huggingface_agents_langgraph.tool_components", "describe_image"),
-        ("huggingface_agents_langgraph.llm_roles", "build_planner"),
-        ("huggingface_agents_langgraph.llm_roles", "build_verifier"),
-        ("huggingface_agents_langgraph.llm_roles", "build_reflect"),
-        ("huggingface_agents_langgraph.llm_roles", "build_self_consistency"),
+        ("huggingface_agents_langgraph.studio.tool_components", "build_tool_node"),
+        ("huggingface_agents_langgraph.studio.tool_components", "build_web_search"),
+        (
+            "huggingface_agents_langgraph.studio.tool_components",
+            "build_wikipedia_search",
+        ),
+        ("huggingface_agents_langgraph.studio.tool_components", "build_calculator"),
+        ("huggingface_agents_langgraph.studio.tool_components", "transcribe_audio"),
+        ("huggingface_agents_langgraph.studio.tool_components", "describe_image"),
+        ("huggingface_agents_langgraph.studio.llm_roles", "build_planner"),
+        ("huggingface_agents_langgraph.studio.llm_roles", "build_verifier"),
+        ("huggingface_agents_langgraph.studio.llm_roles", "build_reflect"),
+        ("huggingface_agents_langgraph.studio.llm_roles", "build_self_consistency"),
     }
 )
 

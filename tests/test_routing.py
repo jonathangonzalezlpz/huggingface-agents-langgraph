@@ -1,7 +1,7 @@
 import pytest
 
-from huggingface_agents_langgraph import routing
-from huggingface_agents_langgraph.experiments import normalize_experiment
+from huggingface_agents_langgraph.domain.experiments import normalize_experiment
+from huggingface_agents_langgraph.pipeline import routing
 
 
 @pytest.mark.parametrize("route", ["direct", "web", "wikipedia"])

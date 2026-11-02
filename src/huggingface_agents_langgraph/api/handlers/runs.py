@@ -3,6 +3,7 @@
 import json
 from time import perf_counter
 
+from huggingface_agents_langgraph.adapters.records import read_record
 from huggingface_agents_langgraph.api.http import (
     JsonResponse,
     Request,
@@ -11,9 +12,8 @@ from huggingface_agents_langgraph.api.http import (
     ok,
 )
 from huggingface_agents_langgraph.api.router import Router
-from huggingface_agents_langgraph.experiments import normalize_experiment
-from huggingface_agents_langgraph.pipeline_run import run_pipeline
-from huggingface_agents_langgraph.records import read_record
+from huggingface_agents_langgraph.application.pipeline_run import run_pipeline
+from huggingface_agents_langgraph.domain.experiments import normalize_experiment
 
 
 def validate_task(payload: object) -> dict:

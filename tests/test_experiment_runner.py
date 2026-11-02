@@ -2,8 +2,9 @@
 
 import pytest
 
-from huggingface_agents_langgraph import experiment_runner, records
-from huggingface_agents_langgraph.experiments import DEFAULT_EXPERIMENT
+from huggingface_agents_langgraph import experiment_runner
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.domain.experiments import DEFAULT_EXPERIMENT
 
 TASKS = [
     {"task_id": f"t{n}", "question": f"q{n}", "file_name": ""} for n in range(1, 4)

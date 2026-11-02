@@ -8,7 +8,7 @@ from huggingface_agents_langgraph.api.http import (
     ok,
 )
 from huggingface_agents_langgraph.api.router import Router
-from huggingface_agents_langgraph.batteries import (
+from huggingface_agents_langgraph.application.batteries import (
     MAX_QUESTIONS,
     BatteryBusyError,
     BatteryManager,

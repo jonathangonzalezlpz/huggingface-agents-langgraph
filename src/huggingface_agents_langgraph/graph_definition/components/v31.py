@@ -22,7 +22,7 @@ def _register_input_nodes(registry: NodeRegistry) -> None:
             guaranteed_outputs=frozenset({"question"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.preprocessing", "preprocessing"
+            "huggingface_agents_langgraph.pipeline.preprocessing", "preprocessing"
         ),
         description="Normalizes whitespace and prepares question string.",
     )
@@ -37,7 +37,7 @@ def _register_input_nodes(registry: NodeRegistry) -> None:
             guaranteed_outputs=frozenset({"file_path"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.attachments", "attachment_resolver"
+            "huggingface_agents_langgraph.pipeline.attachments", "attachment_resolver"
         ),
         description="Resolves and verifies physical existence of attachment.",
     )
@@ -52,7 +52,7 @@ def _register_input_nodes(registry: NodeRegistry) -> None:
             guaranteed_outputs=frozenset({"route"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.routing", "router"
+            "huggingface_agents_langgraph.pipeline.routing", "router"
         ),
         description="Deterministic extension-based router with LLM fallback.",
     )
@@ -77,7 +77,7 @@ def _register_acquisition_nodes(registry: NodeRegistry) -> None:
         metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.code_processing", "code_processing"
+            "huggingface_agents_langgraph.pipeline.code_processing", "code_processing"
         ),
         description="Static inspection or sandboxed execution of Python code.",
     )
@@ -89,7 +89,7 @@ def _register_acquisition_nodes(registry: NodeRegistry) -> None:
         metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.spreadsheet_processing",
+            "huggingface_agents_langgraph.pipeline.spreadsheet_processing",
             "spreadsheet_processing",
         ),
         description="Tabular data extraction and structured analysis.",
@@ -102,7 +102,7 @@ def _register_acquisition_nodes(registry: NodeRegistry) -> None:
         metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.document_processing",
+            "huggingface_agents_langgraph.pipeline.document_processing",
             "document_processing",
         ),
         description="PDF text extraction with relevance filtering.",
@@ -115,7 +115,7 @@ def _register_acquisition_nodes(registry: NodeRegistry) -> None:
         metadata={"category": "acquisition"},
         contract=acquisition_contract,
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.multimedia_processing",
+            "huggingface_agents_langgraph.pipeline.multimedia_processing",
             "multimedia_processing",
         ),
         description="Audio transcription, sound classification, and VLM inspection.",
@@ -133,7 +133,7 @@ def _register_acquisition_nodes(registry: NodeRegistry) -> None:
             optional_outputs=frozenset({"evidence", "research_notes"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.web_research", "web_research"
+            "huggingface_agents_langgraph.pipeline.web_research", "web_research"
         ),
         description="Search engine and encyclopedia retrieval.",
     )
@@ -154,7 +154,7 @@ def _register_research_nodes(registry: NodeRegistry) -> None:
             optional_outputs=frozenset({"research_notes"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.research", "review"
+            "huggingface_agents_langgraph.pipeline.research", "review"
         ),
         description="Iterative review loop deciding the next research action.",
     )
@@ -177,7 +177,7 @@ def _register_research_nodes(registry: NodeRegistry) -> None:
             optional_outputs=frozenset({"source_links"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.research", "research_action"
+            "huggingface_agents_langgraph.pipeline.research", "research_action"
         ),
         description="Dispatches and executes the action chosen by the review node.",
     )
@@ -196,7 +196,7 @@ def _register_answer_nodes(registry: NodeRegistry) -> None:
             optional_outputs=frozenset({"reasoning_warnings"}),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.reasoning", "reasoning"
+            "huggingface_agents_langgraph.pipeline.reasoning", "reasoning"
         ),
         description="Synthesizes evidence to produce a reasoning draft answer.",
     )
@@ -211,7 +211,7 @@ def _register_answer_nodes(registry: NodeRegistry) -> None:
             optional_outputs=frozenset(),
         ),
         resolver=lambda: resolve_authorized_callable(
-            "huggingface_agents_langgraph.answer_production",
+            "huggingface_agents_langgraph.pipeline.answer_production",
             "answer_production",
         ),
         description="Formats concise final answer adhering to GAIA conventions.",

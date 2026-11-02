@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from huggingface_agents_langgraph import multimedia_processing as media
+from huggingface_agents_langgraph.pipeline import multimedia_processing as media
 
 
 def test_image_processing_returns_vlm_evidence(

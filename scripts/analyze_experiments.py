@@ -5,8 +5,8 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.records import list_records, read_record
+from huggingface_agents_langgraph.adapters.records import list_records, read_record
+from huggingface_agents_langgraph.domain.pipeline_versions import V2_REFERENCE_ID
 
 
 def report(group_id: str) -> str:

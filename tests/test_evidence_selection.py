@@ -1,8 +1,10 @@
-from huggingface_agents_langgraph.evidence_selection import select_relevant_evidence
+from huggingface_agents_langgraph.pipeline.evidence_selection import (
+    select_relevant_evidence,
+)
 
 
 def test_select_relevant_evidence_works_with_web_sources(monkeypatch) -> None:
-    from huggingface_agents_langgraph import evidence_selection
+    from huggingface_agents_langgraph.pipeline import evidence_selection
 
     monkeypatch.setattr(evidence_selection, "DOCUMENT_CHUNK_CHARACTERS", 100)
     monkeypatch.setattr(evidence_selection, "DOCUMENT_CHUNK_OVERLAP_CHARACTERS", 0)

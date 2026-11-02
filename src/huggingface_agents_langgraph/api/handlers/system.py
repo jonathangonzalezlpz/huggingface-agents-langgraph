@@ -5,16 +5,16 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import urlopen
 
+from huggingface_agents_langgraph.adapters.llm import get_available_models
+from huggingface_agents_langgraph.adapters.resource_tracking import host_memory
 from huggingface_agents_langgraph.api.http import Request, Response, ok
 from huggingface_agents_langgraph.api.router import Router
 from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
-from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.model_server import gpu_memory, model_inventory
-from huggingface_agents_langgraph.multimedia_processing import (
+from huggingface_agents_langgraph.pipeline.multimedia_processing import (
     get_gpu_status,
     get_multimedia_model_status,
 )
-from huggingface_agents_langgraph.resource_tracking import host_memory
 
 LLM_NAME = "LLM razonador"
 PROBE_TIMEOUT_SECONDS = 2

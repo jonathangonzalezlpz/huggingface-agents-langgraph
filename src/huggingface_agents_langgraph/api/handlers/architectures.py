@@ -4,13 +4,16 @@ from urllib.parse import unquote
 
 from huggingface_agents_langgraph.api.http import Request, Response, failure, ok
 from huggingface_agents_langgraph.api.router import Router
-from huggingface_agents_langgraph.architecture_layouts import get_layout, save_layout
-from huggingface_agents_langgraph.architecture_service import (
+from huggingface_agents_langgraph.application.architecture_layouts import (
+    get_layout,
+    save_layout,
+)
+from huggingface_agents_langgraph.application.architecture_service import (
     architecture_detail,
     get_catalog,
     validate_definition,
 )
-from huggingface_agents_langgraph.architecture_store import (
+from huggingface_agents_langgraph.application.architecture_store import (
     ArchitectureNotFoundError,
     list_architectures,
     save_architecture,

@@ -3,11 +3,17 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import answer_production as formatting
-from huggingface_agents_langgraph import graph as graph_module
-from huggingface_agents_langgraph import llm, pipeline_run, records, research, tracing
-from huggingface_agents_langgraph.calculation import calculate, validate_expression
-from huggingface_agents_langgraph.experiments import normalize_experiment
+from huggingface_agents_langgraph import tracing
+from huggingface_agents_langgraph.adapters import llm, records
+from huggingface_agents_langgraph.application import pipeline_run
+from huggingface_agents_langgraph.domain.experiments import normalize_experiment
+from huggingface_agents_langgraph.pipeline import answer_production as formatting
+from huggingface_agents_langgraph.pipeline import graph as graph_module
+from huggingface_agents_langgraph.pipeline import research
+from huggingface_agents_langgraph.pipeline.calculation import (
+    calculate,
+    validate_expression,
+)
 
 
 @pytest.mark.parametrize(
@@ -234,7 +240,7 @@ def test_local_history_api_preserves_and_deletes_selected_record(monkeypatch, tm
 def test_html_fetch_exposes_paper_links_without_losing_page_text(monkeypatch):
     from email.message import Message
 
-    from huggingface_agents_langgraph import web_research
+    from huggingface_agents_langgraph.pipeline import web_research
 
     class Response(BytesIO):
         headers = Message()
@@ -256,8 +262,8 @@ def test_html_fetch_exposes_paper_links_without_losing_page_text(monkeypatch):
 
 
 def test_reasoning_recovers_once_from_exhausted_thinking_budget(monkeypatch):
-    from huggingface_agents_langgraph import reasoning
-    from huggingface_agents_langgraph.llm import CompletionTruncatedError
+    from huggingface_agents_langgraph.adapters.llm import CompletionTruncatedError
+    from huggingface_agents_langgraph.pipeline import reasoning
 
     calls = []
 

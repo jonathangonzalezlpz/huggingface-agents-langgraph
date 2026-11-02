@@ -2,7 +2,7 @@
 
 import json
 
-from huggingface_agents_langgraph.architecture_service import get_catalog
+from huggingface_agents_langgraph.application.architecture_service import get_catalog
 from huggingface_agents_langgraph.graph_definition import (
     NodeContract,
     NodeRegistry,

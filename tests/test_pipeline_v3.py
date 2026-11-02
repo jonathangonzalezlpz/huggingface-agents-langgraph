@@ -4,24 +4,32 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import (
-    llm,
+from huggingface_agents_langgraph.adapters import llm
+from huggingface_agents_langgraph.domain.answer_contract import AnswerContract
+from huggingface_agents_langgraph.domain.experiment_metrics import timing_summary
+from huggingface_agents_langgraph.domain.experiments import (
+    IMPROVEMENTS,
+    normalize_experiment,
+)
+from huggingface_agents_langgraph.experiment_runner import variant_config
+from huggingface_agents_langgraph.pipeline import (
     multimedia_processing,
     reasoning,
     web_research,
 )
-from huggingface_agents_langgraph.answer_contract import AnswerContract
-from huggingface_agents_langgraph.calculation import (
+from huggingface_agents_langgraph.pipeline.calculation import (
     calculate,
     execution_environment,
     validate_expression,
 )
-from huggingface_agents_langgraph.evidence_selection import select_relevant_evidence
-from huggingface_agents_langgraph.experiment_metrics import timing_summary
-from huggingface_agents_langgraph.experiment_runner import variant_config
-from huggingface_agents_langgraph.experiments import IMPROVEMENTS, normalize_experiment
-from huggingface_agents_langgraph.source_store import read_source, source_catalog
-from huggingface_agents_langgraph.spreadsheet_tools import aggregate_table
+from huggingface_agents_langgraph.pipeline.evidence_selection import (
+    select_relevant_evidence,
+)
+from huggingface_agents_langgraph.pipeline.source_store import (
+    read_source,
+    source_catalog,
+)
+from huggingface_agents_langgraph.pipeline.spreadsheet_tools import aggregate_table
 from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 
@@ -251,7 +259,8 @@ def test_experiment_resume_keeps_completed_tasks_and_excludes_reference_answers(
     monkeypatch,
     tmp_path,
 ):
-    from huggingface_agents_langgraph import experiment_runner, records
+    from huggingface_agents_langgraph import experiment_runner
+    from huggingface_agents_langgraph.adapters import records
 
     monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     monkeypatch.setattr(
