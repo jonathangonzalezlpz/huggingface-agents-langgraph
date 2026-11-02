@@ -177,6 +177,16 @@ def test_the_registry_mechanism_does_not_know_the_components():
     assert offenders == []
 
 
+def test_the_version_store_does_not_know_validation_or_layouts():
+    """Versions are stored on their own; validation and layouts build on the store."""
+    forbidden = {"architecture_service", "architecture_layouts"}
+    imported = GRAPH.get("architecture_store", set())
+    assert imported & forbidden == set()
+    assert not any(
+        target.startswith("graph_definition.components") for target in imported
+    )
+
+
 def _cycles() -> set[frozenset[str]]:
     found: set[frozenset[str]] = set()
     for source, targets in GRAPH.items():

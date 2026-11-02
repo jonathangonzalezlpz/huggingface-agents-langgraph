@@ -6,16 +6,15 @@ from uuid import UUID
 import pytest
 
 from huggingface_agents_langgraph import run_tracking
+from huggingface_agents_langgraph.architecture_layouts import get_layout, save_layout
+from huggingface_agents_langgraph.architecture_service import validate_definition
 from huggingface_agents_langgraph.architecture_store import (
     BUILTIN_V31_ID,
     ArchitectureNotFoundError,
     content_sha256,
     get_architecture,
-    get_layout,
     list_architectures,
     save_architecture,
-    save_layout,
-    validate_definition,
 )
 from huggingface_agents_langgraph.graph_definition import (
     AgentDefinition,
