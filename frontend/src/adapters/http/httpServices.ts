@@ -38,6 +38,7 @@ import {
   toRunRecord,
 } from '../wire/runs';
 import { statusSchema, toStatus } from '../wire/system';
+import { insightsSchema, spanPayloadSchema, toInsights, toTrace, traceSchema } from '../wire/trace';
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -268,6 +269,26 @@ export function createHttpServices(
     questions: {
       list: async () =>
         toQuestions(await requestJson(fetchImpl, '/api/questions', questionsSchema)),
+    },
+    traces: {
+      getTrace: async (runId) =>
+        toTrace(
+          await requestJson(fetchImpl, `/api/runs/${encodeURIComponent(runId)}/trace`, traceSchema),
+        ),
+      getSpanPayload: (runId, spanId) =>
+        requestJson(
+          fetchImpl,
+          `/api/runs/${encodeURIComponent(runId)}/spans/${encodeURIComponent(spanId)}`,
+          spanPayloadSchema,
+        ),
+      getInsights: async (experimentId) =>
+        toInsights(
+          await requestJson(
+            fetchImpl,
+            `/api/experiments/${encodeURIComponent(experimentId)}/insights`,
+            insightsSchema,
+          ),
+        ),
     },
   };
 }

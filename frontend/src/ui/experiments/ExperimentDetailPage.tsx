@@ -14,6 +14,8 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { useAsyncData } from '../hooks/useAsyncData';
 import { AttachmentLink } from '../run/GaiaPicker';
+import { InsightsView } from '../observability/InsightsView';
+import { TabBar } from '../observability/TabBar';
 import { useServices } from '../services';
 import { formatDate, formatScore, formatSeconds } from './format';
 import { ArchitectureLabel, ExperimentStatus } from './HistoryPage';
@@ -124,6 +126,7 @@ export function ExperimentDetailPage() {
   const { experiments } = useServices();
   const { id = '' } = useParams();
   const state = useAsyncData(useCallback(() => experiments.list(), [experiments]));
+  const [view, setView] = useState<'answers' | 'insights'>('answers');
 
   const back = (
     <Link
@@ -179,62 +182,79 @@ export function ExperimentDetailPage() {
 
       <Scoring record={record} onChanged={state.reload} />
 
-      <section aria-labelledby="answers-heading">
-        <h3 id="answers-heading" className="mb-2 font-semibold">
-          {t('detail.answers')}
-        </h3>
-        <div className="overflow-x-auto rounded-xl border border-line">
-          <table className="w-full min-w-[48rem] border-collapse">
-            <thead>
-              <tr>
-                <th className={HEAD}>{t('detail.col.question')}</th>
-                <th className={HEAD}>{t('detail.col.answer')}</th>
-                <th className={HEAD}>{t('detail.col.route')}</th>
-                <th className={HEAD}>{t('detail.col.time')}</th>
-                <th className={HEAD}>{t('detail.col.result')}</th>
-                <th className={HEAD}>
-                  <span className="sr-only">{t('detail.viewRun')}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {record.answers.map((answer) => (
-                <tr key={answer.taskId}>
-                  <td className={`${CELL} max-w-sm`}>
-                    <span className="line-clamp-3">{answer.question}</span>
-                  </td>
-                  <td className={CELL}>
-                    {answer.answer || <span className="text-fg-muted">{t('detail.noAnswer')}</span>}
-                    {answer.fileName && <AttachmentLink taskId={answer.taskId} />}
-                    {answer.error && (
-                      <p className="mt-1 text-xs text-error">
-                        {t('detail.error', { message: answer.error })}
-                      </p>
-                    )}
-                  </td>
-                  <td className={CELL}>{answer.route || '—'}</td>
-                  <td className={CELL}>{formatSeconds(answer.durationSeconds)}</td>
-                  <td className={CELL}>
-                    <Result answer={answer} />
-                  </td>
-                  <td className={CELL}>
-                    {answer.runId ? (
-                      <Link
-                        to={`/runs/${encodeURIComponent(answer.runId)}`}
-                        className="text-accent-fg underline underline-offset-2"
-                      >
-                        {t('detail.viewRun')}
-                      </Link>
-                    ) : (
-                      <span className="text-fg-muted">{t('detail.noRun')}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <TabBar
+        label={t('detail.tab.label')}
+        value={view}
+        onChange={setView}
+        tabs={[
+          { id: 'answers', label: t('detail.tab.answers') },
+          { id: 'insights', label: t('detail.tab.insights') },
+        ]}
+      />
+      <div role="tabpanel" id={`panel-${view}`} aria-labelledby={`tab-${view}`}>
+        {view === 'insights' ? (
+          <InsightsView experimentId={record.id} />
+        ) : (
+          <section aria-labelledby="answers-heading">
+            <h3 id="answers-heading" className="mb-2 font-semibold">
+              {t('detail.answers')}
+            </h3>
+            <div className="overflow-x-auto rounded-xl border border-line">
+              <table className="w-full min-w-[48rem] border-collapse">
+                <thead>
+                  <tr>
+                    <th className={HEAD}>{t('detail.col.question')}</th>
+                    <th className={HEAD}>{t('detail.col.answer')}</th>
+                    <th className={HEAD}>{t('detail.col.route')}</th>
+                    <th className={HEAD}>{t('detail.col.time')}</th>
+                    <th className={HEAD}>{t('detail.col.result')}</th>
+                    <th className={HEAD}>
+                      <span className="sr-only">{t('detail.viewRun')}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {record.answers.map((answer) => (
+                    <tr key={answer.taskId}>
+                      <td className={`${CELL} max-w-sm`}>
+                        <span className="line-clamp-3">{answer.question}</span>
+                      </td>
+                      <td className={CELL}>
+                        {answer.answer || (
+                          <span className="text-fg-muted">{t('detail.noAnswer')}</span>
+                        )}
+                        {answer.fileName && <AttachmentLink taskId={answer.taskId} />}
+                        {answer.error && (
+                          <p className="mt-1 text-xs text-error">
+                            {t('detail.error', { message: answer.error })}
+                          </p>
+                        )}
+                      </td>
+                      <td className={CELL}>{answer.route || '—'}</td>
+                      <td className={CELL}>{formatSeconds(answer.durationSeconds)}</td>
+                      <td className={CELL}>
+                        <Result answer={answer} />
+                      </td>
+                      <td className={CELL}>
+                        {answer.runId ? (
+                          <Link
+                            to={`/runs/${encodeURIComponent(answer.runId)}`}
+                            className="text-accent-fg underline underline-offset-2"
+                          >
+                            {t('detail.viewRun')}
+                          </Link>
+                        ) : (
+                          <span className="text-fg-muted">{t('detail.noRun')}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

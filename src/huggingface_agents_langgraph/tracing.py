@@ -21,6 +21,7 @@ class RunTrace:
     steps: list[dict] = field(default_factory=list)
     experiment: dict = field(default_factory=dict)
     sources: dict = field(default_factory=dict)
+    current_node: str | None = None
 
 
 current_trace: ContextVar[RunTrace | None] = ContextVar("run_trace", default=None)
@@ -44,6 +45,9 @@ def traced_node(function):
         trace = current_trace.get()
         started = perf_counter()
         step = {"node": function.__name__}
+        if trace is not None:
+            step["started_offset_seconds"] = round(started - trace.started, 4)
+            trace.current_node = function.__name__
         try:
             if remaining_seconds() <= 0:
                 raise TimeoutError("Pipeline time budget exhausted")
@@ -56,6 +60,7 @@ def traced_node(function):
         finally:
             step["duration_seconds"] = round(perf_counter() - started, 4)
             if trace is not None:
+                trace.current_node = None
                 trace.steps.append(step)
 
     return wrapped
@@ -78,9 +83,11 @@ def traced_completion(function):
         check_call_budget()
         trace = current_trace.get()
         call = {"messages": deepcopy(messages), "parameters": deepcopy(kwargs)}
-        if trace is not None:
-            trace.calls.append(call)
         started = perf_counter()
+        if trace is not None:
+            call["node"] = trace.current_node
+            call["started_offset_seconds"] = round(started - trace.started, 4)
+            trace.calls.append(call)
         try:
             output = function(messages, **kwargs)
             call["content"] = output

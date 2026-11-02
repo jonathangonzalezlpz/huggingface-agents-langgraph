@@ -43,7 +43,7 @@ GAIA Agent Studio no tiene afiliación con el benchmark GAIA.
 | Pipeline | V2 (por defecto), V3 y V3.1 como opciones del mismo grafo |
 | Mejor resultado local | 10/20 con Qwen3.5-9B y Qwen3-VL-8B; perfil recomendado 9/20 en 45,9 s por pregunta |
 | Referencia histórica | V2: 6/20 en 47,3 s |
-| Pruebas | 819 de Python y 485 del frontend |
+| Pruebas | 890 de Python y 511 del frontend |
 | Plataforma | Windows 11, Python 3.12, RTX 4060 Ti de 16 GB. No verificado en otros sistemas |
 
 Son puntuaciones locales de una sola pasada por configuración, sobre 20 tareas: no demuestran

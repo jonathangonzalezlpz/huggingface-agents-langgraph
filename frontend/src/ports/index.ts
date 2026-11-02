@@ -2,6 +2,8 @@
 import type { BatteryRequest, BatteryStatus } from '../domain/battery';
 import type { Comparison, ExperimentRecord, OfficialSubmission, Score } from '../domain/history';
 import type { EditorDocument, Point } from '../domain/editor/model';
+import type { Insights } from '../domain/insights';
+import type { SpanPayload, Trace } from '../domain/trace';
 import type { GaiaQuestion, ModelCatalog, RunRecord, RunRequest } from '../domain/run';
 import type {
   AgentDefinition,
@@ -110,6 +112,15 @@ export interface QuestionPort {
   list(): Promise<GaiaQuestion[]>;
 }
 
+export interface TracePort {
+  /** The span tree of a stored run, without the heavy content of each span. */
+  getTrace(runId: string): Promise<Trace>;
+  /** The content of one span (messages and output of a call, update of a node). */
+  getSpanPayload(runId: string, spanId: string): Promise<SpanPayload>;
+  /** Aggregates over the answers of a stored experiment. */
+  getInsights(experimentId: string): Promise<Insights>;
+}
+
 export type StudioMode = 'live' | 'demo';
 
 export interface StudioServices {
@@ -125,4 +136,5 @@ export interface StudioServices {
   questions: QuestionPort;
   batteries: BatteryPort;
   experiments: ExperimentPort;
+  traces: TracePort;
 }
