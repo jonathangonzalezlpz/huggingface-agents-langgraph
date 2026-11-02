@@ -42,6 +42,55 @@ def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _refuse(spec: "ParamSpec", reason: str) -> ParamError:
+    return ParamError(INVALID_PARAM_VALUE, spec.name, f"{spec.name}: {reason}")
+
+
+def _validate_boolean(spec: "ParamSpec", value: Any) -> Any:
+    if not isinstance(value, bool):
+        raise _refuse(spec, "must be true or false")
+    return value
+
+
+def _validate_enum(spec: "ParamSpec", value: Any) -> Any:
+    if value not in spec.choices:
+        raise _refuse(spec, f"must be one of {list(spec.choices)}")
+    return value
+
+
+def _validate_text(spec: "ParamSpec", value: Any) -> Any:
+    if not isinstance(value, str):
+        raise _refuse(spec, "must be text")
+    if len(value) > (spec.max_length or 0):
+        raise _refuse(spec, f"is longer than {spec.max_length} characters")
+    return value
+
+
+def _validate_number(spec: "ParamSpec", value: Any) -> Any:
+    if spec.kind == "integer":
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise _refuse(spec, "must be a whole number")
+    elif not _is_number(value) or (
+        isinstance(value, float) and not math.isfinite(value)
+    ):
+        raise _refuse(spec, "must be a finite number")
+    if spec.minimum is not None and value < spec.minimum:
+        raise _refuse(spec, f"must be at least {spec.minimum}")
+    if spec.maximum is not None and value > spec.maximum:
+        raise _refuse(spec, f"must be at most {spec.maximum}")
+    return value
+
+
+_VALIDATORS = {
+    "boolean": _validate_boolean,
+    "enum": _validate_enum,
+    "string": _validate_text,
+    "text": _validate_text,
+    "integer": _validate_number,
+    "number": _validate_number,
+}
+
+
 @dataclass(frozen=True)
 class ParamSpec:
     """The declaration of one parameter: its type, limits and default."""
@@ -61,28 +110,39 @@ class ParamSpec:
         if self.kind not in PARAM_KINDS:
             raise ValueError(f"Parameter '{self.name}' has unknown kind '{self.kind}'")
         object.__setattr__(self, "choices", tuple(self.choices))
+        self._check_choices()
+        self._check_length()
+        self._check_range()
+        self._check_default()
+
+    def _check_choices(self) -> None:
         if self.kind == "enum" and not self.choices:
             raise ValueError(f"Enum parameter '{self.name}' needs choices")
         if self.kind != "enum" and self.choices:
             raise ValueError(f"Parameter '{self.name}' is not an enum")
-        if self.kind in {"string", "text"}:
-            ceiling = MAX_STRING_LENGTH if self.kind == "string" else MAX_TEXT_LENGTH
-            limit = ceiling if self.max_length is None else self.max_length
-            if not 0 < limit <= ceiling:
-                raise ValueError(f"Parameter '{self.name}' max_length is out of range")
-            object.__setattr__(self, "max_length", limit)
-        elif self.max_length is not None:
-            raise ValueError(f"Parameter '{self.name}' takes no max_length")
+
+    def _check_length(self) -> None:
+        """Texts get a length limit (at most the ceiling); nothing else may have one."""
+        if self.kind not in {"string", "text"}:
+            if self.max_length is not None:
+                raise ValueError(f"Parameter '{self.name}' takes no max_length")
+            return
+        ceiling = MAX_STRING_LENGTH if self.kind == "string" else MAX_TEXT_LENGTH
+        limit = ceiling if self.max_length is None else self.max_length
+        if not 0 < limit <= ceiling:
+            raise ValueError(f"Parameter '{self.name}' max_length is out of range")
+        object.__setattr__(self, "max_length", limit)
+
+    def _check_range(self) -> None:
+        low, high = self.minimum, self.maximum
         if self.kind not in {"integer", "number"} and (
-            self.minimum is not None or self.maximum is not None
+            low is not None or high is not None
         ):
             raise ValueError(f"Parameter '{self.name}' takes no numeric range")
-        if (
-            self.minimum is not None
-            and self.maximum is not None
-            and self.minimum > self.maximum
-        ):
+        if low is not None and high is not None and low > high:
             raise ValueError(f"Parameter '{self.name}' has an empty range")
+
+    def _check_default(self) -> None:
         if self.default is None:
             if not self.required:
                 raise ValueError(
@@ -96,36 +156,7 @@ class ParamSpec:
 
     def validate(self, value: Any) -> Any:
         """Return the value if it fits the spec, otherwise raise ``ParamError``."""
-
-        def refuse(reason: str) -> ParamError:
-            return ParamError(INVALID_PARAM_VALUE, self.name, f"{self.name}: {reason}")
-
-        if self.kind == "boolean":
-            if not isinstance(value, bool):
-                raise refuse("must be true or false")
-            return value
-        if self.kind == "enum":
-            if value not in self.choices:
-                raise refuse(f"must be one of {list(self.choices)}")
-            return value
-        if self.kind in {"string", "text"}:
-            if not isinstance(value, str):
-                raise refuse("must be text")
-            if len(value) > (self.max_length or 0):
-                raise refuse(f"is longer than {self.max_length} characters")
-            return value
-        if self.kind == "integer":
-            if isinstance(value, bool) or not isinstance(value, int):
-                raise refuse("must be a whole number")
-        elif not _is_number(value) or (
-            isinstance(value, float) and not math.isfinite(value)
-        ):
-            raise refuse("must be a finite number")
-        if self.minimum is not None and value < self.minimum:
-            raise refuse(f"must be at least {self.minimum}")
-        if self.maximum is not None and value > self.maximum:
-            raise refuse(f"must be at most {self.maximum}")
-        return value
+        return _VALIDATORS[self.kind](self, value)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON, leaving out the limits that do not apply."""
