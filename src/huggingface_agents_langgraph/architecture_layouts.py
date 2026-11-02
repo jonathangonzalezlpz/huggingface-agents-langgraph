@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from uuid import NAMESPACE_OID, uuid5
 
 from huggingface_agents_langgraph.architecture_store import get_architecture
-from huggingface_agents_langgraph.run_tracking import read_record, write_record
+from huggingface_agents_langgraph.records import read_record, write_record
 
 LAYOUT_KIND = "layouts"
 MAX_LAYOUT_NODES = 500

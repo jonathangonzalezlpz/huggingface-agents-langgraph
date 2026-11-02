@@ -5,7 +5,7 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking, web_app
+from huggingface_agents_langgraph import records, web_app
 from huggingface_agents_langgraph.api import course_service
 from huggingface_agents_langgraph.api.handlers import experiments as experiment_handlers
 from huggingface_agents_langgraph.api.handlers import scoring as scoring_handlers
@@ -15,11 +15,11 @@ EXPERIMENT_ID = "66666666-6666-4666-8666-666666666666"
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def store(count=20):
-    run_tracking.write_record(
+    records.write_record(
         "experiments",
         {
             "id": EXPERIMENT_ID,
@@ -109,7 +109,7 @@ def test_official_score_sends_the_stored_answers_and_keeps_the_result(monkeypatc
     assert body["correct_count"] == 9
     assert body["saved"] is True
     assert [a["task_id"] for a in sent[0]["answers"]] == [f"t{n}" for n in range(20)]
-    stored = run_tracking.read_record("experiments", EXPERIMENT_ID)
+    stored = records.read_record("experiments", EXPERIMENT_ID)
     assert stored["score"]["score"] == 45.0
 
 

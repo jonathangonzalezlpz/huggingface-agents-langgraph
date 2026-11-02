@@ -9,7 +9,7 @@ from copy import deepcopy
 
 from huggingface_agents_langgraph.config import CODE_EXECUTION_TIMEOUT_SECONDS
 from huggingface_agents_langgraph.experiments import improvement_enabled
-from huggingface_agents_langgraph.run_tracking import remaining_seconds
+from huggingface_agents_langgraph.tracing import remaining_seconds
 
 STRING_METHODS = {
     "join",

@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking
+from huggingface_agents_langgraph import records
 from huggingface_agents_langgraph.batteries import (
     BatteryBusyError,
     BatteryManager,
@@ -18,7 +18,7 @@ TASKS = [{"task_id": f"t{n}", "question": f"q{n}", "file_name": ""} for n in (1,
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def fake_runner(gate=None, fail=None):
@@ -142,7 +142,7 @@ def test_resumes_a_stored_experiment_with_its_own_config_and_questions():
         "answers": [{"task_id": "t1"}],
         "status": "cancelled",
     }
-    run_tracking.write_record("experiments", stored)
+    records.write_record("experiments", stored)
     runner = fake_runner()
     battery = manager(runner)
     started = battery.start(None, resume_id=stored["id"])
@@ -162,7 +162,7 @@ def test_refuses_to_resume_a_finished_or_missing_experiment():
         "answers": [],
         "status": "completed",
     }
-    run_tracking.write_record("experiments", done)
+    records.write_record("experiments", done)
     battery = manager(fake_runner())
     with pytest.raises(ValueError):
         battery.start(None, resume_id=done["id"])
@@ -171,7 +171,7 @@ def test_refuses_to_resume_a_finished_or_missing_experiment():
 
 
 def test_reference_tasks_come_from_the_frozen_record():
-    run_tracking.write_record(
+    records.write_record(
         "experiments",
         {
             "id": V2_REFERENCE_ID,

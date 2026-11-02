@@ -24,8 +24,8 @@ from huggingface_agents_langgraph.config import (
     RUNTIME_DIRECTORY,
 )
 from huggingface_agents_langgraph.experiments import improvement_enabled
-from huggingface_agents_langgraph.run_tracking import current_trace, remaining_seconds
 from huggingface_agents_langgraph.state import AgentState, Evidence
+from huggingface_agents_langgraph.tracing import current_trace, remaining_seconds
 
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".avi", ".mkv", ".mov", ".mp4", ".webm"}

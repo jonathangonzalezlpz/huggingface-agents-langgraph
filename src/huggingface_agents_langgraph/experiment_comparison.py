@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from statistics import mean
 from typing import Any
 
-from huggingface_agents_langgraph.experiment_runner import timing_summary
+from huggingface_agents_langgraph.experiment_metrics import timing_summary
 
 IGNORED_CONFIG_FIELDS = {"name"}
 MIN_EXPERIMENTS = 2

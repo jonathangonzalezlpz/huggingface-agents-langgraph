@@ -16,11 +16,7 @@ from huggingface_agents_langgraph.graph_definition import AgentDefinition
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
 )
-from huggingface_agents_langgraph.run_tracking import (
-    list_records,
-    read_record,
-    write_record,
-)
+from huggingface_agents_langgraph.records import list_records, read_record, write_record
 
 KIND = "architectures"
 BUILTIN_V31_ID = "builtin:gaia_v31"

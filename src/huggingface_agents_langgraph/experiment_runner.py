@@ -3,23 +3,19 @@
 import argparse
 import hashlib
 import json
-import math
 import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from statistics import mean, median
 from time import perf_counter
 from uuid import uuid4
 
+from huggingface_agents_langgraph.experiment_metrics import timing_summary
 from huggingface_agents_langgraph.experiments import IMPROVEMENTS, normalize_experiment
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
+from huggingface_agents_langgraph.pipeline_run import run_pipeline
 from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.run_tracking import (
-    read_record,
-    run_pipeline,
-    write_record,
-)
+from huggingface_agents_langgraph.records import read_record, write_record
 
 
 def source_identity() -> dict:
@@ -49,25 +45,6 @@ def source_identity() -> dict:
     except (OSError, subprocess.SubprocessError):
         revision = None
     return {"git_revision": revision, "source_sha256": digest.hexdigest()}
-
-
-def timing_summary(answers: list[dict]) -> dict:
-    """Summarize observed timings without counting missing measurements as zero."""
-    times = sorted(
-        answer["duration_seconds"]
-        for answer in answers
-        if isinstance(answer.get("duration_seconds"), (int, float))
-    )
-    return {
-        "count": len(times),
-        "total_seconds": sum(times),
-        "mean_seconds": mean(times) if times else None,
-        "median_seconds": median(times) if times else None,
-        "p95_seconds": times[max(0, math.ceil(len(times) * 0.95) - 1)]
-        if times
-        else None,
-        "technical_errors": sum(bool(answer.get("error")) for answer in answers),
-    }
 
 
 def variant_config(

@@ -25,11 +25,8 @@ from huggingface_agents_langgraph.model_server import (
     model_inventory,
 )
 from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.run_tracking import (
-    RunTrace,
-    current_trace,
-    read_record,
-)
+from huggingface_agents_langgraph.records import read_record
+from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 MODEL_PAIRS = {
     "control": (TEXT_REFERENCE, None),

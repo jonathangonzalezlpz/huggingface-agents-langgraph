@@ -2,7 +2,7 @@
 
 import pytest
 
-from huggingface_agents_langgraph import experiment_runner, run_tracking
+from huggingface_agents_langgraph import experiment_runner, records
 from huggingface_agents_langgraph.experiments import DEFAULT_EXPERIMENT
 
 TASKS = [
@@ -12,7 +12,7 @@ TASKS = [
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     monkeypatch.setattr(
         experiment_runner, "source_identity", lambda: {"source_sha256": "x"}
     )
@@ -41,7 +41,7 @@ def test_stops_before_the_next_question_and_marks_the_record_cancelled():
     )
     assert [a["task_id"] for a in record["answers"]] == ["t1"]
     assert record["status"] == "cancelled"
-    stored = run_tracking.read_record("experiments", record["id"])
+    stored = records.read_record("experiments", record["id"])
     assert stored["status"] == "cancelled"
 
 

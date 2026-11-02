@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Any
 
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
-from huggingface_agents_langgraph.run_tracking import read_record, write_record
+from huggingface_agents_langgraph.records import read_record, write_record
 
 QUESTION_COUNT = 20
 _OFFICIAL_FIELDS = ("score", "correct_count", "total_attempted", "message")

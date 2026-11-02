@@ -14,7 +14,7 @@ from huggingface_agents_langgraph.config import (
     OLLAMA_BASE_URL,
 )
 from huggingface_agents_langgraph.experiments import ModelSelection, improvement_enabled
-from huggingface_agents_langgraph.run_tracking import (
+from huggingface_agents_langgraph.tracing import (
     current_trace,
     remaining_seconds,
     traced_completion,

@@ -2,7 +2,7 @@
 
 import hashlib
 
-from huggingface_agents_langgraph.run_tracking import current_trace
+from huggingface_agents_langgraph.tracing import current_trace
 
 
 def retain_sources(items: list[dict]) -> list[dict]:

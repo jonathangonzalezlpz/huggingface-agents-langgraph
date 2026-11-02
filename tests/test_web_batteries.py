@@ -5,7 +5,7 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking, web_app
+from huggingface_agents_langgraph import records, web_app
 from huggingface_agents_langgraph.api.handlers import batteries as batteries_handlers
 from huggingface_agents_langgraph.batteries import (
     BatteryBusyError,
@@ -15,7 +15,7 @@ from huggingface_agents_langgraph.batteries import (
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 class FakeManager:

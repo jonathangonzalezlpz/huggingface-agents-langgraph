@@ -6,7 +6,7 @@ import pytest
 from huggingface_agents_langgraph import llm, model_server, multimedia_processing
 from huggingface_agents_langgraph.experiments import normalize_experiment
 from huggingface_agents_langgraph.model_trials import MODEL_PAIRS, trial_config
-from huggingface_agents_langgraph.run_tracking import RunTrace, current_trace
+from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 
 def test_inventory_does_not_load_models_or_expose_local_paths(monkeypatch):

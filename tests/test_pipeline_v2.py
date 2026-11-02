@@ -5,7 +5,7 @@ import pytest
 
 from huggingface_agents_langgraph import answer_production as formatting
 from huggingface_agents_langgraph import graph as graph_module
-from huggingface_agents_langgraph import llm, research, run_tracking
+from huggingface_agents_langgraph import llm, pipeline_run, records, research, tracing
 from huggingface_agents_langgraph.calculation import calculate, validate_expression
 from huggingface_agents_langgraph.experiments import normalize_experiment
 
@@ -149,22 +149,22 @@ def test_graph_chains_tools_and_accumulates_evidence(monkeypatch):
 
 
 def test_run_persists_failure_and_restores_context(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     monkeypatch.setattr(
         graph_module,
         "router",
         lambda _s: (_ for _ in ()).throw(ValueError("bad route")),
     )
     with pytest.raises(ValueError) as captured:
-        run_tracking.run_pipeline(
+        pipeline_run.run_pipeline(
             {"task_id": "test", "question": "Question", "file_name": ""}
         )
-    record = run_tracking.read_record("runs", captured.value.run_id)
+    record = records.read_record("runs", captured.value.run_id)
     assert record["error"] == "bad route"
     assert record["steps"][-1]["error"] == "bad route"
-    assert run_tracking.current_trace.get() is None
+    assert tracing.current_trace.get() is None
     with pytest.raises(ValueError):
-        run_tracking.read_record("runs", "../secret")
+        records.read_record("runs", "../secret")
 
 
 def test_llm_records_truncation_and_usage(monkeypatch):
@@ -183,27 +183,27 @@ def test_llm_records_truncation_and_usage(monkeypatch):
     monkeypatch.setattr(
         llm, "urlopen", lambda *_a, **_k: Response(json.dumps(payload).encode())
     )
-    trace = run_tracking.RunTrace()
-    token = run_tracking.current_trace.set(trace)
+    trace = tracing.RunTrace()
+    token = tracing.current_trace.set(trace)
     try:
         with pytest.raises(ValueError, match="truncated"):
             llm.chat_completion([{"role": "user", "content": "Question"}], max_tokens=4)
         assert trace.calls[0]["response"]["usage"]["completion_tokens"] == 4
         assert trace.calls[0]["duration_seconds"] >= 0
     finally:
-        run_tracking.current_trace.reset(token)
+        tracing.current_trace.reset(token)
 
 
 def test_call_budget_stops_before_model_request(monkeypatch):
-    monkeypatch.setattr(run_tracking, "PIPELINE_MAX_LLM_CALLS", 1)
-    trace = run_tracking.RunTrace(calls=[{"duration_seconds": 0.0}])
-    token = run_tracking.current_trace.set(trace)
+    monkeypatch.setattr(tracing, "PIPELINE_MAX_LLM_CALLS", 1)
+    trace = tracing.RunTrace(calls=[{"duration_seconds": 0.0}])
+    token = tracing.current_trace.set(trace)
     try:
         with pytest.raises(RuntimeError, match="budget"):
             llm.chat_completion([{"role": "user", "content": "Question"}])
         assert len(trace.calls) == 1
     finally:
-        run_tracking.current_trace.reset(token)
+        tracing.current_trace.reset(token)
 
 
 def test_local_history_api_preserves_and_deletes_selected_record(monkeypatch, tmp_path):
@@ -212,7 +212,7 @@ def test_local_history_api_preserves_and_deletes_selected_record(monkeypatch, tm
 
     from huggingface_agents_langgraph.web_app import WebAppHandler
 
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     record = {"id": str(uuid4()), "created_at": "2026-10-29", "answers": []}
     body = json.dumps(record).encode()
     handler = WebAppHandler.__new__(WebAppHandler)
@@ -228,7 +228,7 @@ def test_local_history_api_preserves_and_deletes_selected_record(monkeypatch, tm
     handler.path = "/api/experiments/" + record["id"]
     handler.do_DELETE()
     assert responses[-1][1] == {"deleted": True}
-    assert run_tracking.list_records("experiments") == []
+    assert records.list_records("experiments") == []
 
 
 def test_html_fetch_exposes_paper_links_without_losing_page_text(monkeypatch):

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from huggingface_agents_langgraph import baseline_archive, graph, run_tracking
+from huggingface_agents_langgraph import baseline_archive, graph, records
 from huggingface_agents_langgraph.pipeline_versions import (
     V2_REFERENCE_ID,
     V2_REFERENCE_NAME,
@@ -24,22 +24,22 @@ def test_reference_label_preserves_original_configuration():
 
 
 def test_reference_cannot_be_overwritten_or_deleted(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     record = {"id": V2_REFERENCE_ID, "answers": [{"submitted_answer": "original"}]}
-    run_tracking.write_record("experiments", record)
+    records.write_record("experiments", record)
     original_bytes = (tmp_path / "experiments" / f"{V2_REFERENCE_ID}.json").read_bytes()
-    run_tracking.write_record("experiments", experiment_presentation(record))
+    records.write_record("experiments", experiment_presentation(record))
     with pytest.raises(ValueError, match="immutable"):
-        run_tracking.write_record("experiments", record | {"answers": []})
+        records.write_record("experiments", record | {"answers": []})
     with pytest.raises(ValueError, match="cannot be deleted"):
-        run_tracking.delete_record("experiments", V2_REFERENCE_ID)
+        records.delete_record("experiments", V2_REFERENCE_ID)
     assert (
         tmp_path / "experiments" / f"{V2_REFERENCE_ID}.json"
     ).read_bytes() == original_bytes
 
 
 def test_failed_run_returns_version_and_trace_in_http_response(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
     def fail(_state):
         raise ValueError("Invalid route")
@@ -59,7 +59,7 @@ def test_failed_run_returns_version_and_trace_in_http_response(monkeypatch, tmp_
     assert status == 400
     assert body["pipeline_version"] == "2"
     assert body["llm_duration_seconds"] == 0
-    assert run_tracking.read_record("runs", body["run_id"])["status"] == "error"
+    assert records.read_record("runs", body["run_id"])["status"] == "error"
 
 
 def test_reference_archive_retains_exact_records_and_detects_changes(

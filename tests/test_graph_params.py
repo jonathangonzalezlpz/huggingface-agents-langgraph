@@ -315,10 +315,10 @@ class TestRunRecord:
     def test_the_selected_graph_records_them_in_the_run_description(
         self, monkeypatch, tmp_path
     ):
-        from huggingface_agents_langgraph import graph_selection, run_tracking
+        from huggingface_agents_langgraph import graph_selection, records
         from huggingface_agents_langgraph.architecture_store import save_architecture
 
-        monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+        monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
         monkeypatch.setattr(
             graph_selection, "create_studio_registry", lambda: _registry([])
         )

@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.run_tracking import list_records, read_record
+from huggingface_agents_langgraph.records import list_records, read_record
 
 
 def report(group_id: str) -> str:

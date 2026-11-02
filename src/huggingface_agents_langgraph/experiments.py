@@ -162,7 +162,7 @@ def normalize_experiment(value: object) -> ExperimentConfig:
 def improvement_enabled(experiment: dict | None, improvement: str) -> bool:
     """Check an explicit feature switch, including nested tool calls in a run."""
     if experiment is None:
-        from huggingface_agents_langgraph.run_tracking import current_trace
+        from huggingface_agents_langgraph.tracing import current_trace
 
         trace = current_trace.get()
         experiment = trace.experiment if trace else {}

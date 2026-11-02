@@ -18,7 +18,7 @@ from huggingface_agents_langgraph.graph_definition.definitions import (
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_gaia_v31_routing_registry,
 )
-from huggingface_agents_langgraph.run_tracking import RunTrace, current_trace
+from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 RECURSION_LIMIT = 40
 

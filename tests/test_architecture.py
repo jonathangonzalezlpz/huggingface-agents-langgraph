@@ -18,15 +18,13 @@ ROOT = Path(__file__).resolve().parents[1] / "src" / PACKAGE
 ENTRY_POINTS = {"web_app", "cli", "__main__"}
 
 # What may still depend on each other in a cycle. Fix it and remove the entry.
-KNOWN_CYCLES = {frozenset({"experiments", "run_tracking"})}
+KNOWN_CYCLES: set[frozenset[str]] = set()
 
 # Edges that break a rule today. Fix one and remove it here: the list only ever shrinks.
-# experiment_comparison reaches into the CLI runner only for ``timing_summary``, which
-# belongs in a pure metrics module.
-KNOWN_VIOLATIONS = {("experiment_comparison", "experiment_runner")}
+KNOWN_VIOLATIONS: set[tuple[str, str]] = set()
 
 # The declarative layer describes graphs; it must not reach into infrastructure.
-DECLARATIVE_MAY_IMPORT = {"state", "run_tracking", "tool_library"}
+DECLARATIVE_MAY_IMPORT = {"state", "tracing", "tool_library"}
 
 # Pure data and rules: no model, network, file or HTTP code behind them.
 PURE_MODULES = {
@@ -108,7 +106,7 @@ def _top(module: str) -> str:
 
 def test_the_analysis_sees_the_package():
     assert len(_modules()) > 40
-    assert "run_tracking" in GRAPH["batteries"]
+    assert "records" in GRAPH["batteries"]
 
 
 def test_nothing_depends_on_an_entry_point():
@@ -145,7 +143,7 @@ def test_pure_modules_do_not_import_infrastructure():
 @pytest.mark.parametrize("source", sorted(PURE_MODULES - {"state"}))
 def test_the_data_core_does_not_depend_on_runtime_tracking(source):
     # ``state`` is the only module every layer shares; the others stay free of tracing.
-    allowed = {"state", "experiments", "pipeline_versions"}
+    allowed = {"state", "experiments", "pipeline_versions", "experiment_metrics"}
     extra = {
         target
         for target in GRAPH.get(source, set())

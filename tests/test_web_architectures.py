@@ -6,7 +6,7 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking
+from huggingface_agents_langgraph import records
 from huggingface_agents_langgraph.api.http import MAX_REQUEST_BYTES
 from huggingface_agents_langgraph.architecture_store import BUILTIN_V31_ID
 from huggingface_agents_langgraph.graph_definition.definitions import (
@@ -17,7 +17,7 @@ from huggingface_agents_langgraph.web_app import WebAppHandler
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def _call(method: str, path: str, body: bytes | None = None):
@@ -142,7 +142,7 @@ class TestRunEndpointArchitecture:
         )
         assert status == 400
         assert "Unknown architecture" in body["error"]
-        assert run_tracking.read_record("runs", body["run_id"])["status"] == "error"
+        assert records.read_record("runs", body["run_id"])["status"] == "error"
 
     @pytest.mark.usefixtures("stubbed_nodes")
     def test_builtin_architecture_runs_through_the_endpoint(self):
@@ -157,5 +157,5 @@ class TestRunEndpointArchitecture:
         )
         assert status == 200
         assert body["submitted_answer"] == "answer"
-        record = run_tracking.read_record("runs", body["run_id"])
+        record = records.read_record("runs", body["run_id"])
         assert record["architecture"]["engine"] == "compiled"

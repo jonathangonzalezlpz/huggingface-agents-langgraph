@@ -14,8 +14,8 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from huggingface_agents_langgraph.llm import ChatMessage, chat_completion
-from huggingface_agents_langgraph.run_tracking import remaining_seconds
 from huggingface_agents_langgraph.state import AgentState
+from huggingface_agents_langgraph.tracing import remaining_seconds
 
 # Below this many seconds left, no further samples are started.
 MIN_SECONDS_PER_SAMPLE = 5.0

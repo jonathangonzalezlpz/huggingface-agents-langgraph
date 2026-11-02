@@ -19,9 +19,9 @@ from huggingface_agents_langgraph.preprocessing import preprocessing
 from huggingface_agents_langgraph.reasoning import reasoning
 from huggingface_agents_langgraph.research import research_action, review
 from huggingface_agents_langgraph.routing import capability_for_attachment, router
-from huggingface_agents_langgraph.run_tracking import traced_node
 from huggingface_agents_langgraph.spreadsheet_processing import spreadsheet_processing
 from huggingface_agents_langgraph.state import AgentState
+from huggingface_agents_langgraph.tracing import traced_node
 from huggingface_agents_langgraph.web_research import web_research
 
 

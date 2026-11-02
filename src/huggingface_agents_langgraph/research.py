@@ -15,9 +15,9 @@ from huggingface_agents_langgraph.experiments import (
     is_capability_enabled,
 )
 from huggingface_agents_langgraph.llm import chat_completion
-from huggingface_agents_langgraph.run_tracking import current_trace, remaining_seconds
 from huggingface_agents_langgraph.source_store import read_source, source_catalog
 from huggingface_agents_langgraph.state import AgentState
+from huggingface_agents_langgraph.tracing import current_trace, remaining_seconds
 from huggingface_agents_langgraph.web_research import _search_web, fetch_source
 
 

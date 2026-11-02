@@ -14,7 +14,7 @@ from uuid import uuid4
 from huggingface_agents_langgraph.experiment_runner import run_experiment
 from huggingface_agents_langgraph.experiments import normalize_experiment
 from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.run_tracking import read_record
+from huggingface_agents_langgraph.records import read_record
 
 MAX_QUESTIONS = 20
 _FINISHED = {"completed", "cancelled", "failed"}

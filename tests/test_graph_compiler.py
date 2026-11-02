@@ -15,7 +15,7 @@ from huggingface_agents_langgraph.graph_definition import (
     RoutingRegistry,
     RoutingStrategy,
 )
-from huggingface_agents_langgraph.run_tracking import RunTrace, current_trace
+from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 TASK = {"task_id": "t", "question": "q", "file_name": ""}
 

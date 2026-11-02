@@ -17,14 +17,12 @@ from huggingface_agents_langgraph.calculation import (
     validate_expression,
 )
 from huggingface_agents_langgraph.evidence_selection import select_relevant_evidence
-from huggingface_agents_langgraph.experiment_runner import (
-    timing_summary,
-    variant_config,
-)
+from huggingface_agents_langgraph.experiment_metrics import timing_summary
+from huggingface_agents_langgraph.experiment_runner import variant_config
 from huggingface_agents_langgraph.experiments import IMPROVEMENTS, normalize_experiment
-from huggingface_agents_langgraph.run_tracking import RunTrace, current_trace
 from huggingface_agents_langgraph.source_store import read_source, source_catalog
 from huggingface_agents_langgraph.spreadsheet_tools import aggregate_table
+from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 
 @contextmanager
@@ -253,9 +251,9 @@ def test_experiment_resume_keeps_completed_tasks_and_excludes_reference_answers(
     monkeypatch,
     tmp_path,
 ):
-    from huggingface_agents_langgraph import experiment_runner, run_tracking
+    from huggingface_agents_langgraph import experiment_runner, records
 
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     monkeypatch.setattr(
         experiment_runner, "source_identity", lambda: {"source_sha256": "fixed"}
     )
@@ -282,7 +280,7 @@ def test_experiment_resume_keeps_completed_tasks_and_excludes_reference_answers(
     config = normalize_experiment(None)
     with pytest.raises(KeyboardInterrupt):
         experiment_runner.run_experiment(tasks, config, group_id="group", score=False)
-    record = run_tracking.list_records("experiments")[0]
+    record = records.list_records("experiments")[0]
     assert len(record["answers"]) == 1
     monkeypatch.setattr(
         experiment_runner,
