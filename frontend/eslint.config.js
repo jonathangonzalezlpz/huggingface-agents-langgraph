@@ -62,12 +62,7 @@ export default tseslint.config(
   },
   {
     // Pages that grew too branchy; split into subcomponents in the refactoring (F1).
-    files: [
-      'src/ui/editor/EditorWorkspace.tsx',
-      'src/ui/editor/nodes.tsx',
-      'src/ui/experiments/ExperimentsPage.tsx',
-      'src/ui/run/RunsPage.tsx',
-    ],
+    files: ['src/ui/editor/EditorWorkspace.tsx'],
     rules: { complexity: 'off' },
   },
   {

@@ -27,12 +27,94 @@ const RUN_CLASSES = {
   failed: 'border-error ring-2 ring-error',
 } as const;
 
-export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) {
-  const { t, tp } = useI18n();
-  const { node, component, isEntry, severity, diagnosticCount, run } = data;
-  const style = CATEGORY_STYLE[component?.category ?? 'other'];
+type NodeData = ComponentFlowNode['data'];
+
+/** The name of the node, its component, the parameters it was given and how it ran. */
+function NodeTitle({ data }: { data: NodeData }) {
+  const { tp } = useI18n();
+  const { node, component, run } = data;
+  const params = summarizeParams(node.params, component?.params ?? []);
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="truncate font-mono text-sm font-semibold">{node.id}</p>
+      {node.id !== node.implementationId && (
+        <p className="truncate font-mono text-xs text-fg-muted">{node.implementationId}</p>
+      )}
+      {params.length > 0 && (
+        <p className="truncate font-mono text-xs text-fg-muted">{params.join(' · ')}</p>
+      )}
+      {run && run.visits > 0 && (
+        <p className="truncate text-xs text-fg-muted">
+          {tp('runs.visits', run.visits)} · {run.seconds.toFixed(1)} s
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Small icons that say what is special about the node, never by colour alone. */
+function NodeBadges({ data }: { data: NodeData }) {
+  const { t } = useI18n();
+  const { component, isEntry, severity, diagnosticCount, run } = data;
   const SeverityIcon = severity ? SEVERITY_ICON[severity] : CheckCircle2;
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {isEntry && (
+        <span title={t('editor.node.entry')} className="text-accent-fg">
+          <Flag aria-hidden="true" className="size-3.5" />
+          <span className="sr-only">{t('editor.node.entry')}</span>
+        </span>
+      )}
+      {component?.recoverErrors && (
+        <span title={t('builder.recoversErrors')} className="text-fg-muted">
+          <ShieldCheck aria-hidden="true" className="size-3.5" />
+          <span className="sr-only">{t('builder.recoversErrors')}</span>
+        </span>
+      )}
+      {run?.state === 'failed' && (
+        <span className="text-error" title={t('runs.status.error')}>
+          <XCircle aria-hidden="true" className="size-3.5" />
+          <span className="sr-only">{t('runs.status.error')}</span>
+        </span>
+      )}
+      {severity && (
+        <span className={`inline-flex items-center gap-0.5 text-xs ${SEVERITY_TONE[severity]}`}>
+          <SeverityIcon aria-hidden="true" className="size-3.5" />
+          {diagnosticCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** One output handle per branch of a decision, or a single one for a direct output. */
+function NodeOutputs({ node }: { node: NodeData['node'] }) {
+  const { t } = useI18n();
   const { outgoing } = node;
+  if (outgoing.kind !== 'decision') {
+    return <Handle type="source" position={Position.Right} id={OUTPUT_HANDLE} />;
+  }
+  return (
+    <ul className="mt-2 border-t border-line">
+      {Object.entries(outgoing.branches).map(([label, target]) => (
+        <li
+          key={label}
+          className="relative flex h-[26px] items-center justify-end pr-4 pl-3 text-xs"
+        >
+          <span className="mr-auto text-fg-muted">{label}</span>
+          <span className={target === null ? 'text-warning' : 'font-mono text-fg'}>
+            {target === null ? t('editor.node.pending') : target}
+          </span>
+          <Handle type="source" position={Position.Right} id={branchHandle(label)} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) {
+  const { node, component, run } = data;
+  const style = CATEGORY_STYLE[component?.category ?? 'other'];
 
   return (
     <div
@@ -44,68 +126,10 @@ export function ComponentNode({ data, selected }: NodeProps<ComponentFlowNode>) 
       <Handle type="target" position={Position.Left} id={INPUT_HANDLE} />
       <div className="flex items-start gap-2 px-3 pt-2.5">
         <style.Icon aria-hidden="true" className={`mt-0.5 size-4 shrink-0 ${style.text}`} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-sm font-semibold">{node.id}</p>
-          {node.id !== node.implementationId && (
-            <p className="truncate font-mono text-xs text-fg-muted">{node.implementationId}</p>
-          )}
-          {summarizeParams(node.params, component?.params ?? []).length > 0 && (
-            <p className="truncate font-mono text-xs text-fg-muted">
-              {summarizeParams(node.params, component?.params ?? []).join(' · ')}
-            </p>
-          )}
-          {run && run.visits > 0 && (
-            <p className="truncate text-xs text-fg-muted">
-              {tp('runs.visits', run.visits)} · {run.seconds.toFixed(1)} s
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {isEntry && (
-            <span title={t('editor.node.entry')} className="text-accent-fg">
-              <Flag aria-hidden="true" className="size-3.5" />
-              <span className="sr-only">{t('editor.node.entry')}</span>
-            </span>
-          )}
-          {component?.recoverErrors && (
-            <span title={t('builder.recoversErrors')} className="text-fg-muted">
-              <ShieldCheck aria-hidden="true" className="size-3.5" />
-              <span className="sr-only">{t('builder.recoversErrors')}</span>
-            </span>
-          )}
-          {run?.state === 'failed' && (
-            <span className="text-error" title={t('runs.status.error')}>
-              <XCircle aria-hidden="true" className="size-3.5" />
-              <span className="sr-only">{t('runs.status.error')}</span>
-            </span>
-          )}
-          {severity && (
-            <span className={`inline-flex items-center gap-0.5 text-xs ${SEVERITY_TONE[severity]}`}>
-              <SeverityIcon aria-hidden="true" className="size-3.5" />
-              {diagnosticCount}
-            </span>
-          )}
-        </div>
+        <NodeTitle data={data} />
+        <NodeBadges data={data} />
       </div>
-
-      {outgoing.kind === 'decision' ? (
-        <ul className="mt-2 border-t border-line">
-          {Object.entries(outgoing.branches).map(([label, target]) => (
-            <li
-              key={label}
-              className="relative flex h-[26px] items-center justify-end pr-4 pl-3 text-xs"
-            >
-              <span className="mr-auto text-fg-muted">{label}</span>
-              <span className={target === null ? 'text-warning' : 'font-mono text-fg'}>
-                {target === null ? t('editor.node.pending') : target}
-              </span>
-              <Handle type="source" position={Position.Right} id={branchHandle(label)} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <Handle type="source" position={Position.Right} id={OUTPUT_HANDLE} />
-      )}
+      <NodeOutputs node={node} />
     </div>
   );
 }
