@@ -50,6 +50,9 @@ traducen en comandos; así las reglas de prevención de errores se prueban sin n
 - **Comandos.** Funciones `(documento, ...) → aceptado | rechazado con motivo`. Un comando que
   no cambia nada devuelve el mismo documento y el historial no registra nada.
 - **Historial.** Pila de estados inmutables; arrastrar varios nodos es un único paso.
+- **Espacio de trabajo.** `EditorWorkspace` solo compone: cada responsabilidad vive en un hook o
+  pieza con nombre (`useValidation`, `useVersionSaving`, `useEditorPersistence`,
+  `useEditorShortcuts`, `createInspectorActions`, `runButtonState`, `EditorNotices`).
 - **Disposición.** Las posiciones viajan aparte de la estructura (`EditorDocument.layout`) y no
   alteran la identidad de la versión. En versiones guardadas solo se persiste la disposición.
 - **Conversión.** `fromDefinition`/`toDefinition`; lo que el editor no puede representar se

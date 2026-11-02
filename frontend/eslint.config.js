@@ -41,8 +41,7 @@ export default tseslint.config(
       ],
     },
   })),
-  // Size gate. The files listed in the override below were already over the limit
-  // before the gate existed; split them and remove them from the list, never add.
+  // Size gate: no file over 450 lines, no function above complexity 20.
   {
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['**/*.test.{ts,tsx}'],
@@ -55,15 +54,6 @@ export default tseslint.config(
     // Message catalogues are data, not logic.
     files: ['src/i18n/messages.*.ts'],
     rules: { 'max-lines': 'off' },
-  },
-  {
-    files: ['src/ui/editor/EditorWorkspace.tsx'],
-    rules: { 'max-lines': 'off' },
-  },
-  {
-    // Pages that grew too branchy; split into subcomponents in the refactoring (F1).
-    files: ['src/ui/editor/EditorWorkspace.tsx'],
-    rules: { complexity: 'off' },
   },
   {
     files: ['**/*.test.{ts,tsx}', 'src/test/**', 'scripts/**', 'eslint.config.js'],
