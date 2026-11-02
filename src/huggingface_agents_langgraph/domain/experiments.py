@@ -56,39 +56,29 @@ DEFAULT_EXPERIMENT: ExperimentConfig = {
 }
 
 
-def normalize_experiment(value: object) -> ExperimentConfig:
-    """Validate user-supplied experiment settings and fill safe defaults."""
-    if value is None:
-        return deepcopy(DEFAULT_EXPERIMENT)
-    if not isinstance(value, dict):
-        raise ValueError("experiment must be an object")
+MODEL_PROVIDERS = {"configured", "ollama"}
+SAMPLING_PROFILES = {"legacy", "controlled", "author"}
+PIPELINE_VERSIONS = {"2", "3", "3.1"}
 
-    name = value.get("name", "Personalizado")
-    force_direct = value.get("force_direct", False)
-    enabled = value.get("enabled_capabilities", list(CAPABILITIES))
-    model = value.get("model")
-    vision_model = value.get("vision_model")
-    version = value.get("pipeline_version", "2")
-    improvements = value.get("improvements", [])
-    mode = value.get("reasoning_mode", "bounded")
-    thinking = value.get("thinking_tokens", 512)
-    solution = value.get("solution_tokens", 1024)
-    sampling = value.get(
-        "sampling_profile", "controlled" if version == "3.1" else "legacy"
-    )
-    seed = value.get("seed", 42 if version == "3.1" else None)
-    architecture = value.get("architecture")
+
+def _check_architecture(architecture: object) -> None:
     if architecture is not None and (
         not isinstance(architecture, str)
         or not architecture.strip()
         or len(architecture.strip()) > 100
     ):
         raise ValueError("experiment.architecture must be a non-empty string")
-    if sampling not in {"legacy", "controlled", "author"}:
+
+
+def _check_sampling_and_seed(sampling: object, seed: object) -> None:
+    if sampling not in SAMPLING_PROFILES:
         raise ValueError("Unsupported sampling profile")
     if seed is not None and (type(seed) is not int or not 0 <= seed < 2**32):
         raise ValueError("seed must be an unsigned 32-bit integer")
-    if version not in {"2", "3", "3.1"}:
+
+
+def _check_version_and_improvements(version: object, improvements: object) -> None:
+    if version not in PIPELINE_VERSIONS:
         raise ValueError("Unsupported pipeline version")
     if (
         not isinstance(improvements, list)
@@ -99,6 +89,9 @@ def normalize_experiment(value: object) -> ExperimentConfig:
         or (version == "2" and improvements)
     ):
         raise ValueError("Invalid improvements for this pipeline version")
+
+
+def _check_reasoning(mode: object, thinking: object, solution: object) -> None:
     if mode not in {"off", "bounded"}:
         raise ValueError("Unsupported reasoning mode")
     if any(
@@ -107,6 +100,11 @@ def normalize_experiment(value: object) -> ExperimentConfig:
         raise ValueError("Token budgets must be integers between 0 and 8192")
     if solution < 128:
         raise ValueError("The solution budget must be at least 128 tokens")
+
+
+def _check_name_and_capabilities(
+    name: object, force_direct: object, enabled: object
+) -> None:
     if not isinstance(name, str) or not name.strip():
         raise ValueError("experiment.name must be a non-empty string")
     if not isinstance(force_direct, bool):
@@ -117,35 +115,70 @@ def normalize_experiment(value: object) -> ExperimentConfig:
         raise ValueError(
             "experiment.enabled_capabilities contains an unknown capability"
         )
-    if model is not None:
-        if not isinstance(model, dict):
-            raise ValueError("experiment.model must be an object")
-        provider = model.get("provider")
-        model_id = model.get("model_id")
-        if not isinstance(provider, str) or provider not in {"configured", "ollama"}:
-            raise ValueError("experiment.model.provider is unsupported")
-        if not isinstance(model_id, str) or not model_id.strip() or len(model_id) > 200:
-            raise ValueError("experiment.model.model_id must be a non-empty string")
-        model = {"provider": provider, "model_id": model_id.strip()}
-    if vision_model is not None:
-        if (
-            not isinstance(vision_model, dict)
-            or vision_model.get("provider") not in {"configured", "ollama"}
-            or not isinstance(vision_model.get("model_id"), str)
-            or not vision_model["model_id"].strip()
-            or len(vision_model["model_id"]) > 200
-        ):
-            raise ValueError("experiment.vision_model is invalid")
-        vision_model = {
-            "provider": vision_model["provider"],
-            "model_id": vision_model["model_id"].strip(),
-        }
+
+
+def _normalize_model(model: object) -> ModelSelection | None:
+    if model is None:
+        return None
+    if not isinstance(model, dict):
+        raise ValueError("experiment.model must be an object")
+    provider = model.get("provider")
+    model_id = model.get("model_id")
+    if not isinstance(provider, str) or provider not in MODEL_PROVIDERS:
+        raise ValueError("experiment.model.provider is unsupported")
+    if not isinstance(model_id, str) or not model_id.strip() or len(model_id) > 200:
+        raise ValueError("experiment.model.model_id must be a non-empty string")
+    return {"provider": provider, "model_id": model_id.strip()}
+
+
+def _normalize_vision_model(vision_model: object) -> ModelSelection | None:
+    if vision_model is None:
+        return None
+    if (
+        not isinstance(vision_model, dict)
+        or vision_model.get("provider") not in MODEL_PROVIDERS
+        or not isinstance(vision_model.get("model_id"), str)
+        or not vision_model["model_id"].strip()
+        or len(vision_model["model_id"]) > 200
+    ):
+        raise ValueError("experiment.vision_model is invalid")
+    return {
+        "provider": vision_model["provider"],
+        "model_id": vision_model["model_id"].strip(),
+    }
+
+
+def normalize_experiment(value: object) -> ExperimentConfig:
+    """Validate user-supplied experiment settings and fill safe defaults."""
+    if value is None:
+        return deepcopy(DEFAULT_EXPERIMENT)
+    if not isinstance(value, dict):
+        raise ValueError("experiment must be an object")
+
+    name = value.get("name", "Personalizado")
+    force_direct = value.get("force_direct", False)
+    enabled = value.get("enabled_capabilities", list(CAPABILITIES))
+    version = value.get("pipeline_version", "2")
+    improvements = value.get("improvements", [])
+    mode = value.get("reasoning_mode", "bounded")
+    thinking = value.get("thinking_tokens", 512)
+    solution = value.get("solution_tokens", 1024)
+    sampling = value.get(
+        "sampling_profile", "controlled" if version == "3.1" else "legacy"
+    )
+    seed = value.get("seed", 42 if version == "3.1" else None)
+    architecture = value.get("architecture")
+    _check_architecture(architecture)
+    _check_sampling_and_seed(sampling, seed)
+    _check_version_and_improvements(version, improvements)
+    _check_reasoning(mode, thinking, solution)
+    _check_name_and_capabilities(name, force_direct, enabled)
     normalized: ExperimentConfig = {
         "name": name.strip()[:80],
         "force_direct": force_direct,
         "enabled_capabilities": list(dict.fromkeys(enabled)),
-        "model": model,
-        "vision_model": vision_model,
+        "model": _normalize_model(value.get("model")),
+        "vision_model": _normalize_vision_model(value.get("vision_model")),
         "pipeline_version": version,
         "improvements": list(dict.fromkeys(improvements)),
         "reasoning_mode": mode,
