@@ -8,13 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 
-from huggingface_agents_langgraph.config import MODEL_SERVER_MODE, RUNTIME_DIRECTORY
-from huggingface_agents_langgraph.experiment_runner import (
+from huggingface_agents_langgraph.adapters.llm import chat_completion
+from huggingface_agents_langgraph.adapters.records import read_record
+from huggingface_agents_langgraph.application.experiment_run import (
     run_experiment,
     source_identity,
 )
-from huggingface_agents_langgraph.experiments import normalize_experiment
-from huggingface_agents_langgraph.llm import chat_completion
+from huggingface_agents_langgraph.config import MODEL_SERVER_MODE, RUNTIME_DIRECTORY
+from huggingface_agents_langgraph.domain.experiments import normalize_experiment
+from huggingface_agents_langgraph.domain.pipeline_versions import V2_REFERENCE_ID
 from huggingface_agents_langgraph.model_server import (
     SHARED_MODEL,
     SHARED_MODEL_HIGH_PRECISION,
@@ -24,12 +26,7 @@ from huggingface_agents_langgraph.model_server import (
     gpu_memory,
     model_inventory,
 )
-from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.run_tracking import (
-    RunTrace,
-    current_trace,
-    read_record,
-)
+from huggingface_agents_langgraph.tracing import RunTrace, current_trace
 
 MODEL_PAIRS = {
     "control": (TEXT_REFERENCE, None),
@@ -112,7 +109,9 @@ def run_smoke() -> dict:
     """Check text, native vision, and residency before committing to full batteries."""
     from PIL import Image, ImageDraw
 
-    from huggingface_agents_langgraph.multimedia_processing import _run_vision_model
+    from huggingface_agents_langgraph.pipeline.multimedia_processing import (
+        _run_vision_model,
+    )
 
     record = {
         "created_at": datetime.now(UTC).isoformat(),

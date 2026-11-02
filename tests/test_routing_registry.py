@@ -105,11 +105,11 @@ class TestRoutingResolution:
             resolve_routing_attr("os", "system")
         with pytest.raises(PermissionError):
             resolve_routing_attr(
-                "huggingface_agents_langgraph.graph", "build_state_graph"
+                "huggingface_agents_langgraph.pipeline.graph", "build_state_graph"
             )
 
     def test_v31_catalog_resolves_to_the_runtime_routing_functions(self):
-        from huggingface_agents_langgraph import graph
+        from huggingface_agents_langgraph.pipeline import graph
 
         registry = create_gaia_v31_routing_registry()
         assert registry.resolve("route_after_router") is graph._route_after_router

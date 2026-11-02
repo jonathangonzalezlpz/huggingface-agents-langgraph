@@ -1,8 +1,8 @@
-from huggingface_agents_langgraph import reasoning
 from huggingface_agents_langgraph.config import (
     LLM_REASONING_MAX_TOKENS,
     LLM_REASONING_TEMPERATURE,
 )
+from huggingface_agents_langgraph.pipeline import reasoning
 
 
 def test_reasoning_passes_selected_model_to_answer_call(monkeypatch) -> None:

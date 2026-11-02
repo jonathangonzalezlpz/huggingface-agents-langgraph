@@ -6,13 +6,13 @@ from uuid import uuid4
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking
+from huggingface_agents_langgraph.adapters import records
 from huggingface_agents_langgraph.web_app import WebAppHandler
 
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def _post(payload) -> tuple[int, dict]:
@@ -29,7 +29,7 @@ def _post(payload) -> tuple[int, dict]:
 
 def _store(seed: int, answer_text: str = "PRIVATE-ANSWER") -> str:
     record_id = str(uuid4())
-    run_tracking.write_record(
+    records.write_record(
         "experiments",
         {
             "id": record_id,

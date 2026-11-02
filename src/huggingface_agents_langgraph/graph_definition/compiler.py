@@ -7,6 +7,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from huggingface_agents_langgraph.domain.state import AgentState
 from huggingface_agents_langgraph.graph_definition.diagnostics import (
     ValidationReport,
 )
@@ -22,8 +23,7 @@ from huggingface_agents_langgraph.graph_definition.schema import (
     _unfreeze_metadata,
 )
 from huggingface_agents_langgraph.graph_definition.validator import GraphValidator
-from huggingface_agents_langgraph.run_tracking import traced_node
-from huggingface_agents_langgraph.state import AgentState
+from huggingface_agents_langgraph.tracing import traced_node
 
 RECOVERABLE_ERRORS = (ValueError, RuntimeError, OSError)
 END_TERMINALS = SPECIAL_TERMINALS - START_TERMINALS

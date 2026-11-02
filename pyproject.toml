@@ -54,7 +54,17 @@ line-length = 88
 src = ["src"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# C901/PLR09xx keep functions small. Files listed under per-file-ignores hold the
+# functions that already exceeded the limits before the gate existed: new code in
+# every other file is held to it. Remove a file from the list when its functions are
+# split; never add to it.
+select = ["E", "F", "I", "UP", "B", "C901", "PLR0912", "PLR0913", "PLR0915"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["C901", "PLR0912", "PLR0913", "PLR0915"]
+"src/huggingface_agents_langgraph/application/experiment_run.py" = ["PLR0913"]
+"src/huggingface_agents_langgraph/adapters/llm.py" = ["PLR0913"]
+"src/huggingface_agents_langgraph/graph_definition/registry.py" = ["PLR0913"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

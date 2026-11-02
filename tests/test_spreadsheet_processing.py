@@ -3,7 +3,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from huggingface_agents_langgraph import spreadsheet_processing
+from huggingface_agents_langgraph.pipeline import spreadsheet_processing
 
 
 def test_spreadsheet_processing_passes_workbook_data_to_llm(

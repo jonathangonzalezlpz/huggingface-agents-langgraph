@@ -2,8 +2,8 @@
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking
-from huggingface_agents_langgraph.experiment_scoring import (
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.experiment_scoring import (
     evaluate_experiment,
     official_answers,
     record_official_score,
@@ -14,7 +14,7 @@ EXPERIMENT_ID = "55555555-5555-4555-8555-555555555555"
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def store(count=20, **extra):
@@ -27,7 +27,7 @@ def store(count=20, **extra):
         ],
         **extra,
     }
-    run_tracking.write_record("experiments", record)
+    records.write_record("experiments", record)
     return record
 
 
@@ -49,7 +49,7 @@ def test_local_evaluation_marks_each_answer_and_stores_the_totals():
     store()
     score = evaluate_experiment(EXPERIMENT_ID, evaluator=fake_evaluator)
     assert score == {"score": 10.0, "correct_count": 2, "total_attempted": 20}
-    saved = run_tracking.read_record("experiments", EXPERIMENT_ID)
+    saved = records.read_record("experiments", EXPERIMENT_ID)
     assert saved["local_score"] == score
     assert [a["locally_correct"] for a in saved["answers"]][:3] == [True, True, False]
 
@@ -70,7 +70,7 @@ def test_refuses_to_score_an_incomplete_experiment():
     store(count=5)
     with pytest.raises(ValueError, match="20"):
         evaluate_experiment(EXPERIMENT_ID, evaluator=fake_evaluator)
-    assert "local_score" not in run_tracking.read_record("experiments", EXPERIMENT_ID)
+    assert "local_score" not in records.read_record("experiments", EXPERIMENT_ID)
 
 
 def test_a_missing_experiment_is_not_found():
@@ -86,7 +86,7 @@ def test_an_evaluator_failure_leaves_the_record_untouched():
 
     with pytest.raises(RuntimeError):
         evaluate_experiment(EXPERIMENT_ID, evaluator=broken)
-    assert "local_score" not in run_tracking.read_record("experiments", EXPERIMENT_ID)
+    assert "local_score" not in records.read_record("experiments", EXPERIMENT_ID)
 
 
 def test_official_answers_come_from_the_stored_record():
@@ -121,4 +121,4 @@ def test_the_official_result_keeps_only_known_fields():
         "total_attempted": 20,
         "message": "ok",
     }
-    assert run_tracking.read_record("experiments", EXPERIMENT_ID)["score"] == kept
+    assert records.read_record("experiments", EXPERIMENT_ID)["score"] == kept

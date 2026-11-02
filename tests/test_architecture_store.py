@@ -5,17 +5,21 @@ from uuid import UUID
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking
-from huggingface_agents_langgraph.architecture_store import (
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.architecture_layouts import (
+    get_layout,
+    save_layout,
+)
+from huggingface_agents_langgraph.application.architecture_service import (
+    validate_definition,
+)
+from huggingface_agents_langgraph.application.architecture_store import (
     BUILTIN_V31_ID,
     ArchitectureNotFoundError,
     content_sha256,
     get_architecture,
-    get_layout,
     list_architectures,
     save_architecture,
-    save_layout,
-    validate_definition,
 )
 from huggingface_agents_langgraph.graph_definition import (
     AgentDefinition,
@@ -29,7 +33,7 @@ from huggingface_agents_langgraph.graph_definition.definitions import (
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def _definition(architecture_id="demo", targets=("a", "b")) -> AgentDefinition:

@@ -1,7 +1,10 @@
 import pytest
 
-from huggingface_agents_langgraph import graph as graph_module
-from huggingface_agents_langgraph.graph import _route_after_router, build_state_graph
+from huggingface_agents_langgraph.pipeline import graph as graph_module
+from huggingface_agents_langgraph.pipeline.graph import (
+    _route_after_router,
+    build_state_graph,
+)
 
 
 @pytest.mark.parametrize(

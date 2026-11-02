@@ -5,8 +5,35 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from huggingface_agents_langgraph.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.run_tracking import list_records, read_record
+from huggingface_agents_langgraph.adapters.records import list_records, read_record
+from huggingface_agents_langgraph.domain.pipeline_versions import V2_REFERENCE_ID
+
+
+def _changes_against(record: dict, baseline_answers: dict, task_order: dict):
+    """Question numbers whose result was gained, lost, or whose input differs."""
+    gained, lost, changed = [], [], []
+    for answer in record["answers"]:
+        previous = baseline_answers.get(answer["task_id"])
+        if not previous:
+            continue
+        number = task_order[answer["task_id"]]
+        if (answer["question"], answer.get("file_name", "")) != (
+            previous["question"],
+            previous.get("file_name", ""),
+        ):
+            changed.append(number)
+            continue
+        if (
+            answer.get("locally_correct") is True
+            and previous.get("locally_correct") is False
+        ):
+            gained.append(number)
+        if (
+            answer.get("locally_correct") is False
+            and previous.get("locally_correct") is True
+        ):
+            lost.append(number)
+    return gained, lost, changed
 
 
 def report(group_id: str) -> str:
@@ -72,28 +99,7 @@ def report(group_id: str) -> str:
     for record in records:
         if record["id"] == baseline["id"]:
             continue
-        gained, lost, changed = [], [], []
-        for answer in record["answers"]:
-            previous = baseline_answers.get(answer["task_id"])
-            if not previous:
-                continue
-            number = task_order[answer["task_id"]]
-            if (answer["question"], answer.get("file_name", "")) != (
-                previous["question"],
-                previous.get("file_name", ""),
-            ):
-                changed.append(number)
-                continue
-            if (
-                answer.get("locally_correct") is True
-                and previous.get("locally_correct") is False
-            ):
-                gained.append(number)
-            if (
-                answer.get("locally_correct") is False
-                and previous.get("locally_correct") is True
-            ):
-                lost.append(number)
+        gained, lost, changed = _changes_against(record, baseline_answers, task_order)
         lines.extend(
             [
                 f"### {record['config']['name']}",

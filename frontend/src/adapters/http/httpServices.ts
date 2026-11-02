@@ -7,35 +7,37 @@ import type { StudioServices } from '../../ports';
 import { createLocalStorageDrafts } from '../drafts/localStorageDrafts';
 import {
   architectureListSchema,
-  batterySchema,
+  architectureSchema,
+  catalogSchema,
+  definitionToWire,
+  layoutSchema,
+  savedRecordSchema,
+  toArchitecture,
+  toCatalog,
+  toSummary,
+  toValidation,
+  validationSchema,
+} from '../wire/architectures';
+import { batterySchema, toBatteryStatus } from '../wire/batteries';
+import {
   comparisonSchema,
   deletedSchema,
   evaluateSchema,
   experimentListSchema,
   submitSchema,
-  architectureSchema,
-  catalogSchema,
-  definitionToWire,
-  layoutSchema,
-  modelsSchema,
-  questionsSchema,
-  runRecordSchema,
-  savedRecordSchema,
-  statusSchema,
-  toArchitecture,
-  toBatteryStatus,
-  toCatalog,
   toComparison,
   toExperimentRecords,
   toScore,
+} from '../wire/experiments';
+import {
+  modelsSchema,
+  questionsSchema,
+  runRecordSchema,
   toModels,
   toQuestions,
   toRunRecord,
-  toStatus,
-  toSummary,
-  toValidation,
-  validationSchema,
-} from '../wire';
+} from '../wire/runs';
+import { statusSchema, toStatus } from '../wire/system';
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 

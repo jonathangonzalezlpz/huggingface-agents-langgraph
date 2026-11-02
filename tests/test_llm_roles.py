@@ -4,22 +4,22 @@ import json
 
 import pytest
 
-from huggingface_agents_langgraph import llm_roles
-from huggingface_agents_langgraph.architecture_store import get_catalog
+from huggingface_agents_langgraph.application.architecture_service import get_catalog
+from huggingface_agents_langgraph.domain.state import AgentState
 from huggingface_agents_langgraph.graph_definition import (
     AgentDefinition,
     EdgeDefinition,
     GraphCompiler,
     NodeDefinition,
 )
-from huggingface_agents_langgraph.graph_definition.registry import (
+from huggingface_agents_langgraph.graph_definition.components import (
     create_studio_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_studio_routing_registry,
 )
 from huggingface_agents_langgraph.graph_definition.validator import GraphValidator
-from huggingface_agents_langgraph.state import AgentState
+from huggingface_agents_langgraph.studio import llm_roles
 
 TASK = {"task_id": "t", "question": "What is 2+2?", "file_name": ""}
 
@@ -281,7 +281,7 @@ class TestInAnArchitecture:
     def _compiler(self, monkeypatch):
         registry = create_studio_registry()
         monkeypatch.setattr(
-            "huggingface_agents_langgraph.reasoning.chat_completion",
+            "huggingface_agents_langgraph.pipeline.reasoning.chat_completion",
             lambda *a, **k: "5",
         )
         return GraphCompiler(registry, create_studio_routing_registry())
@@ -331,7 +331,7 @@ class TestInAnArchitecture:
     def test_the_planner_feeds_the_next_node_through_the_notes(self, fake, monkeypatch):
         fake("1. Add\n2. Check")
         monkeypatch.setattr(
-            "huggingface_agents_langgraph.reasoning.chat_completion",
+            "huggingface_agents_langgraph.pipeline.reasoning.chat_completion",
             lambda *a, **k: "4",
         )
         definition = AgentDefinition(

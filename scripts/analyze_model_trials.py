@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from huggingface_agents_langgraph.run_tracking import list_records
+from huggingface_agents_langgraph.adapters.records import list_records
 
 
 def report(group_id: str) -> str:

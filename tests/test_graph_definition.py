@@ -11,8 +11,10 @@ from huggingface_agents_langgraph.graph_definition import (
     NodeDefinition,
     NodeRegistry,
 )
-from huggingface_agents_langgraph.graph_definition.registry import (
-    _resolve_module_attr,
+from huggingface_agents_langgraph.graph_definition.authorization import (
+    resolve_authorized_callable,
+)
+from huggingface_agents_langgraph.graph_definition.components import (
     create_gaia_v3_registry,
 )
 
@@ -375,11 +377,11 @@ class TestNodeRegistry:
 
     def test_unauthorized_module_resolution_rejected(self):
         with pytest.raises(PermissionError, match="Unauthorized module"):
-            _resolve_module_attr("os", "system")
+            resolve_authorized_callable("os", "system")
 
     def test_unwhitelisted_internal_attribute_resolution_rejected(self):
         with pytest.raises(PermissionError, match="Unauthorized module attribute"):
-            _resolve_module_attr("huggingface_agents_langgraph.cli", "main")
+            resolve_authorized_callable("huggingface_agents_langgraph.cli", "main")
 
     def test_gaia_v3_canonical_registry(self):
         registry = create_gaia_v3_registry()

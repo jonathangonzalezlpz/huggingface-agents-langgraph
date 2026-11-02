@@ -19,6 +19,42 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'error',
     },
   },
+  // Hexagonal direction: inner layers know nothing of the outer ones.
+  ...[
+    ['src/domain/**', ['adapters', 'application', 'ports', 'ui', 'app']],
+    ['src/application/**', ['adapters', 'ui', 'app']],
+    ['src/ports/**', ['adapters', 'application', 'ui', 'app']],
+    ['src/adapters/**', ['ui', 'app']],
+    ['src/ui/**', ['adapters', 'app']],
+  ].map(([layer, forbidden]) => ({
+    files: [layer],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: forbidden.map((target) => ({
+            regex: `(^|/)${target}(/|$)`,
+            message: `${layer.replace('/**', '')} must not depend on ${target}.`,
+          })),
+        },
+      ],
+    },
+  })),
+  // Size gate: no file over 450 lines, no function above complexity 20.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.{ts,tsx}'],
+    rules: {
+      'max-lines': ['error', { max: 450, skipBlankLines: true, skipComments: true }],
+      complexity: ['error', 20],
+    },
+  },
+  {
+    // Message catalogues are data, not logic.
+    files: ['src/i18n/messages.*.ts'],
+    rules: { 'max-lines': 'off' },
+  },
   {
     files: ['**/*.test.{ts,tsx}', 'src/test/**', 'scripts/**', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } },

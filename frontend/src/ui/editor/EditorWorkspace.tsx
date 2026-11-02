@@ -1,47 +1,36 @@
 import { ReactFlowProvider } from '@xyflow/react';
-import { X } from 'lucide-react';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useMemo, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
   addNode,
   applyLayout,
-  clearDecision,
   connect,
   connectBranch,
-  disconnect,
-  disconnectBranch,
   moveNodes,
-  removeNode,
-  renameArchitecture,
-  renameNode,
-  setDecision,
-  setDescription,
-  setInitial,
-  setParam,
   uniqueNodeId,
 } from '../../domain/editor/commands';
-import { toDefinition, unexportableDecisions } from '../../domain/editor/convert';
-import { type EditorDocument, type EditorGraph, type Point } from '../../domain/editor/model';
-import { StudioError } from '../../domain/errors';
+import { type EditorDocument, type Point } from '../../domain/editor/model';
 import type { Catalog, ValidationReport } from '../../domain/types';
 import { useI18n } from '../../i18n/I18nProvider';
-import type { SavedMarker } from '../../ports';
 import { useServices } from '../services';
 import { computeLayout } from './autoLayout';
-import { DiagnosticsPanel, type ValidationView } from './DiagnosticsPanel';
+import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { AddComponentDialog, ConnectDialog } from './dialogs';
 import { EditorCanvas, type CanvasApi } from './EditorCanvas';
 import { editorReducer, initialState, type EditorAction } from './editorState';
-import { Inspector, type InspectorActions } from './Inspector';
-import type { AvailabilityView } from './InspectorFields';
+import { createInspectorActions } from './inspectorActions';
+import { Inspector } from './Inspector';
+import { EditorNotices } from './EditorNotices';
 import { Palette } from './Palette';
-import { rejectionText } from './rejectionText';
+import { runButtonState } from './runButton';
 import { Toolbar } from './Toolbar';
+import { useEditorPersistence } from './useEditorPersistence';
+import { useEditorShortcuts } from './useEditorShortcuts';
+import { useValidation } from './useValidation';
+import { useVersionSaving } from './useVersionSaving';
+import { availabilityView, hasErrorsNow, visibleDiagnostics } from './validationView';
 
-const DRAFT_SAVE_DELAY_MS = 400;
-const LAYOUT_SAVE_DELAY_MS = 600;
-const VALIDATION_DELAY_MS = 600;
 const NEW_NODE_STAGGER = 28;
 
 export interface WorkspaceProps {
@@ -63,14 +52,6 @@ export interface WorkspaceProps {
 }
 
 type Apply = Extract<EditorAction, { type: 'apply' }>;
-type Validated = { view: ValidationView; graph: EditorGraph | null };
-type Notice = { tone: 'success' | 'warning' | 'error'; text: string } | null;
-
-const NOTICE_TONE = {
-  success: 'bg-success-soft text-success',
-  warning: 'bg-warning-soft text-warning',
-  error: 'bg-error-soft text-error',
-} as const;
 
 function Workspace({
   initialDocument,
@@ -83,7 +64,7 @@ function Workspace({
   editLabel = 'editor.duplicate',
   onEdit,
 }: WorkspaceProps) {
-  const { t, tp } = useI18n();
+  const { t } = useI18n();
   const services = useServices();
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(editorReducer, initialDocument, initialState);
@@ -95,18 +76,18 @@ function Workspace({
   const [connectTo, setConnectTo] = useState<{ nodeId: string; branch: string | null } | null>(
     null,
   );
-  const [validated, setValidated] = useState<Validated>(
-    initialValidation
-      ? { view: { status: 'done', report: initialValidation }, graph: initialDocument.graph }
-      : { view: { status: 'idle' }, graph: null },
-  );
-  const [validating, setValidating] = useState(false);
-  const [liveValidation, setLiveValidation] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saveNotice, setSaveNotice] = useState<Notice>(null);
-  const [marker, setMarker] = useState<SavedMarker | null>(() =>
-    draftId ? services.drafts.savedMarker(draftId) : null,
-  );
+
+  const { validated, validating, stale, validate } = useValidation({
+    graph: doc.graph,
+    initialGraph: initialDocument.graph,
+    readOnly,
+    initialValidation,
+  });
+  const { marker, saving, notice, dismissNotice, saveState, saveVersion } = useVersionSaving({
+    doc,
+    ...(draftId ? { draftId } : {}),
+  });
+  useEditorPersistence({ doc, initialDocument, draftId, layoutKey });
 
   const nodeIds = useMemo(() => doc.graph.nodes.map((node) => node.id), [doc.graph.nodes]);
   const selected = useMemo(
@@ -114,27 +95,6 @@ function Workspace({
     [selection, nodeIds],
   );
   const primary = selected.length === 1 ? (selected[0] ?? null) : null;
-
-  const stale = validated.view.status === 'done' && validated.graph !== doc.graph;
-  const diagnostics = useMemo(
-    () => (validated.view.status === 'done' && !stale ? validated.view.report.diagnostics : []),
-    [validated.view, stale],
-  );
-
-  const currentJson = useMemo(() => JSON.stringify(toDefinition(doc.graph)), [doc.graph]);
-  const saveState: 'saved' | 'unsaved' | null = draftId
-    ? marker && marker.definitionJson === currentJson
-      ? 'saved'
-      : 'unsaved'
-    : null;
-
-  const availability: AvailabilityView = (() => {
-    const { view } = validated;
-    if (view.status === 'unavailable') return { status: 'unavailable' };
-    if (view.status !== 'done') return { status: 'pending' };
-    if (stale) return { status: 'stale' };
-    return { status: 'ready', node: primary ? (view.report.availability[primary] ?? null) : null };
-  })();
 
   /** Run a command; `onSuccess` receives the resulting document when it was accepted. */
   const execute = (
@@ -149,9 +109,10 @@ function Workspace({
 
   const addComponent = (implementationId: string, position?: Point) => {
     const offset = (doc.graph.nodes.length % 6) * NEW_NODE_STAGGER;
+    const center = canvasApi.current?.centerPosition() ?? { x: 0, y: 0 };
     const at = position ?? {
-      x: Math.round((canvasApi.current?.centerPosition().x ?? 0) + offset - 120),
-      y: Math.round((canvasApi.current?.centerPosition().y ?? 0) + offset - 40),
+      x: Math.round(center.x + offset - 120),
+      y: Math.round(center.y + offset - 40),
     };
     const newId = uniqueNodeId(doc.graph, implementationId);
     execute(
@@ -170,96 +131,16 @@ function Workspace({
     );
   };
 
-  // Validation: a response only counts if no newer request started after it.
-  const requestSerial = useRef(0);
-  const runValidation = async (graph: EditorGraph) => {
-    const serial = ++requestSerial.current;
-    setValidating(true);
-    try {
-      const report = await services.validation.validate(toDefinition(graph));
-      if (serial !== requestSerial.current) return;
-      setValidated({ view: { status: 'done', report }, graph });
-    } catch (error) {
-      if (serial !== requestSerial.current) return;
-      const unavailable = error instanceof StudioError && error.kind === 'unavailable';
-      if (unavailable) setLiveValidation(false);
-      setValidated({ view: { status: unavailable ? 'unavailable' : 'failed' }, graph: null });
-    }
-    setValidating(false);
-  };
-
-  const validateLatest = useRef(runValidation);
-  useEffect(() => {
-    validateLatest.current = runValidation;
+  const run = runButtonState({
+    readOnly,
+    runVersionId,
+    draftId,
+    saveState,
+    live: services.mode === 'live',
+    saving,
+    hasErrors: hasErrorsNow(validated, stale),
+    storedVersionValid: initialValidation?.isValid,
   });
-  useEffect(() => {
-    if (readOnly || !liveValidation || doc.graph.nodes.length === 0) return;
-    const timer = setTimeout(() => void validateLatest.current(doc.graph), VALIDATION_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [doc.graph, readOnly, liveValidation]);
-
-  /** Save the draft as a version. Resolves to its id only when it is clean enough to run. */
-  const saveVersion = async (): Promise<string | null> => {
-    if (!draftId) return null;
-    if (doc.graph.nodes.length === 0) {
-      setSaveNotice({ tone: 'error', text: t('editor.save.empty') });
-      return null;
-    }
-    const snapshot = doc;
-    const snapshotJson = currentJson;
-    setSaving(true);
-    setSaveNotice(null);
-    try {
-      const { architecture, created } = await services.architectures.save(
-        toDefinition(snapshot.graph),
-      );
-      const saved: SavedMarker = {
-        versionId: architecture.id,
-        version: architecture.version ?? 0,
-        definitionJson: snapshotJson,
-      };
-      services.drafts.save(draftId, snapshot);
-      services.drafts.markSaved(draftId, saved);
-      setMarker(saved);
-
-      const parts = [
-        created
-          ? t('editor.save.created', { version: saved.version })
-          : t('editor.save.existing', { version: saved.version }),
-      ];
-      const errors = architecture.validation.counts.error;
-      if (errors > 0) parts.push(tp('editor.save.withErrors', errors));
-      const dropped = unexportableDecisions(snapshot.graph);
-      if (dropped.length > 0) parts.push(t('editor.save.dropped', { ids: dropped.join(', ') }));
-      setSaveNotice({
-        tone: errors > 0 || dropped.length > 0 ? 'warning' : 'success',
-        text: parts.join(' '),
-      });
-      return errors === 0 && dropped.length === 0 ? architecture.id : null;
-    } catch (error) {
-      const unavailable = error instanceof StudioError && error.kind === 'unavailable';
-      setSaveNotice({
-        tone: 'error',
-        text: t(unavailable ? 'editor.save.unavailable' : 'editor.save.failed'),
-      });
-      return null;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const live = services.mode === 'live';
-  const invalidNow = validated.view.status === 'done' && !stale && !validated.view.report.isValid;
-  const run: { label: 'editor.run' | 'editor.runSave'; disabled: boolean } | null = readOnly
-    ? runVersionId
-      ? { label: 'editor.run', disabled: !live || initialValidation?.isValid === false }
-      : null
-    : draftId
-      ? {
-          label: saveState === 'saved' ? 'editor.run' : 'editor.runSave',
-          disabled: !live || saving || invalidNow,
-        }
-      : null;
 
   const startRun = async () => {
     const versionId = readOnly
@@ -275,118 +156,22 @@ function Workspace({
     canvasApi.current?.focusNode(id);
   };
 
-  const inspectorActions: InspectorActions = {
-    rename: (id, newId) =>
-      execute(
-        (current) => renameNode(current, id, newId),
-        () => ({ key: 'editor.announce.renamed', params: { id, newId } }),
-        () => setSelection([newId]),
-      ),
-    setEntry: (id) =>
-      execute(
-        (current) => setInitial(current, id),
-        () => ({ key: 'editor.announce.entry', params: { id } }),
-      ),
-    remove: (id) =>
-      execute(
-        (current) => removeNode(current, id),
-        () => ({ key: 'editor.announce.removed', params: { id } }),
-        () => setSelection([]),
-      ),
+  const inspectorActions = createInspectorActions({
+    execute,
+    catalog,
+    select: setSelection,
     openConnect: (nodeId, branch) => setConnectTo({ nodeId, branch }),
-    disconnect: (nodeId, branch) =>
-      execute(
-        (current) =>
-          branch ? disconnectBranch(current, nodeId, branch) : disconnect(current, nodeId),
-        () => ({ key: 'editor.announce.disconnected', params: { source: nodeId } }),
-      ),
-    setDecision: (nodeId, strategy) =>
-      execute(
-        (current) =>
-          strategy === ''
-            ? clearDecision(current, nodeId)
-            : setDecision(current, catalog, nodeId, strategy),
-        () => ({ key: 'editor.announce.decision', params: { id: nodeId, strategy } }),
-      ),
-    setDescription: (nodeId, text) => execute((current) => setDescription(current, nodeId, text)),
-    setParam: (nodeId, name, value) =>
-      execute(
-        (current) => setParam(current, catalog, nodeId, name, value),
-        () => ({
-          key: value === null ? 'editor.announce.paramReset' : 'editor.announce.param',
-          params: { id: nodeId, name },
-        }),
-      ),
-    renameArchitecture: (name) => execute((current) => renameArchitecture(current, name)),
-  };
-
-  // Keyboard shortcuts. The latest handler is kept in a ref so the listener is attached once.
-  const shortcut = useRef<(event: KeyboardEvent) => void>(() => undefined);
-  useEffect(() => {
-    shortcut.current = (event) => {
-      const target = event.target as HTMLElement | null;
-      const typing =
-        !!target && (target.matches('input, textarea, select') || target.isContentEditable);
-      const mod = event.ctrlKey || event.metaKey;
-      const key = event.key.toLowerCase();
-      if (mod && key === 'k') {
-        event.preventDefault();
-        if (!readOnly) setAddOpen(true);
-        return;
-      }
-      if (typing || addOpen || connectTo) return;
-      if (mod && key === 's' && draftId) {
-        event.preventDefault();
-        void saveVersion();
-      } else if (mod && key === 'z') {
-        event.preventDefault();
-        dispatch({ type: event.shiftKey ? 'redo' : 'undo' });
-      } else if (mod && key === 'y') {
-        event.preventDefault();
-        dispatch({ type: 'redo' });
-      } else if (!mod && key === 'f') {
-        canvasApi.current?.fit();
-      } else if (!mod && key === 'l') {
-        runLayout();
-      }
-    };
   });
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => shortcut.current(event);
-    document.addEventListener('keydown', listener);
-    return () => document.removeEventListener('keydown', listener);
-  }, []);
 
-  // Persistence: drafts keep everything, saved versions keep only where nodes sit.
-  const latest = useRef(doc);
-  useEffect(() => {
-    latest.current = doc;
-  }, [doc]);
-
-  useEffect(() => {
-    if (!draftId || doc === initialDocument) return;
-    const timer = setTimeout(() => services.drafts.save(draftId, doc), DRAFT_SAVE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [doc, draftId, initialDocument, services.drafts]);
-
-  useEffect(() => {
-    if (!draftId) return;
-    return () => {
-      if (latest.current !== initialDocument) services.drafts.save(draftId, latest.current);
-    };
-  }, [draftId, initialDocument, services.drafts]);
-
-  useEffect(() => {
-    if (!layoutKey || doc.layout === initialDocument.layout) return;
-    const timer = setTimeout(() => {
-      services.layouts.save(layoutKey, doc.layout).catch(() => undefined);
-    }, LAYOUT_SAVE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [doc.layout, layoutKey, initialDocument.layout, services.layouts]);
-
-  const announcement = state.announcement
-    ? t(state.announcement.key, state.announcement.params)
-    : '';
+  useEditorShortcuts({
+    openAdd: readOnly ? null : () => setAddOpen(true),
+    save: draftId ? () => void saveVersion() : null,
+    undo: () => dispatch({ type: 'undo' }),
+    redo: () => dispatch({ type: 'redo' }),
+    fit: () => canvasApi.current?.fit(),
+    layout: runLayout,
+    blocked: addOpen || connectTo !== null,
+  });
 
   return (
     <div className="flex h-screen min-h-0 flex-col">
@@ -406,49 +191,20 @@ function Workspace({
         onAdd={() => setAddOpen(true)}
         onLayout={runLayout}
         onFit={() => canvasApi.current?.fit()}
-        onValidate={() => void runValidation(doc.graph)}
+        onValidate={() => void validate(doc.graph)}
         run={run}
         onSave={() => void saveVersion()}
         onRun={() => void startRun()}
         onEdit={() => onEdit(doc)}
       />
-      {readOnly && (
-        <p className="border-b border-line bg-muted px-4 py-1.5 text-xs text-fg-muted">
-          {t(editLabel === 'editor.edit' ? 'editor.readOnlyHint.saved' : 'editor.readOnlyHint')}
-        </p>
-      )}
-      {saveNotice && (
-        <div
-          role="status"
-          className={`flex items-center justify-between gap-3 border-b border-line px-4 py-1.5 text-sm ${NOTICE_TONE[saveNotice.tone]}`}
-        >
-          <span>{saveNotice.text}</span>
-          <button
-            type="button"
-            onClick={() => setSaveNotice(null)}
-            aria-label={t('editor.cancel')}
-            className="inline-flex size-7 items-center justify-center rounded-md hover:bg-surface/50"
-          >
-            <X aria-hidden="true" className="size-4" />
-          </button>
-        </div>
-      )}
-      {state.notice && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 border-b border-line bg-warning-soft px-4 py-1.5 text-sm text-warning"
-        >
-          <span>{rejectionText(t, state.notice)}</span>
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'dismissNotice' })}
-            aria-label={t('editor.cancel')}
-            className="inline-flex size-7 items-center justify-center rounded-md hover:bg-surface/50"
-          >
-            <X aria-hidden="true" className="size-4" />
-          </button>
-        </div>
-      )}
+      <EditorNotices
+        readOnly={readOnly}
+        editLabel={editLabel}
+        saveNotice={notice}
+        onDismissSaveNotice={dismissNotice}
+        rejection={state.notice}
+        onDismissRejection={() => dispatch({ type: 'dismissNotice' })}
+      />
 
       <div
         className={`grid min-h-0 flex-1 grid-cols-1 ${
@@ -466,7 +222,7 @@ function Workspace({
           <EditorCanvas
             doc={doc}
             catalog={catalog}
-            diagnostics={diagnostics}
+            diagnostics={visibleDiagnostics(validated, stale)}
             readOnly={readOnly}
             selectedIds={selected}
             onSelect={setSelection}
@@ -483,7 +239,7 @@ function Workspace({
             selectedId={primary}
             readOnly={readOnly}
             actions={inspectorActions}
-            availability={availability}
+            availability={availabilityView(validated, stale, primary)}
           />
         </div>
       </div>
@@ -522,7 +278,7 @@ function Workspace({
         }}
       />
       <div role="status" aria-live="polite" className="sr-only">
-        {announcement}
+        {state.announcement ? t(state.announcement.key, state.announcement.params) : ''}
       </div>
     </div>
   );

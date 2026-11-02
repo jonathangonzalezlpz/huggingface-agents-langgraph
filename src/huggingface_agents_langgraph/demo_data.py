@@ -6,11 +6,13 @@ The demo never contains benchmark questions, answers or run records.
 import json
 from pathlib import Path
 
-from huggingface_agents_langgraph.architecture_store import (
-    BUILTIN_V31_ID,
-    get_architecture,
+from huggingface_agents_langgraph.application.architecture_service import (
     get_catalog,
     validate_definition,
+)
+from huggingface_agents_langgraph.application.architecture_store import (
+    BUILTIN_V31_ID,
+    get_architecture,
 )
 
 DEMO_FILE = (

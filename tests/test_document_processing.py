@@ -2,7 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from huggingface_agents_langgraph import document_processing, evidence_selection
+from huggingface_agents_langgraph.pipeline import (
+    document_processing,
+    evidence_selection,
+)
 
 
 class FakePage:

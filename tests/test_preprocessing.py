@@ -2,7 +2,7 @@
 
 import pytest
 
-from huggingface_agents_langgraph.preprocessing import preprocessing
+from huggingface_agents_langgraph.pipeline.preprocessing import preprocessing
 
 
 def test_preprocessing_trims_question() -> None:

@@ -6,8 +6,8 @@ from io import BytesIO
 
 import pytest
 
-from huggingface_agents_langgraph import run_tracking
-from huggingface_agents_langgraph.architecture_store import BUILTIN_V31_ID
+from huggingface_agents_langgraph.adapters import records
+from huggingface_agents_langgraph.application.architecture_store import BUILTIN_V31_ID
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
 )
@@ -16,7 +16,7 @@ from huggingface_agents_langgraph.web_app import WebAppHandler
 
 @pytest.fixture(autouse=True)
 def runtime_directory(monkeypatch, tmp_path):
-    monkeypatch.setattr(run_tracking, "RUNTIME_DIRECTORY", str(tmp_path))
+    monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
 
 
 def _call(method: str, path: str, payload=None):

@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from uuid import UUID
 
-from huggingface_agents_langgraph.pipeline_versions import (
+from huggingface_agents_langgraph.domain.pipeline_versions import (
     V2_REFERENCE_ID,
     V2_REFERENCE_NAME,
     V2_REFERENCE_REVISION,

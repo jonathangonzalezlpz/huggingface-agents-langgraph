@@ -18,8 +18,9 @@ frontend/src/
 ├── ports/         Interfaces de salida: Catalog, Architecture, System, Validation,
 │                  Layout y Draft.
 ├── adapters/
-│   ├── wire.ts    Contrato JSON del backend (zod) y traducción al dominio. Único sitio que
-│   │              conoce el snake_case del backend.
+│   ├── wire/      Contrato JSON del backend (zod) y traducción al dominio, un módulo por
+│   │              recurso (architectures, runs, experiments, batteries, system). Único sitio
+│   │              que conoce el snake_case del backend.
 │   ├── http/      Adaptador contra el backend Python.
 │   ├── drafts/    Borradores en localStorage (validados al leer; lo corrupto se descarta).
 │   └── memory/    Adaptador con datos de ejemplo (demo y tests). demo-data.json se genera.
@@ -49,6 +50,9 @@ traducen en comandos; así las reglas de prevención de errores se prueban sin n
 - **Comandos.** Funciones `(documento, ...) → aceptado | rechazado con motivo`. Un comando que
   no cambia nada devuelve el mismo documento y el historial no registra nada.
 - **Historial.** Pila de estados inmutables; arrastrar varios nodos es un único paso.
+- **Espacio de trabajo.** `EditorWorkspace` solo compone: cada responsabilidad vive en un hook o
+  pieza con nombre (`useValidation`, `useVersionSaving`, `useEditorPersistence`,
+  `useEditorShortcuts`, `createInspectorActions`, `runButtonState`, `EditorNotices`).
 - **Disposición.** Las posiciones viajan aparte de la estructura (`EditorDocument.layout`) y no
   alteran la identidad de la versión. En versiones guardadas solo se persiste la disposición.
 - **Conversión.** `fromDefinition`/`toDefinition`; lo que el editor no puede representar se
@@ -113,7 +117,7 @@ y un test de Python falla si se desincroniza del backend.
 - **Texto nuevo:** añadir la clave en `messages.es.ts` y en `messages.en.ts`.
 - **Componente nuevo del catálogo:** añadir `component.<id>` en ambos catálogos; si falta, la
   interfaz muestra la descripción del backend.
-- **Llamada nueva al backend:** puerto en `ports/`, esquema y traducción en `adapters/wire.ts`,
+- **Llamada nueva al backend:** puerto en `ports/`, esquema y traducción en el módulo de `adapters/wire/` de su recurso,
   implementación HTTP y en memoria, y prueba de contrato.
 - **Colores:** solo en `styles/tokens.css`; el test de contraste los valida.
 
