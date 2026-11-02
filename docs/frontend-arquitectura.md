@@ -18,8 +18,9 @@ frontend/src/
 ├── ports/         Interfaces de salida: Catalog, Architecture, System, Validation,
 │                  Layout y Draft.
 ├── adapters/
-│   ├── wire.ts    Contrato JSON del backend (zod) y traducción al dominio. Único sitio que
-│   │              conoce el snake_case del backend.
+│   ├── wire/      Contrato JSON del backend (zod) y traducción al dominio, un módulo por
+│   │              recurso (architectures, runs, experiments, batteries, system). Único sitio
+│   │              que conoce el snake_case del backend.
 │   ├── http/      Adaptador contra el backend Python.
 │   ├── drafts/    Borradores en localStorage (validados al leer; lo corrupto se descarta).
 │   └── memory/    Adaptador con datos de ejemplo (demo y tests). demo-data.json se genera.
@@ -113,7 +114,7 @@ y un test de Python falla si se desincroniza del backend.
 - **Texto nuevo:** añadir la clave en `messages.es.ts` y en `messages.en.ts`.
 - **Componente nuevo del catálogo:** añadir `component.<id>` en ambos catálogos; si falta, la
   interfaz muestra la descripción del backend.
-- **Llamada nueva al backend:** puerto en `ports/`, esquema y traducción en `adapters/wire.ts`,
+- **Llamada nueva al backend:** puerto en `ports/`, esquema y traducción en el módulo de `adapters/wire/` de su recurso,
   implementación HTTP y en memoria, y prueba de contrato.
 - **Colores:** solo en `styles/tokens.css`; el test de contraste los valida.
 

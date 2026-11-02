@@ -14,7 +14,7 @@ import {
   toSummary,
   toValidation,
   validationSchema,
-} from '../wire';
+} from '../wire/architectures';
 import rawDemoData from './demo-data.json';
 
 const demoSchema = z.object({

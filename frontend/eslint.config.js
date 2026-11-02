@@ -57,7 +57,7 @@ export default tseslint.config(
     rules: { 'max-lines': 'off' },
   },
   {
-    files: ['src/adapters/wire.ts', 'src/ui/editor/EditorWorkspace.tsx'],
+    files: ['src/ui/editor/EditorWorkspace.tsx'],
     rules: { 'max-lines': 'off' },
   },
   {

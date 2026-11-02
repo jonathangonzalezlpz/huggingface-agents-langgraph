@@ -7,7 +7,7 @@ import { createLocalStorageDrafts } from './drafts/localStorageDrafts';
 import { createHttpServices, type FetchLike } from './http/httpServices';
 import demo from './memory/demo-data.json';
 import { createMemoryServices } from './memory/memoryServices';
-import { definitionToWire } from './wire';
+import { definitionToWire } from './wire/architectures';
 
 const memory = createMemoryServices();
 const catalog = await memory.catalog.getCatalog();
