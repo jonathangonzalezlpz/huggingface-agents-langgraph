@@ -70,8 +70,6 @@ select = ["E", "F", "I", "UP", "B", "C901", "PLR0912", "PLR0913", "PLR0915"]
 "src/huggingface_agents_langgraph/domain/experiments.py" = ["C901", "PLR0912", "PLR0915"]
 "src/huggingface_agents_langgraph/adapters/llm.py" = ["C901", "PLR0912", "PLR0913", "PLR0915"]
 "src/huggingface_agents_langgraph/pipeline/multimedia_processing.py" = ["C901"]
-"src/huggingface_agents_langgraph/pipeline/spreadsheet_processing.py" = ["C901", "PLR0912"]
-"src/huggingface_agents_langgraph/pipeline/spreadsheet_tools.py" = ["C901", "PLR0912"]
 "src/huggingface_agents_langgraph/graph_definition/registry.py" = ["PLR0913"]
 
 [tool.pytest.ini_options]
