@@ -112,26 +112,35 @@ def validate_expression(expression: str, *, enhanced: bool = False) -> None:
         if not isinstance(node, ALLOWED_NODES + ((ast.Attribute,) if enhanced else ())):
             raise ValueError(f"Unsupported calculation syntax: {type(node).__name__}")
         if isinstance(node, ast.Attribute):
-            if node.attr not in STRING_METHODS or not any(
-                isinstance(parent, ast.Call) and parent.func is node for parent in nodes
-            ):
-                raise ValueError("Only whitelisted string method calls are allowed")
+            _check_method_attribute(node, nodes)
         if isinstance(node, ast.Name) and node.id.startswith("_"):
             raise ValueError("Private names are not allowed in calculations")
         if isinstance(node, ast.Call):
-            named = isinstance(node.func, ast.Name) and node.func.id in (
-                ALLOWED_FUNCTIONS
-                | ({"reversed", "bool", "dict"} if enhanced else set())
-            )
-            method = (
-                enhanced
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr in STRING_METHODS
-            )
-            if not (named or method) or node.keywords:
-                raise ValueError("Calculation calls must use an allowed pure function")
+            _check_call(node, enhanced)
         if isinstance(node, ast.comprehension) and node.is_async:
             raise ValueError("Async expressions are not allowed")
+
+
+def _check_method_attribute(node: ast.Attribute, nodes: list[ast.AST]) -> None:
+    """Attributes are only whitelisted string methods that are being called."""
+    if node.attr not in STRING_METHODS or not any(
+        isinstance(parent, ast.Call) and parent.func is node for parent in nodes
+    ):
+        raise ValueError("Only whitelisted string method calls are allowed")
+
+
+def _check_call(node: ast.Call, enhanced: bool) -> None:
+    """Calls must target an allowed pure function or string method, no keywords."""
+    named = isinstance(node.func, ast.Name) and node.func.id in (
+        ALLOWED_FUNCTIONS | ({"reversed", "bool", "dict"} if enhanced else set())
+    )
+    method = (
+        enhanced
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr in STRING_METHODS
+    )
+    if not (named or method) or node.keywords:
+        raise ValueError("Calculation calls must use an allowed pure function")
 
 
 def calculate(expression: str) -> str:

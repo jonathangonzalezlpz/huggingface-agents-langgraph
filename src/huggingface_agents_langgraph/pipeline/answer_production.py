@@ -31,19 +31,26 @@ def validate_answer(question: str, answer: str) -> list[str]:
         if not SAN_PATTERN.fullmatch(answer):
             issues.append("Return a single move in standard algebraic notation.")
     if LIST_PATTERN.search(question):
-        items = [item.strip() for item in answer.split(",")]
-        if any(not item for item in items) or "\n" in answer:
-            issues.append("Return a single comma-delimited list without prose.")
-        if re.search(r"alphabeti", question, re.IGNORECASE):
-            if items != sorted(items, key=str.casefold):
-                issues.append("Sort the list alphabetically by its returned items.")
-        if re.search(r"ascending order", question, re.IGNORECASE):
-            try:
-                numbers = [float(item) for item in items]
-                if numbers != sorted(numbers):
-                    issues.append("Sort the numbers in ascending order.")
-            except ValueError:
-                issues.append("Return numeric items in ascending order.")
+        issues.extend(_list_issues(question, answer))
+    return issues
+
+
+def _list_issues(question: str, answer: str) -> list[str]:
+    """Shape problems of an answer to a question that asks for a list."""
+    issues = []
+    items = [item.strip() for item in answer.split(",")]
+    if any(not item for item in items) or "\n" in answer:
+        issues.append("Return a single comma-delimited list without prose.")
+    if re.search(r"alphabeti", question, re.IGNORECASE):
+        if items != sorted(items, key=str.casefold):
+            issues.append("Sort the list alphabetically by its returned items.")
+    if re.search(r"ascending order", question, re.IGNORECASE):
+        try:
+            numbers = [float(item) for item in items]
+            if numbers != sorted(numbers):
+                issues.append("Sort the numbers in ascending order.")
+        except ValueError:
+            issues.append("Return numeric items in ascending order.")
     return issues
 
 

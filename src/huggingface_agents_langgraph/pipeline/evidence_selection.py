@@ -96,26 +96,15 @@ def select_relevant_evidence(
     document_frequency = {
         term: sum(term in counts for counts in chunk_terms) for term in question_terms
     }
-    scores: list[tuple[float, int]] = []
-    for index, counts in enumerate(chunk_terms):
-        length = sum(counts.values())
-        score = 0.0
-        for term in question_terms:
-            frequency = counts[term]
-            if frequency:
-                inverse_frequency = math.log(
-                    1
-                    + (len(chunks) - document_frequency[term] + 0.5)
-                    / (document_frequency[term] + 0.5)
-                )
-                length_factor = 0.25 + 0.75 * length / average_length
-                score += (
-                    inverse_frequency
-                    * frequency
-                    * 2.2
-                    / (frequency + 1.2 * length_factor)
-                )
-        scores.append((score, index))
+    scores = [
+        (
+            _chunk_score(
+                counts, question_terms, document_frequency, len(chunks), average_length
+            ),
+            index,
+        )
+        for index, counts in enumerate(chunk_terms)
+    ]
 
     if not any(score for score, _ in scores):
         return _sample_chunks(chunks)
@@ -129,6 +118,31 @@ def select_relevant_evidence(
         selected_indexes.append(index)
         selected_size += chunk_size
     return [chunks[index] for index in sorted(selected_indexes)]
+
+
+def _chunk_score(
+    counts: Counter,
+    question_terms: set[str],
+    document_frequency: dict[str, int],
+    chunk_count: int,
+    average_length: float,
+) -> float:
+    """BM25-style relevance of one chunk to the question terms."""
+    length = sum(counts.values())
+    score = 0.0
+    for term in question_terms:
+        frequency = counts[term]
+        if frequency:
+            inverse_frequency = math.log(
+                1
+                + (chunk_count - document_frequency[term] + 0.5)
+                / (document_frequency[term] + 0.5)
+            )
+            length_factor = 0.25 + 0.75 * length / average_length
+            score += (
+                inverse_frequency * frequency * 2.2 / (frequency + 1.2 * length_factor)
+            )
+    return score
 
 
 def _split_text(text: str) -> list[str]:

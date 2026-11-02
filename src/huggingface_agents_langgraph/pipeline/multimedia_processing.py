@@ -59,46 +59,59 @@ class MultimediaProcessingUpdate(TypedDict):
     video_path: NotRequired[Path]
 
 
+def _video_route(state: AgentState, file_path) -> tuple[bool, str | None]:
+    """Whether the improved video path applies, and the video URL if any."""
+    if not improvement_enabled(state.get("experiment", {}), "multimedia_tools"):
+        return False, None
+    match = VIDEO_URL_PATTERN.search(state["question"])
+    extension = Path(file_path).suffix.lower() if file_path else ""
+    applies = (file_path is None and match) or extension in VIDEO_EXTENSIONS
+    return bool(applies), match.group() if match else None
+
+
+def _inspect_by_extension(path: Path, question: str) -> list[Evidence]:
+    extension = path.suffix.lower()
+    source = str(path)
+    if extension in IMAGE_EXTENSIONS:
+        return [_inspect_image(path, question, source)]
+    if extension in AUDIO_EXTENSIONS:
+        return _inspect_audio(path, question, source)
+    if extension in VIDEO_EXTENSIONS:
+        return _inspect_video(path, question, source)
+    raise ValueError(f"Unsupported multimedia attachment: {extension}")
+
+
+def _process_video_url(question: str) -> MultimediaProcessingUpdate:
+    """Download the video named in the question and describe it."""
+    match = VIDEO_URL_PATTERN.search(question)
+    if match is None:
+        raise ValueError(
+            "file_path is required unless the question contains a YouTube URL"
+        )
+    directory = Path(RUNTIME_DIRECTORY) / "media" / str(uuid4())
+    directory.mkdir(parents=True, exist_ok=True)
+    path = download_video(match.group(), directory)
+    evidence = _inspect_video(path, question, match.group())
+    return {"evidence": evidence, "video_path": path}
+
+
 def multimedia_processing(state: AgentState) -> MultimediaProcessingUpdate:
     """Transcribe or inspect the attachment, then return concise evidence."""
     file_path = state.get("file_path")
-    if improvement_enabled(state.get("experiment", {}), "multimedia_tools"):
-        match = VIDEO_URL_PATTERN.search(state["question"])
-        extension = Path(file_path).suffix.lower() if file_path else ""
-        if (file_path is None and match) or extension in VIDEO_EXTENSIONS:
-            return _process_video_modalities(
-                state, file_path, match.group() if match else None
-            )
+    improved_video, url = _video_route(state, file_path)
+    if improved_video:
+        return _process_video_modalities(state, file_path, url)
     if file_path is None:
-        match = VIDEO_URL_PATTERN.search(state["question"])
-        if match is None:
-            raise ValueError(
-                "file_path is required unless the question contains a YouTube URL"
-            )
-        directory = Path(RUNTIME_DIRECTORY) / "media" / str(uuid4())
-        directory.mkdir(parents=True, exist_ok=True)
-        path = download_video(match.group(), directory)
-        evidence = _inspect_video(path, state["question"], match.group())
-        return {"evidence": evidence, "video_path": path}
+        return _process_video_url(state["question"])
 
     path = Path(file_path)
     if not path.is_file():
         raise FileNotFoundError(f"Multimedia attachment does not exist: {path}")
 
-    extension = path.suffix.lower()
-    source = str(path)
-    if extension in IMAGE_EXTENSIONS:
-        evidence = [_inspect_image(path, state["question"], source)]
-    elif extension in AUDIO_EXTENSIONS:
-        evidence = _inspect_audio(path, state["question"], source)
-    elif extension in VIDEO_EXTENSIONS:
-        evidence = _inspect_video(path, state["question"], source)
-    else:
-        raise ValueError(f"Unsupported multimedia attachment: {extension}")
-
+    evidence = _inspect_by_extension(path, state["question"])
     if not any(item["content"].strip() for item in evidence):
         raise ValueError("Multimedia processing produced no usable evidence")
-    if extension in VIDEO_EXTENSIONS:
+    if path.suffix.lower() in VIDEO_EXTENSIONS:
         return {"evidence": evidence, "video_path": path}
     return {"evidence": evidence}
 
@@ -515,7 +528,6 @@ def _sample_video_frames(path: Path) -> list[tuple[float, object]]:
             "Video frame extraction requires the optional 'multimedia' dependencies"
         ) from error
 
-    frames: list[tuple[float, object]] = []
     with av.open(str(path)) as container:
         video_stream = next(
             (stream for stream in container.streams if stream.type == "video"), None
@@ -528,40 +540,54 @@ def _sample_video_frames(path: Path) -> list[tuple[float, object]]:
             else 0.0
         )
         if duration > 0 and video_stream.time_base is not None:
-            interval = max(
-                MEDIA_VIDEO_FRAME_INTERVAL_SECONDS,
-                duration / max(MEDIA_MAX_VIDEO_FRAMES - 1, 1),
-            )
-            sample_count = min(
-                MEDIA_MAX_VIDEO_FRAMES,
-                math.floor(duration / interval) + 1,
-            )
-            start_ticks = video_stream.start_time or 0
-            start_seconds = float(start_ticks * video_stream.time_base)
-            for index in range(sample_count):
-                offset = min(index * interval, duration)
-                target_seconds = start_seconds + offset
-                target_ticks = start_ticks + round(offset / video_stream.time_base)
-                container.seek(target_ticks, stream=video_stream)
-                for frame in container.decode(video_stream):
-                    timestamp = frame.time
-                    if timestamp is None and frame.pts is not None:
-                        frame_time_base = frame.time_base or video_stream.time_base
-                        timestamp = float(frame.pts * frame_time_base)
-                    if timestamp is None or timestamp < target_seconds:
-                        continue
-                    frames.append((float(timestamp), frame.to_image()))
-                    break
-        else:
-            next_timestamp = 0.0
-            for frame in container.decode(video_stream):
-                timestamp = float(frame.time or 0.0)
-                if timestamp < next_timestamp:
-                    continue
-                frames.append((timestamp, frame.to_image()))
-                next_timestamp = timestamp + MEDIA_VIDEO_FRAME_INTERVAL_SECONDS
-                if len(frames) >= MEDIA_MAX_VIDEO_FRAMES:
-                    break
+            return _frames_at_intervals(container, video_stream, duration)
+        return _frames_in_sequence(container, video_stream)
+
+
+def _frames_at_intervals(container, video_stream, duration: float) -> list:
+    """Seek to evenly spaced timestamps and keep the first frame at or after each."""
+    frames: list[tuple[float, object]] = []
+    interval = max(
+        MEDIA_VIDEO_FRAME_INTERVAL_SECONDS,
+        duration / max(MEDIA_MAX_VIDEO_FRAMES - 1, 1),
+    )
+    sample_count = min(MEDIA_MAX_VIDEO_FRAMES, math.floor(duration / interval) + 1)
+    start_ticks = video_stream.start_time or 0
+    start_seconds = float(start_ticks * video_stream.time_base)
+    for index in range(sample_count):
+        offset = min(index * interval, duration)
+        target_seconds = start_seconds + offset
+        target_ticks = start_ticks + round(offset / video_stream.time_base)
+        container.seek(target_ticks, stream=video_stream)
+        for frame in container.decode(video_stream):
+            timestamp = _frame_seconds(frame, video_stream)
+            if timestamp is None or timestamp < target_seconds:
+                continue
+            frames.append((float(timestamp), frame.to_image()))
+            break
+    return frames
+
+
+def _frame_seconds(frame, video_stream) -> float | None:
+    timestamp = frame.time
+    if timestamp is None and frame.pts is not None:
+        frame_time_base = frame.time_base or video_stream.time_base
+        timestamp = float(frame.pts * frame_time_base)
+    return timestamp
+
+
+def _frames_in_sequence(container, video_stream) -> list:
+    """Decode a stream of unknown duration, keeping one frame per interval."""
+    frames: list[tuple[float, object]] = []
+    next_timestamp = 0.0
+    for frame in container.decode(video_stream):
+        timestamp = float(frame.time or 0.0)
+        if timestamp < next_timestamp:
+            continue
+        frames.append((timestamp, frame.to_image()))
+        next_timestamp = timestamp + MEDIA_VIDEO_FRAME_INTERVAL_SECONDS
+        if len(frames) >= MEDIA_MAX_VIDEO_FRAMES:
+            break
     return frames
 
 
@@ -601,8 +627,8 @@ def download_video(url: str, directory: Path, *, audio_only: bool = False) -> Pa
     return downloaded_path
 
 
-def _process_video_modalities(state: AgentState, file_path, url: str | None) -> dict:
-    """Acquire and verify the modalities selected from the question's intent."""
+def _choose_modalities(question: str, model) -> dict:
+    """Ask which modalities the question needs; both when the reply is unusable."""
     from huggingface_agents_langgraph.adapters.llm import chat_completion
 
     reply = chat_completion(
@@ -615,10 +641,10 @@ def _process_video_modalities(state: AgentState, file_path, url: str | None) -> 
                 "Visible entities, actions and counts require vision. Choose both when "
                 "both are relevant or uncertain. Do not answer the question. /no_think",
             },
-            {"role": "user", "content": state["question"]},
+            {"role": "user", "content": question},
         ],
         max_tokens=128,
-        model=state.get("experiment", {}).get("model"),
+        model=model,
     )
     try:
         modalities = json.loads(reply)
@@ -629,7 +655,52 @@ def _process_video_modalities(state: AgentState, file_path, url: str | None) -> 
         ):
             raise ValueError("Invalid modality selection")
     except (ValueError, TypeError):
-        modalities = {"audio": True, "vision": True}
+        return {"audio": True, "vision": True}
+    return modalities
+
+
+def _audio_evidence(
+    video_path: Path | None, url: str | None, question: str, directory: Path
+) -> list[Evidence]:
+    """Transcribe the audio of the local video, or of the downloaded audio track."""
+    audio_path = video_path
+    if audio_path is None or not _has_audio_stream(audio_path):
+        if not url:
+            raise ValueError(
+                "The question requires audio but the local file has no audio stream"
+            )
+        audio_path = download_video(url, directory, audio_only=True)
+    if not _has_audio_stream(audio_path):
+        raise ValueError("The downloaded media has no required audio stream")
+    return _inspect_audio(audio_path, question, url or str(audio_path))
+
+
+def _vision_evidence(
+    video_path: Path, url: str | None, question: str
+) -> list[Evidence]:
+    """One visual observation per sampled frame."""
+    evidence: list[Evidence] = []
+    for timestamp, image in _sample_video_frames(video_path):
+        observation = _run_vision_model(
+            image,
+            question
+            + " Describe only visible evidence, distinguishing observed entities "
+            "from guesses. Do not infer dialogue from a still image.",
+        )
+        evidence.append(
+            {
+                "content": f"Partial visual sample at {timestamp:.1f}s: {observation}",
+                "source": f"{url or video_path}#t={timestamp:.1f}s",
+                "source_type": "video_frame_vlm",
+            }
+        )
+    return evidence
+
+
+def _process_video_modalities(state: AgentState, file_path, url: str | None) -> dict:
+    """Acquire and verify the modalities selected from the question's intent."""
+    question = state["question"]
+    modalities = _choose_modalities(question, state.get("experiment", {}).get("model"))
     directory = Path(RUNTIME_DIRECTORY) / "media" / str(uuid4())
     directory.mkdir(parents=True, exist_ok=True)
     video_path = Path(file_path) if file_path else None
@@ -637,34 +708,9 @@ def _process_video_modalities(state: AgentState, file_path, url: str | None) -> 
         video_path = download_video(url, directory)
     evidence = []
     if modalities["audio"]:
-        audio_path = video_path
-        if audio_path is None or not _has_audio_stream(audio_path):
-            if not url:
-                raise ValueError(
-                    "The question requires audio but the local file has no audio stream"
-                )
-            audio_path = download_video(url, directory, audio_only=True)
-        if not _has_audio_stream(audio_path):
-            raise ValueError("The downloaded media has no required audio stream")
-        evidence.extend(
-            _inspect_audio(audio_path, state["question"], url or str(audio_path))
-        )
+        evidence.extend(_audio_evidence(video_path, url, question, directory))
     if modalities["vision"]:
-        for timestamp, image in _sample_video_frames(video_path):
-            observation = _run_vision_model(
-                image,
-                state["question"]
-                + " Describe only visible evidence, distinguishing observed entities "
-                "from guesses. Do not infer dialogue from a still image.",
-            )
-            evidence.append(
-                {
-                    "content": f"Partial visual sample at {timestamp:.1f}s: "
-                    f"{observation}",
-                    "source": f"{url or video_path}#t={timestamp:.1f}s",
-                    "source_type": "video_frame_vlm",
-                }
-            )
+        evidence.extend(_vision_evidence(video_path, url, question))
     if not evidence:
         raise ValueError("The required modalities produced no usable evidence")
     update = {"evidence": evidence}
