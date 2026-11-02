@@ -1,11 +1,11 @@
 """The declarative V3.1 definition must mirror the runtime graph topology."""
 
 from huggingface_agents_langgraph.graph import build_state_graph
+from huggingface_agents_langgraph.graph_definition.components import (
+    create_gaia_v3_registry,
+)
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
-)
-from huggingface_agents_langgraph.graph_definition.registry import (
-    create_gaia_v3_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_gaia_v31_routing_registry,

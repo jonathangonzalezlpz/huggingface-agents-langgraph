@@ -16,7 +16,7 @@ from huggingface_agents_langgraph.graph_definition import (
     AgentDefinition,
     GraphCompiler,
 )
-from huggingface_agents_langgraph.graph_definition.registry import (
+from huggingface_agents_langgraph.graph_definition.components import (
     create_studio_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (

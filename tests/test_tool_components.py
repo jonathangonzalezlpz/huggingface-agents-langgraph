@@ -12,7 +12,7 @@ from huggingface_agents_langgraph.graph_definition import (
     GraphCompiler,
     NodeDefinition,
 )
-from huggingface_agents_langgraph.graph_definition.registry import (
+from huggingface_agents_langgraph.graph_definition.components import (
     create_studio_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
@@ -342,7 +342,7 @@ class TestCatalogAndGraphs:
         assert result["draft_answer"] == "unknown"
 
     def test_the_v31_registry_is_untouched(self):
-        from huggingface_agents_langgraph.graph_definition.registry import (
+        from huggingface_agents_langgraph.graph_definition.components import (
             create_gaia_v3_registry,
         )
 

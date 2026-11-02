@@ -165,6 +165,18 @@ def test_components_do_not_import_the_declarative_layer():
     assert offenders == []
 
 
+def test_the_registry_mechanism_does_not_know_the_components():
+    """The registry holds registrations; the components catalogues depend on it."""
+    mechanism = {"graph_definition.registry", "graph_definition.authorization"}
+    offenders = [
+        f"{source} -> {target}"
+        for source in mechanism
+        for target in GRAPH.get(source, set())
+        if target.startswith("graph_definition.components")
+    ]
+    assert offenders == []
+
+
 def _cycles() -> set[frozenset[str]]:
     found: set[frozenset[str]] = set()
     for source, targets in GRAPH.items():

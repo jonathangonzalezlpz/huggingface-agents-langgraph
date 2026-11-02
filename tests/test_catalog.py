@@ -13,7 +13,7 @@ from huggingface_agents_langgraph.graph_definition.catalog import (
     CATEGORIES,
     build_catalog,
 )
-from huggingface_agents_langgraph.graph_definition.registry import (
+from huggingface_agents_langgraph.graph_definition.components import (
     create_gaia_v3_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (

@@ -20,11 +20,11 @@ from huggingface_agents_langgraph.graph_definition import (
     ValidationReport,
 )
 from huggingface_agents_langgraph.graph_definition.catalog import build_catalog
+from huggingface_agents_langgraph.graph_definition.components import (
+    create_studio_registry,
+)
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
-)
-from huggingface_agents_langgraph.graph_definition.registry import (
-    create_studio_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_studio_routing_registry,

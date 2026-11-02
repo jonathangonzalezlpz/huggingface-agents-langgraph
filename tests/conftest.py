@@ -5,7 +5,7 @@ import pytest
 
 from huggingface_agents_langgraph import graph as runtime_graph
 from huggingface_agents_langgraph import llm
-from huggingface_agents_langgraph.graph_definition.registry import (
+from huggingface_agents_langgraph.graph_definition.authorization import (
     AUTHORIZED_CALLABLES,
 )
 

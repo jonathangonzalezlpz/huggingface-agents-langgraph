@@ -9,11 +9,11 @@ import pytest
 from huggingface_agents_langgraph import graph as runtime_graph
 from huggingface_agents_langgraph.experiments import normalize_experiment
 from huggingface_agents_langgraph.graph_definition import GraphCompiler
+from huggingface_agents_langgraph.graph_definition.components import (
+    create_gaia_v3_registry,
+)
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
-)
-from huggingface_agents_langgraph.graph_definition.registry import (
-    create_gaia_v3_registry,
 )
 from huggingface_agents_langgraph.graph_definition.routing_registry import (
     create_gaia_v31_routing_registry,
