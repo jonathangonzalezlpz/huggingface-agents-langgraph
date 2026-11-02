@@ -122,7 +122,7 @@ def test_invalid_architecture_reference_is_rejected(value) -> None:
 
 
 def test_variant_config_can_carry_an_architecture_reference() -> None:
-    from huggingface_agents_langgraph.experiment_runner import variant_config
+    from huggingface_agents_langgraph.application.experiment_run import variant_config
 
     reference = normalize_experiment(None)
     assert "architecture" not in variant_config(reference, "combined")

@@ -1,6 +1,6 @@
 """Run a question battery in the background so it outlives the browser tab.
 
-One battery runs at a time. It reuses ``experiment_runner.run_experiment``, so its
+One battery runs at a time. It reuses ``experiment_run.run_experiment``, so its
 records are the same ones the command line produces (source identity, task-set hash,
 timings) and can be compared and resumed in the same way.
 """
@@ -12,9 +12,9 @@ from typing import Any
 from uuid import uuid4
 
 from huggingface_agents_langgraph.adapters.records import read_record
+from huggingface_agents_langgraph.application.experiment_run import run_experiment
 from huggingface_agents_langgraph.domain.experiments import normalize_experiment
 from huggingface_agents_langgraph.domain.pipeline_versions import V2_REFERENCE_ID
-from huggingface_agents_langgraph.experiment_runner import run_experiment
 
 MAX_QUESTIONS = 20
 _FINISHED = {"completed", "cancelled", "failed"}

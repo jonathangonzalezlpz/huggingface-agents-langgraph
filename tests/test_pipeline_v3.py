@@ -5,13 +5,13 @@ from io import BytesIO
 import pytest
 
 from huggingface_agents_langgraph.adapters import llm
+from huggingface_agents_langgraph.application.experiment_run import variant_config
 from huggingface_agents_langgraph.domain.answer_contract import AnswerContract
 from huggingface_agents_langgraph.domain.experiment_metrics import timing_summary
 from huggingface_agents_langgraph.domain.experiments import (
     IMPROVEMENTS,
     normalize_experiment,
 )
-from huggingface_agents_langgraph.experiment_runner import variant_config
 from huggingface_agents_langgraph.pipeline import (
     multimedia_processing,
     reasoning,
@@ -259,12 +259,12 @@ def test_experiment_resume_keeps_completed_tasks_and_excludes_reference_answers(
     monkeypatch,
     tmp_path,
 ):
-    from huggingface_agents_langgraph import experiment_runner
     from huggingface_agents_langgraph.adapters import records
+    from huggingface_agents_langgraph.application import experiment_run
 
     monkeypatch.setattr(records, "RUNTIME_DIRECTORY", str(tmp_path))
     monkeypatch.setattr(
-        experiment_runner, "source_identity", lambda: {"source_sha256": "fixed"}
+        experiment_run, "source_identity", lambda: {"source_sha256": "fixed"}
     )
     calls = []
 
@@ -275,7 +275,7 @@ def test_experiment_resume_keeps_completed_tasks_and_excludes_reference_answers(
             raise KeyboardInterrupt
         return {"submitted_answer": "candidate", "route": "direct"}
 
-    monkeypatch.setattr(experiment_runner, "run_pipeline", interrupted)
+    monkeypatch.setattr(experiment_run, "run_pipeline", interrupted)
     tasks = [
         {
             "task_id": str(index),
@@ -288,18 +288,18 @@ def test_experiment_resume_keeps_completed_tasks_and_excludes_reference_answers(
     ]
     config = normalize_experiment(None)
     with pytest.raises(KeyboardInterrupt):
-        experiment_runner.run_experiment(tasks, config, group_id="group", score=False)
+        experiment_run.run_experiment(tasks, config, group_id="group", score=False)
     record = records.list_records("experiments")[0]
     assert len(record["answers"]) == 1
     monkeypatch.setattr(
-        experiment_runner,
+        experiment_run,
         "run_pipeline",
         lambda task: {
             "submitted_answer": "second",
             "route": "direct",
         },
     )
-    resumed = experiment_runner.run_experiment(
+    resumed = experiment_run.run_experiment(
         tasks,
         config,
         group_id="group",

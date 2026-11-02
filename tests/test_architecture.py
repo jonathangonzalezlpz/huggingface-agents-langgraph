@@ -22,10 +22,7 @@ ENTRY_POINTS = {"web_app", "cli", "__main__"}
 KNOWN_CYCLES: set[frozenset[str]] = set()
 
 # Edges that break a rule today. Fix one and remove it here: the list only ever shrinks.
-KNOWN_VIOLATIONS: set[tuple[str, str]] = {
-    # F3 moves the experiment use case out of the entry module.
-    ("application.batteries", "experiment_runner"),
-}
+KNOWN_VIOLATIONS: set[tuple[str, str]] = {}
 
 # Shared by every layer: settings and per-run tracing.
 KERNEL = {"config", "tracing"}
