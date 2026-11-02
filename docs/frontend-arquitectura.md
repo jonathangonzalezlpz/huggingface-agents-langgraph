@@ -1,0 +1,126 @@
+# Arquitectura del frontend (GAIA Agent Studio)
+
+Aplicación en `frontend/` (React, TypeScript estricto, Vite), servida en `/app` (`/` redirige
+a ella). Sustituyó a la interfaz anterior (`src/huggingface_agents_langgraph/frontend/`, ya
+retirada; sigue en el historial de Git y en la etiqueta `pipeline-v3.1.0`).
+
+El diseño de experiencia está en [DISENO_UX_V4.md](DISENO_UX_V4.md) y las fases en
+[ROADMAP_V4.md](ROADMAP_V4.md). La seguridad de las dependencias, en
+[frontend-seguridad.md](frontend-seguridad.md).
+
+## Arquitectura hexagonal pragmática
+
+```
+frontend/src/
+├── domain/        Modelo (Architecture, Catalog, Diagnostic…) y reglas puras. Sin React ni red.
+│   └── editor/    Grafo editable, comandos, historial, conversión y plantillas.
+├── application/   Casos de uso que reciben puertos (hoy: loadLibrary).
+├── ports/         Interfaces de salida: Catalog, Architecture, System, Validation,
+│                  Layout y Draft.
+├── adapters/
+│   ├── wire.ts    Contrato JSON del backend (zod) y traducción al dominio. Único sitio que
+│   │              conoce el snake_case del backend.
+│   ├── http/      Adaptador contra el backend Python.
+│   ├── drafts/    Borradores en localStorage (validados al leer; lo corrupto se descarta).
+│   └── memory/    Adaptador con datos de ejemplo (demo y tests). demo-data.json se genera.
+├── ui/            Componentes React: shell, páginas y piezas reutilizables.
+│   └── editor/    Lienzo (React Flow), paleta, inspector, diálogos y espacio de trabajo.
+├── app/           Raíz de composición: elige adaptadores y monta rutas y proveedores.
+├── i18n/          Catálogos es/en tipados y proveedor de idioma.
+├── theme/         Proveedor de tema (sistema, claro, oscuro).
+└── styles/        Tokens de diseño (tokens.css) y Tailwind.
+```
+
+Regla de dependencias: `ui → application → domain`; los `adapters` implementan `ports`; solo
+`app` conoce los adaptadores concretos. Los puertos existen donde hay dos implementaciones
+reales (HTTP y memoria), que es lo que permite probar sin backend y publicar una demo en el
+Space. La capa `application` crece con cada caso de uso (edición del grafo en M3.1) en lugar
+de definirse por adelantado.
+
+## El editor
+
+El estado del grafo en edición es **código de dominio puro**, no estado de React Flow. La
+biblioteca solo dibuja una proyección (`ui/editor/projection.ts`) y emite eventos que se
+traducen en comandos; así las reglas de prevención de errores se prueban sin navegador.
+
+- **Modelo.** Cada nodo tiene una `salida`: ninguna, directa o una decisión (estrategia y una
+  rama por etiqueta, conectada o pendiente). Las reglas del backend que no se pueden
+  representar quedan fuera por construcción.
+- **Comandos.** Funciones `(documento, ...) → aceptado | rechazado con motivo`. Un comando que
+  no cambia nada devuelve el mismo documento y el historial no registra nada.
+- **Historial.** Pila de estados inmutables; arrastrar varios nodos es un único paso.
+- **Disposición.** Las posiciones viajan aparte de la estructura (`EditorDocument.layout`) y no
+  alteran la identidad de la versión. En versiones guardadas solo se persiste la disposición.
+- **Conversión.** `fromDefinition`/`toDefinition`; lo que el editor no puede representar se
+  informa, nunca se oculta. Las ramas sin conectar no se exportan, de modo que el validador
+  las señala.
+- **Borradores.** Locales al navegador (`DraftPort`), con un marcador de qué versión se guardó
+  para saber si hay cambios sin guardar. Guardar una versión (`ArchitecturePort.save`) crea la
+  siguiente de esa arquitectura; el nombre decide a qué historial pertenece.
+- **Validación.** En vivo con retardo; una respuesta solo cuenta si ninguna petición posterior
+  empezó después. El informe incluye la disponibilidad de campos por nodo.
+- **Versiones.** `domain/versions.ts` agrupa y `domain/diff.ts` resume los cambios entre dos
+  definiciones; ambos son funciones puras.
+- **Carga bajo demanda.** El editor está en un fragmento aparte para no penalizar el resto.
+
+
+```powershell
+cd frontend
+npm ci              # instalación reproducible desde package-lock.json
+npm run dev         # servidor de desarrollo en 127.0.0.1:5173 (proxy de /api al backend :7860)
+npm run check       # tipos estrictos, ESLint (incluye accesibilidad), Prettier y Vitest
+npm run build       # compila a src/huggingface_agents_langgraph/static/app (ignorado por Git)
+```
+
+Equivalente con script: `.\scripts\build_frontend.ps1`. Después, `uv run python -m
+huggingface_agents_langgraph.web_app` y `http://127.0.0.1:7860/app/`.
+
+Sin el paquete compilado, `/app` explica cómo construirlo y `/` sigue mostrando la interfaz
+anterior. Previsto para macOS y Linux (Node y Vite son multiplataforma), sin verificar: el
+proyecto solo se ha probado en Windows.
+
+## Pruebas
+
+- **Adaptadores:** contrato con el backend, errores de red, HTTP y de forma de los datos.
+- **Aplicación completa** (Testing Library con el adaptador en memoria): navegación,
+  idioma, tema, estados de carga y error, y accesibilidad con axe en ambos idiomas.
+- **Editor:** comandos, historial, conversión y una prueba aleatoria de invariantes en el
+  dominio; proyección, autodisposición y búsqueda; y el espacio de trabajo completo con React
+  Flow en jsdom (`src/test/reactFlow.ts` simula `ResizeObserver` y la geometría). jsdom no
+  puede probar el arrastre ni el aspecto: eso se comprobó en un Edge real.
+- **Ejecuciones:** dominio del recorrido (`runPath`), superposición sobre la proyección del
+  grafo (`ui/run/overlay.ts`), página con puertos simulados (bloqueo de versiones inválidas,
+  ejecución, fallo en el nodo, dejar de esperar, preguntas de GAIA, demostración) y el botón
+  del editor. El camino de éxito con un modelo real no se ha comprobado.
+- **Experimentos:** dominio de ajustes y baterías, adaptadores (`/api/batteries`, lista de
+  experimentos), la página con un servidor simulado y con estado (progreso, detener, 409,
+  reanudar) y el panel de ajustes. El progreso es por sondeo; el servidor ejecuta la batería.
+- **Historial y puntuación:** dominio de lista, orden y filtro, adaptadores (lista con respuestas,
+  borrar, puntuar, envío oficial, comparar), historial, comparación, detalle y el diálogo de envío
+  oficial con puertos simulados (el envío real nunca se ejercita en las pruebas).
+- **i18n:** mismas claves y marcadores en ambos idiomas, plurales y detección.
+- **Tokens:** todos los pares de color cumplen WCAG (4,5:1 texto, 3:1 componentes) en ambos
+  temas. Se comprueba contra `tokens.css`, que es la única fuente de los colores.
+- jsdom no calcula diseño, así que el contraste se verifica en los tokens y no en axe.
+
+`demo-data.json` se regenera con `uv run python -m huggingface_agents_langgraph.demo_data`
+y un test de Python falla si se desincroniza del backend.
+
+## Cómo extender
+
+- **Idioma nuevo:** añadir `messages.xx.ts` con `Record<MessageKey, string>` (el compilador
+  exige todas las claves) y registrarlo en `i18n/index.ts`.
+- **Texto nuevo:** añadir la clave en `messages.es.ts` y en `messages.en.ts`.
+- **Componente nuevo del catálogo:** añadir `component.<id>` en ambos catálogos; si falta, la
+  interfaz muestra la descripción del backend.
+- **Llamada nueva al backend:** puerto en `ports/`, esquema y traducción en `adapters/wire.ts`,
+  implementación HTTP y en memoria, y prueba de contrato.
+- **Colores:** solo en `styles/tokens.css`; el test de contraste los valida.
+
+## Modo demostración
+
+`?demo=1` o `VITE_STUDIO_MODE=demo` usan el adaptador en memoria y enrutado por hash (un
+alojamiento estático no puede reescribir rutas). Un cartel permanente declara que los datos
+son de ejemplo. Contiene solo el catálogo y la arquitectura integrada: nunca preguntas,
+respuestas ni ejecuciones de GAIA. La publicación en el Space es de M6 y requiere
+autorización explícita.

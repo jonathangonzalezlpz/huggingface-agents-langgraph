@@ -37,6 +37,7 @@ class ExperimentConfig(TypedDict):
     solution_tokens: NotRequired[int]
     sampling_profile: NotRequired[str]
     seed: NotRequired[int | None]
+    architecture: NotRequired[str]
 
 
 DEFAULT_EXPERIMENT: ExperimentConfig = {
@@ -76,6 +77,13 @@ def normalize_experiment(value: object) -> ExperimentConfig:
         "sampling_profile", "controlled" if version == "3.1" else "legacy"
     )
     seed = value.get("seed", 42 if version == "3.1" else None)
+    architecture = value.get("architecture")
+    if architecture is not None and (
+        not isinstance(architecture, str)
+        or not architecture.strip()
+        or len(architecture.strip()) > 100
+    ):
+        raise ValueError("experiment.architecture must be a non-empty string")
     if sampling not in {"legacy", "controlled", "author"}:
         raise ValueError("Unsupported sampling profile")
     if seed is not None and (type(seed) is not int or not 0 <= seed < 2**32):
@@ -132,7 +140,7 @@ def normalize_experiment(value: object) -> ExperimentConfig:
             "provider": vision_model["provider"],
             "model_id": vision_model["model_id"].strip(),
         }
-    return {
+    normalized: ExperimentConfig = {
         "name": name.strip()[:80],
         "force_direct": force_direct,
         "enabled_capabilities": list(dict.fromkeys(enabled)),
@@ -146,6 +154,9 @@ def normalize_experiment(value: object) -> ExperimentConfig:
         "sampling_profile": sampling,
         "seed": seed,
     }
+    if architecture is not None:
+        normalized["architecture"] = architecture.strip()
+    return normalized
 
 
 def improvement_enabled(experiment: dict | None, improvement: str) -> bool:

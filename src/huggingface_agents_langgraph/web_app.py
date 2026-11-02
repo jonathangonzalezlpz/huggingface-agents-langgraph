@@ -9,8 +9,30 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from huggingface_agents_langgraph.architecture_store import (
+    ArchitectureNotFoundError,
+    architecture_detail,
+    get_catalog,
+    get_layout,
+    list_architectures,
+    save_architecture,
+    save_layout,
+    validate_definition,
+)
 from huggingface_agents_langgraph.attachments import get_attachment_path
+from huggingface_agents_langgraph.batteries import (
+    BatteryBusyError,
+    BatteryManager,
+    BatteryUnavailableError,
+)
 from huggingface_agents_langgraph.config import LLM_BASE_URL, MODEL_SERVER_MODE
+from huggingface_agents_langgraph.experiment_comparison import compare_experiments
+from huggingface_agents_langgraph.experiment_scoring import (
+    evaluate_experiment,
+    official_answers,
+    record_official_score,
+)
+from huggingface_agents_langgraph.graph_definition import AgentDefinition
 from huggingface_agents_langgraph.llm import get_available_models
 from huggingface_agents_langgraph.local_evaluation import evaluate_validation_answers
 from huggingface_agents_langgraph.model_server import gpu_memory, model_inventory
@@ -29,8 +51,32 @@ from huggingface_agents_langgraph.run_tracking import (
 )
 
 SCORING_API_URL = "https://agents-course-unit4-scoring.hf.space"
-FRONTEND_DIRECTORY = Path(__file__).parent / "frontend"
+APP_DIRECTORY = Path(__file__).parent / "static" / "app"
+APP_PREFIX = "/app"
+WEB_CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".map": "application/json; charset=utf-8",
+}
+BUNDLE_NOT_BUILT = (
+    "<!doctype html><meta charset=utf-8><title>GAIA Agent Studio</title>"
+    "<h1>GAIA Agent Studio is not built</h1>"
+    "<p>Run <code>scripts/build_frontend.ps1</code> and reload. "
+    'The previous interface is still available at <a href="/">/</a>.</p>'
+)
 MAX_REQUEST_BYTES = 1_000_000
+MAX_COMPARED_EXPERIMENTS = 20
+
+
+BATTERIES = BatteryManager()
 
 
 class WebAppHandler(BaseHTTPRequestHandler):
@@ -39,12 +85,10 @@ class WebAppHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         """Serve the application, questions, or an attachment."""
         request_path = urlsplit(self.path).path
-        if request_path == "/":
-            self._serve_asset("index.html")
-        elif request_path == "/assets/app.js":
-            self._serve_asset("app.js")
-        elif request_path == "/assets/styles.css":
-            self._serve_asset("styles.css")
+        if request_path == APP_PREFIX or request_path.startswith(APP_PREFIX + "/"):
+            self._serve_app(request_path.removeprefix(APP_PREFIX))
+        elif request_path == "/":
+            self._redirect(APP_PREFIX + "/")
         elif request_path in {"/api/questions", "/api/random-question"}:
             self._get_questions(request_path)
         elif request_path == "/api/status":
@@ -123,6 +167,21 @@ class WebAppHandler(BaseHTTPRequestHandler):
                     ]
                 },
             )
+        elif request_path == "/api/batteries/current":
+            self._send_json(200, BATTERIES.status())
+        elif request_path == "/api/architectures":
+            self._send_json(200, {"architectures": list_architectures()})
+        elif request_path == "/api/catalog":
+            self._send_json(200, get_catalog())
+        elif request_path.startswith("/api/architectures/"):
+            identifier = unquote(request_path.removeprefix("/api/architectures/"))
+            try:
+                if identifier.endswith("/layout"):
+                    self._send_json(200, get_layout(identifier.removesuffix("/layout")))
+                else:
+                    self._send_json(200, architecture_detail(identifier))
+            except ArchitectureNotFoundError:
+                self._send_json(404, {"error": "Architecture not found"})
         elif request_path.startswith("/api/runs/"):
             try:
                 record = read_record("runs", request_path.removeprefix("/api/runs/"))
@@ -140,8 +199,30 @@ class WebAppHandler(BaseHTTPRequestHandler):
         if request_path == "/api/experiments":
             self._save_experiment()
             return
+        if request_path == "/api/experiments/compare":
+            self._compare_experiments()
+            return
+        if request_path == "/api/batteries":
+            self._start_battery()
+            return
+        if request_path == "/api/batteries/stop":
+            self._send_json(200, BATTERIES.stop())
+            return
+        if request_path == "/api/architectures/validate":
+            self._validate_architecture()
+            return
+        if request_path == "/api/architectures":
+            self._save_architecture()
+            return
         if request_path == "/api/score":
             self._submit_score()
+            return
+        if request_path.startswith("/api/experiments/") and request_path.endswith(
+            "/evaluate"
+        ):
+            self._evaluate_stored(
+                request_path.removeprefix("/api/experiments/").removesuffix("/evaluate")
+            )
             return
         if request_path == "/api/evaluate":
             self._evaluate_locally()
@@ -190,6 +271,21 @@ class WebAppHandler(BaseHTTPRequestHandler):
         result["duration_seconds"] = round(perf_counter() - started_at, 3)
         self._send_json(200, result)
 
+    def do_PUT(self) -> None:
+        """Store the node layout of an architecture version."""
+        path = urlsplit(self.path).path
+        prefix, suffix = "/api/architectures/", "/layout"
+        if not (path.startswith(prefix) and path.endswith(suffix)):
+            self._send_json(404, {"error": "Not found"})
+            return
+        version_id = unquote(path.removeprefix(prefix).removesuffix(suffix))
+        try:
+            self._send_json(200, save_layout(version_id, self._read_json_object()))
+        except ArchitectureNotFoundError:
+            self._send_json(404, {"error": "Architecture not found"})
+        except (ValueError, TypeError) as error:
+            self._send_json(400, {"error": str(error)})
+
     def do_DELETE(self) -> None:
         """Remove a selected persisted experiment without deleting other runs."""
         path = urlsplit(self.path).path
@@ -202,6 +298,91 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": str(error)})
             return
         self._send_json(200, {"deleted": True})
+
+    def _read_json_object(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0"))
+        if not 0 < length <= MAX_REQUEST_BYTES:
+            raise ValueError("Request body is empty or too large")
+        payload = json.loads(self.rfile.read(length))
+        if not isinstance(payload, dict):
+            raise ValueError("Request body must be a JSON object")
+        return payload
+
+    def _start_battery(self) -> None:
+        try:
+            payload = self._read_json_object()
+            limit = payload.get("limit", 20)
+            if type(limit) is not int:
+                raise ValueError("limit must be an integer")
+            resume_id = payload.get("resume_id")
+            if resume_id is not None and not isinstance(resume_id, str):
+                raise ValueError("resume_id must be an experiment id")
+            status = BATTERIES.start(
+                payload.get("experiment"), limit=limit, resume_id=resume_id
+            )
+        except BatteryBusyError as error:
+            self._send_json(409, {"error": str(error)})
+            return
+        except BatteryUnavailableError as error:
+            self._send_json(503, {"error": str(error)})
+            return
+        except FileNotFoundError:
+            self._send_json(404, {"error": "Experiment not found"})
+            return
+        except (ValueError, TypeError, KeyError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(202, status)
+
+    def _compare_experiments(self) -> None:
+        try:
+            payload = self._read_json_object()
+            ids = payload.get("ids")
+            base = payload.get("base")
+            if (
+                not isinstance(ids, list)
+                or not 2 <= len(ids) <= MAX_COMPARED_EXPERIMENTS
+                or not all(isinstance(item, str) for item in ids)
+                or len(set(ids)) != len(ids)
+            ):
+                raise ValueError("ids must list 2 to 20 distinct experiment ids")
+            if base is not None and not isinstance(base, str):
+                raise ValueError("base must be an experiment id")
+            records = []
+            for experiment_id in ids:
+                try:
+                    record = read_record("experiments", experiment_id)
+                except FileNotFoundError:
+                    self._send_json(
+                        404, {"error": f"Experiment not found: {experiment_id}"}
+                    )
+                    return
+                records.append(experiment_presentation(record))
+            comparison = compare_experiments(records, base_id=base)
+        except (ValueError, TypeError, KeyError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(200, comparison)
+
+    def _validate_architecture(self) -> None:
+        try:
+            report = validate_definition(self._read_json_object())
+        except (ValueError, TypeError) as error:
+            self._send_json(400, {"error": str(error)})
+            return
+        self._send_json(200, report)
+
+    def _save_architecture(self) -> None:
+        try:
+            definition = AgentDefinition.from_dict(self._read_json_object())
+            record = save_architecture(definition)
+        except (KeyError, ValueError, TypeError, AttributeError) as error:
+            message = (
+                f"Missing field {error}" if isinstance(error, KeyError) else str(error)
+            )
+            self._send_json(400, {"error": message})
+            return
+        self._send_json(200, record)
 
     def _save_experiment(self) -> None:
         try:
@@ -245,6 +426,16 @@ class WebAppHandler(BaseHTTPRequestHandler):
             self._send_json(503, {"error": str(error)})
             return
         self._send_json(200, result)
+
+    def _evaluate_stored(self, experiment_id: str) -> None:
+        try:
+            self._send_json(200, evaluate_experiment(experiment_id))
+        except FileNotFoundError:
+            self._send_json(404, {"error": "Experiment not found"})
+        except ValueError as error:
+            self._send_json(400, {"error": str(error)})
+        except RuntimeError as error:
+            self._send_json(503, {"error": str(error)})
 
     def _get_questions(self, request_path: str) -> None:
         endpoint = (
@@ -297,10 +488,16 @@ class WebAppHandler(BaseHTTPRequestHandler):
             username = payload.get("username")
             agent_code = payload.get("agent_code")
             answers = payload.get("answers")
+            experiment_id = payload.get("experiment_id")
             if not isinstance(username, str) or not username.strip():
                 raise ValueError("username is required")
             if not isinstance(agent_code, str) or not agent_code.strip():
                 raise ValueError("agent_code is required")
+            if experiment_id is not None:
+                if not isinstance(experiment_id, str):
+                    raise ValueError("experiment_id must be a string")
+                # The stored record is the only source of the answers that get sent.
+                answers = official_answers(experiment_id)
             if not isinstance(answers, list) or len(answers) != 20:
                 raise ValueError("Exactly 20 answers are required")
             for answer in answers:
@@ -328,9 +525,18 @@ class WebAppHandler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             self._send_json(400, {"error": str(error)})
             return
+        except FileNotFoundError:
+            self._send_json(404, {"error": "Experiment not found"})
+            return
         except (HTTPError, URLError, TimeoutError, OSError) as error:
             self._send_json(502, {"error": f"Official scoring failed: {error}"})
             return
+        if experiment_id is not None and isinstance(result, dict):
+            try:
+                record_official_score(experiment_id, result)
+                result = {**result, "saved": True}
+            except (ValueError, OSError):
+                result = {**result, "saved": False}
         self._send_json(200, result)
 
     @staticmethod
@@ -357,18 +563,37 @@ class WebAppHandler(BaseHTTPRequestHandler):
             "experiment": normalize_experiment(payload.get("experiment")),
         }
 
-    def _serve_asset(self, file_name: str) -> None:
-        asset_path = FRONTEND_DIRECTORY / file_name
-        if not asset_path.is_file():
-            self._send_json(404, {"error": "Frontend asset not found"})
+    def _serve_app(self, relative_path: str) -> None:
+        """Serve the compiled application; client routes fall back to the index."""
+        root = APP_DIRECTORY.resolve()
+        index = root / "index.html"
+        if not index.is_file():
+            self._send_bytes(404, BUNDLE_NOT_BUILT.encode(), WEB_CONTENT_TYPES[".html"])
             return
-
-        content_type = mimetypes.guess_type(file_name)[0]
+        requested = unquote(relative_path).strip("/")
+        target = (root / requested).resolve() if requested else index
+        if not target.is_relative_to(root):
+            target = index
+        if target.is_file():
+            asset = target
+        elif Path(requested).suffix:
+            self._send_json(404, {"error": "Asset not found"})
+            return
+        else:
+            asset = index
+        cache = "no-cache" if asset == index else "public, max-age=31536000, immutable"
         self._send_bytes(
             200,
-            asset_path.read_bytes(),
-            content_type or "application/octet-stream",
+            asset.read_bytes(),
+            WEB_CONTENT_TYPES.get(asset.suffix.lower(), "application/octet-stream"),
+            {"Cache-Control": cache},
         )
+
+    def _redirect(self, location: str) -> None:
+        self.send_response(302)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _send_json(self, status: int, payload: object) -> None:
         body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")

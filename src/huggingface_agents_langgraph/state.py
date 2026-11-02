@@ -48,3 +48,9 @@ class AgentState(TypedDict):
     video_path: NotRequired[Path]
     run_id: NotRequired[str]
     source_links: NotRequired[list[str]]
+    # Fields written by the optional LLM-role components (llm_roles.py); the V3.1
+    # graph never reads or writes them.
+    plan: NotRequired[list[str]]
+    verdict: NotRequired[dict]
+    candidates: NotRequired[list[str]]
+    revision_count: NotRequired[int]

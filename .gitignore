@@ -232,3 +232,7 @@ __marimo__/
 # Local environment files (allow a future secrets-free example)
 .env.*
 !.env.example
+
+# Studio frontend (built output and dependencies are not versioned)
+frontend/node_modules/
+src/huggingface_agents_langgraph/static/

@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import subprocess
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import mean, median
@@ -22,13 +23,16 @@ from huggingface_agents_langgraph.run_tracking import (
 
 
 def source_identity() -> dict:
-    """Identify executable source and lockfile, including uncommitted changes."""
+    """Identify executable source and lockfile, including uncommitted changes.
+
+    Only Python sources count: the built interface is output, and rebuilding it must not
+    make otherwise identical experiments look like they ran different code.
+    """
     root = Path(__file__).resolve().parents[2]
-    files = (
-        sorted((root / "src").rglob("*.py"))
-        + sorted((root / "src").rglob("*.js"))
-        + [root / "pyproject.toml", root / "uv.lock"]
-    )
+    files = sorted((root / "src").rglob("*.py")) + [
+        root / "pyproject.toml",
+        root / "uv.lock",
+    ]
     digest = hashlib.sha256()
     for path in files:
         digest.update(path.relative_to(root).as_posix().encode())
@@ -66,7 +70,9 @@ def timing_summary(answers: list[dict]) -> dict:
     }
 
 
-def variant_config(reference: dict, variant: str) -> dict:
+def variant_config(
+    reference: dict, variant: str, architecture: str | None = None
+) -> dict:
     """Keep the model and capabilities fixed while changing one feature or all."""
     if variant not in {"baseline", "combined", *IMPROVEMENTS}:
         raise ValueError("Unknown evaluation variant")
@@ -80,14 +86,14 @@ def variant_config(reference: dict, variant: str) -> dict:
         if variant == "baseline"
         else ("V3 · Completo" if variant == "combined" else f"V3 · Solo {variant}")
     )
-    return normalize_experiment(
-        reference
-        | {
-            "name": name,
-            "pipeline_version": "2" if variant == "baseline" else "3",
-            "improvements": improvements,
-        }
-    )
+    overrides = {
+        "name": name,
+        "pipeline_version": "2" if variant == "baseline" else "3",
+        "improvements": improvements,
+    }
+    if architecture is not None:
+        overrides["architecture"] = architecture
+    return normalize_experiment(reference | overrides)
 
 
 def run_experiment(
@@ -97,8 +103,15 @@ def run_experiment(
     group_id: str,
     score: bool = True,
     record: dict | None = None,
+    should_stop: Callable[[], bool] | None = None,
+    on_progress: Callable[[dict], None] | None = None,
 ) -> dict:
-    """Persist each completed task and evaluate labels only after agent execution."""
+    """Persist each completed task and evaluate labels only after agent execution.
+
+    ``should_stop`` is checked before every task, never during one: a stopped
+    experiment is stored as ``cancelled`` and can be resumed with ``record``.
+    ``on_progress`` sees the record after each write.
+    """
     tasks = [
         {key: task.get(key, "") for key in ("task_id", "question", "file_name")}
         for task in tasks
@@ -132,10 +145,18 @@ def run_experiment(
     }
     record["status"] = "running"
     write_record("experiments", record)
+    if on_progress:
+        on_progress(record)
     completed = {answer["task_id"] for answer in record["answers"]}
     for task in tasks:
         if task["task_id"] in completed:
             continue
+        if should_stop and should_stop():
+            record["status"] = "cancelled"
+            write_record("experiments", record)
+            if on_progress:
+                on_progress(record)
+            return record
         started = perf_counter()
         try:
             result = run_pipeline(task | {"experiment": config})
@@ -186,6 +207,8 @@ def run_experiment(
         record["metrics"] = timing_summary(record["answers"])
         record["average_duration_seconds"] = record["metrics"]["mean_seconds"]
         write_record("experiments", record)
+        if on_progress:
+            on_progress(record)
         print(
             f"{config['name']}: {len(record['answers'])}/{len(tasks)} "
             f"{answer['duration_seconds']:.1f}s "
@@ -207,6 +230,8 @@ def run_experiment(
         except (RuntimeError, ValueError) as error:
             record["evaluation_error"] = str(error)
     write_record("experiments", record)
+    if on_progress:
+        on_progress(record)
     return record
 
 
@@ -222,6 +247,10 @@ def main() -> None:
     parser.add_argument("--group-id", default=str(uuid4()))
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--resume", help="UUID of a partially completed experiment")
+    parser.add_argument(
+        "--architecture",
+        help="Stored architecture version (or builtin:gaia_v31) to compile and run",
+    )
     args = parser.parse_args()
     reference = read_record("experiments", V2_REFERENCE_ID)
     if not 1 <= args.limit <= 20:
@@ -238,7 +267,9 @@ def main() -> None:
         return
     for variant in args.variants:
         result = run_experiment(
-            tasks, variant_config(reference["config"], variant), group_id=args.group_id
+            tasks,
+            variant_config(reference["config"], variant, args.architecture),
+            group_id=args.group_id,
         )
         print(
             json.dumps(

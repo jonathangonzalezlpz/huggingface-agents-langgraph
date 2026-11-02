@@ -154,7 +154,9 @@ El lanzador inicia Qwen si aún no está activo, espera a que su API responda y 
 
 También se puede indicar directamente `-Mode frontend` o `-Mode terminal`. El modo terminal permite escoger una pregunta aleatoria o procesar la batería completa. Consulta [docs/ejecucion-local.md](docs/ejecucion-local.md) para preparación, opciones del lanzador y funcionamiento de ambos modos.
 
-### Frontal GAIA
+### Frontal GAIA (Studio)
+
+La interfaz web es el Studio de `frontend/`. Se compila aparte con `.\scripts\build_frontend.ps1` (primera vez y tras cambiarla); el lanzador avisa si falta el paquete.
 
 Con el servidor de Qwen iniciado y `.env` configurado, arranca el frontal local:
 
