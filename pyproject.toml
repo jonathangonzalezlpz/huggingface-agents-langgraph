@@ -74,7 +74,6 @@ select = ["E", "F", "I", "UP", "B", "C901", "PLR0912", "PLR0913", "PLR0915"]
 "src/huggingface_agents_langgraph/spreadsheet_processing.py" = ["C901", "PLR0912"]
 "src/huggingface_agents_langgraph/spreadsheet_tools.py" = ["C901", "PLR0912"]
 # Added by recent work; to be fixed in the refactoring (F1).
-"src/huggingface_agents_langgraph/web_app.py" = ["C901", "PLR0912"]
 "src/huggingface_agents_langgraph/graph_definition/params.py" = ["C901"]
 "src/huggingface_agents_langgraph/graph_definition/schema.py" = ["C901", "PLR0912"]
 "src/huggingface_agents_langgraph/graph_definition/registry.py" = ["PLR0913"]

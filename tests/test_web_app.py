@@ -1,7 +1,7 @@
 import json
 from io import BytesIO
 
-from huggingface_agents_langgraph import web_app
+from huggingface_agents_langgraph.api.handlers import system
 
 
 class FakeResponse:
@@ -29,9 +29,9 @@ def test_llm_status_reports_sleep_without_waking_model(monkeypatch) -> None:
             return FakeResponse({"status": "ok"})
         return FakeResponse({"is_sleeping": True})
 
-    monkeypatch.setattr(web_app, "urlopen", fake_urlopen)
+    monkeypatch.setattr(system, "urlopen", fake_urlopen)
 
-    assert web_app._get_llm_status() == {
+    assert system.get_llm_status() == {
         "state": "sleeping",
         "name": "LLM razonador",
     }
@@ -43,10 +43,10 @@ def test_llm_status_reports_sleep_without_waking_model(monkeypatch) -> None:
 
 def test_llm_status_reports_loading_when_health_returns_503(monkeypatch) -> None:
     def fake_urlopen(_url: str, timeout: int):
-        raise web_app.HTTPError(
+        raise system.HTTPError(
             "http://127.0.0.1:8080/health", 503, "Loading", {}, BytesIO()
         )
 
-    monkeypatch.setattr(web_app, "urlopen", fake_urlopen)
+    monkeypatch.setattr(system, "urlopen", fake_urlopen)
 
-    assert web_app._get_llm_status()["state"] == "loading"
+    assert system.get_llm_status()["state"] == "loading"

@@ -6,6 +6,7 @@ from io import BytesIO
 import pytest
 
 from huggingface_agents_langgraph import run_tracking, web_app
+from huggingface_agents_langgraph.api.handlers import batteries as batteries_handlers
 from huggingface_agents_langgraph.batteries import (
     BatteryBusyError,
     BatteryUnavailableError,
@@ -41,7 +42,7 @@ class FakeManager:
 @pytest.fixture
 def manager(monkeypatch):
     fake = FakeManager()
-    monkeypatch.setattr(web_app, "BATTERIES", fake)
+    monkeypatch.setattr(batteries_handlers, "BATTERIES", fake)
     return fake
 
 

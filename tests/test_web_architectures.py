@@ -7,11 +7,12 @@ from io import BytesIO
 import pytest
 
 from huggingface_agents_langgraph import run_tracking
+from huggingface_agents_langgraph.api.http import MAX_REQUEST_BYTES
 from huggingface_agents_langgraph.architecture_store import BUILTIN_V31_ID
 from huggingface_agents_langgraph.graph_definition.definitions import (
     create_gaia_v31_definition,
 )
-from huggingface_agents_langgraph.web_app import MAX_REQUEST_BYTES, WebAppHandler
+from huggingface_agents_langgraph.web_app import WebAppHandler
 
 
 @pytest.fixture(autouse=True)

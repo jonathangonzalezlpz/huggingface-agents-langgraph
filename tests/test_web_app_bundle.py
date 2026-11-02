@@ -2,7 +2,7 @@
 
 import pytest
 
-from huggingface_agents_langgraph import web_app
+from huggingface_agents_langgraph.api.handlers import app_files
 from huggingface_agents_langgraph.web_app import WebAppHandler
 
 
@@ -15,7 +15,7 @@ def bundle(monkeypatch, tmp_path):
     (root / "assets" / "main-abc123.css").write_text("body{}", encoding="utf-8")
     (root / "assets" / "font.woff2").write_bytes(b"\x00\x01")
     (tmp_path / "secret.txt").write_text("secret", encoding="utf-8")
-    monkeypatch.setattr(web_app, "APP_DIRECTORY", root)
+    monkeypatch.setattr(app_files, "APP_DIRECTORY", root)
     return root
 
 
@@ -80,7 +80,7 @@ def test_paths_outside_the_bundle_are_never_served(bundle, path):
 
 
 def test_missing_bundle_explains_how_to_build_it(monkeypatch, tmp_path):
-    monkeypatch.setattr(web_app, "APP_DIRECTORY", tmp_path / "absent")
+    monkeypatch.setattr(app_files, "APP_DIRECTORY", tmp_path / "absent")
     status, body, content_type, _headers = _get("/app")
     assert status == 404
     assert content_type.startswith("text/html")

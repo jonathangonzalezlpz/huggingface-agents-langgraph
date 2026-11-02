@@ -6,6 +6,9 @@ from io import BytesIO
 import pytest
 
 from huggingface_agents_langgraph import run_tracking, web_app
+from huggingface_agents_langgraph.api import course_service
+from huggingface_agents_langgraph.api.handlers import experiments as experiment_handlers
+from huggingface_agents_langgraph.api.handlers import scoring as scoring_handlers
 
 EXPERIMENT_ID = "66666666-6666-4666-8666-666666666666"
 
@@ -57,7 +60,7 @@ class FakeResponse:
 def test_local_evaluation_of_a_stored_experiment(monkeypatch):
     store()
     monkeypatch.setattr(
-        web_app,
+        experiment_handlers,
         "evaluate_experiment",
         lambda experiment_id: {"score": 50, "correct_count": 10, "total_attempted": 20},
     )
@@ -77,7 +80,7 @@ def test_local_evaluation_failures(monkeypatch, error, expected):
     def fail(_id):
         raise error
 
-    monkeypatch.setattr(web_app, "evaluate_experiment", fail)
+    monkeypatch.setattr(experiment_handlers, "evaluate_experiment", fail)
     status, body = post(f"/api/experiments/{EXPERIMENT_ID}/evaluate")
     assert status == expected
     assert body["error"]
@@ -93,7 +96,7 @@ def test_official_score_sends_the_stored_answers_and_keeps_the_result(monkeypatc
             {"score": 45.0, "correct_count": 9, "total_attempted": 20, "message": "ok"}
         )
 
-    monkeypatch.setattr(web_app, "urlopen", fake_urlopen)
+    monkeypatch.setattr(course_service, "urlopen", fake_urlopen)
     status, body = post(
         "/api/score",
         {
@@ -114,7 +117,7 @@ def test_the_client_cannot_override_the_stored_answers(monkeypatch):
     store()
     sent = []
     monkeypatch.setattr(
-        web_app,
+        course_service,
         "urlopen",
         lambda request, timeout: (
             sent.append(json.loads(request.data))
@@ -136,7 +139,7 @@ def test_the_client_cannot_override_the_stored_answers(monkeypatch):
 def test_official_score_needs_a_complete_experiment_and_never_calls_out(monkeypatch):
     store(count=5)
     calls = []
-    monkeypatch.setattr(web_app, "urlopen", lambda *a, **k: calls.append(a))
+    monkeypatch.setattr(course_service, "urlopen", lambda *a, **k: calls.append(a))
     status, _ = post(
         "/api/score",
         {"username": "u", "agent_code": "c", "experiment_id": EXPERIMENT_ID},
@@ -148,7 +151,7 @@ def test_official_score_needs_a_complete_experiment_and_never_calls_out(monkeypa
 def test_the_result_is_still_returned_if_it_cannot_be_saved(monkeypatch):
     store()
     monkeypatch.setattr(
-        web_app,
+        course_service,
         "urlopen",
         lambda request, timeout: FakeResponse(
             {"score": 5, "correct_count": 1, "total_attempted": 20}
@@ -158,7 +161,7 @@ def test_the_result_is_still_returned_if_it_cannot_be_saved(monkeypatch):
     def broken(_id, _result):
         raise ValueError("immutable")
 
-    monkeypatch.setattr(web_app, "record_official_score", broken)
+    monkeypatch.setattr(scoring_handlers, "record_official_score", broken)
     status, body = post(
         "/api/score",
         {"username": "u", "agent_code": "c", "experiment_id": EXPERIMENT_ID},
