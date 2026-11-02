@@ -152,7 +152,9 @@ def report(group_id: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--group-id", default="v31-native-models-20261030-r1")
-    parser.add_argument("--output", type=Path, default=Path("docs/resultados-v3.1.md"))
+    parser.add_argument(
+        "--output", type=Path, default=Path(".runtime/analisis-modelos.md")
+    )
     args = parser.parse_args()
     args.output.write_text(report(args.group_id), encoding="utf-8")
     print(args.output)

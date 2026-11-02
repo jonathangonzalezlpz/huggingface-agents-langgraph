@@ -166,7 +166,9 @@ def report(group_id: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--group-id", required=True)
-    parser.add_argument("--output", type=Path, default=Path("docs/resultados-v3.md"))
+    parser.add_argument(
+        "--output", type=Path, default=Path(".runtime/analisis-experimentos.md")
+    )
     args = parser.parse_args()
     args.output.write_text(report(args.group_id), encoding="utf-8")
     print(json.dumps({"report": str(args.output)}))

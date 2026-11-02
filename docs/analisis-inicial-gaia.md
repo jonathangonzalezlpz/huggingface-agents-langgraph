@@ -599,7 +599,7 @@ La resolución vuelve a disponer de un presupuesto independiente de la producci�
 
 La reducción de contexto sigue siendo necesaria. El revisor recibe fragmentos seleccionados y procedencia, además de enlaces que permiten continuar la investigación. La selección léxica conserva sus límites: puede omitir relaciones relevantes y no reemplaza una comprobación semántica de suficiencia. La nueva capacidad de pedir más información permite recuperar parte de lo que una sola extracción habría descartado.
 
-Cada pregunta conserva una traza local con decisiones, fuentes, entradas y salidas de modelos, datos de terminación y tiempos por etapa. Los experimentos completos se persisten también en el servidor. Así se podrá distinguir una mejora real de acierto de un cambio de latencia o de formato, comparando el mismo conjunto de tareas y configuración. La evaluación posterior de la V2 obtuvo 6/20 aciertos (30 %) con 47,3 segundos de media. El detalle del grafo y de los límites implementados se recoge en [pipeline-v2.md](pipeline-v2.md).
+Cada pregunta conserva una traza local con decisiones, fuentes, entradas y salidas de modelos, datos de terminación y tiempos por etapa. Los experimentos completos se persisten también en el servidor. Así se podrá distinguir una mejora real de acierto de un cambio de latencia o de formato, comparando el mismo conjunto de tareas y configuración. La evaluación posterior de la V2 obtuvo 6/20 aciertos (30 %) con 47,3 segundos de media. El detalle del grafo y de los límites implementados se recoge en [pipeline-v2.md](pipeline.md).
 
 ## Conservación de la referencia V2 y evaluación de las versiones posteriores
 
@@ -613,5 +613,5 @@ mejore el resultado: cada cambio debe registrar aciertos, regresiones, errores y
 tiempos, además de sus dependencias con otras mejoras.
 
 El historial de arquitectura, resultados, limitaciones, conservación y protocolo
-experimental se recoge en [evolucion-pipeline.md](evolucion-pipeline.md). Las variantes
+experimental se recoge en [evolucion-pipeline.md](evaluacion.md). Las variantes
 V3 descritas allí son un plan; no representan experimentos ejecutados.
